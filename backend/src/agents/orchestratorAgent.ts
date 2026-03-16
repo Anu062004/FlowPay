@@ -50,22 +50,37 @@ async function withdrawFromPositions(companyId: string, amountEth: number): Prom
     }
 
     const toWithdraw = Math.min(positionAmount, remaining);
-    await withdrawFromAave(companyId, toWithdraw);
-
-    if (toWithdraw >= positionAmount) {
+    try {
+      const txHash = await withdrawFromAave(companyId, toWithdraw);
       await db.query(
         "UPDATE investment_positions SET status = 'closed', closed_at = now() WHERE id = $1",
         [position.id]
       );
-    } else {
+      await logAgentAction(
+        "GUARDIAN",
+        { companyId, positionId: position.id, amount: toWithdraw, txHash },
+        { action: "WITHDRAWAL_SUCCESS" },
+        `Successfully withdrew ${toWithdraw.toFixed(6)} ETH for position ${position.id}.`,
+        "WITHDRAWAL_SUCCESS",
+        companyId
+      );
+      withdrawn += toWithdraw;
+      remaining -= toWithdraw;
+    } catch (error) {
       await db.query(
-        "UPDATE investment_positions SET amount_deposited = amount_deposited - $1 WHERE id = $2",
-        [toWithdraw, position.id]
+        "UPDATE investment_positions SET status = 'sync_failed' WHERE id = $1",
+        [position.id]
+      );
+      const errorMessage = error instanceof Error ? error.message : "Unknown withdrawal error";
+      await logAgentAction(
+        "GUARDIAN",
+        { companyId, positionId: position.id, amount: toWithdraw },
+        { action: "WITHDRAWAL_FAILED" },
+        errorMessage,
+        "WITHDRAWAL_FAILED",
+        companyId
       );
     }
-
-    withdrawn += toWithdraw;
-    remaining -= toWithdraw;
   }
 
   return withdrawn;
@@ -80,12 +95,36 @@ async function withdrawAllPositions(companyId: string): Promise<number> {
     if (amount <= 0) {
       continue;
     }
-    await withdrawFromAave(companyId, amount);
-    await db.query(
-      "UPDATE investment_positions SET status = 'closed', closed_at = now() WHERE id = $1",
-      [position.id]
-    );
-    total += amount;
+    try {
+      const txHash = await withdrawFromAave(companyId, amount);
+      await db.query(
+        "UPDATE investment_positions SET status = 'closed', closed_at = now() WHERE id = $1",
+        [position.id]
+      );
+      await logAgentAction(
+        "GUARDIAN",
+        { companyId, positionId: position.id, amount, txHash },
+        { action: "WITHDRAWAL_SUCCESS" },
+        `Successfully withdrew ${amount.toFixed(6)} ETH for position ${position.id}.`,
+        "WITHDRAWAL_SUCCESS",
+        companyId
+      );
+      total += amount;
+    } catch (error) {
+      await db.query(
+        "UPDATE investment_positions SET status = 'sync_failed' WHERE id = $1",
+        [position.id]
+      );
+      const errorMessage = error instanceof Error ? error.message : "Unknown withdrawal error";
+      await logAgentAction(
+        "GUARDIAN",
+        { companyId, positionId: position.id, amount },
+        { action: "WITHDRAWAL_FAILED" },
+        errorMessage,
+        "WITHDRAWAL_FAILED",
+        companyId
+      );
+    }
   }
 
   return total;
@@ -150,7 +189,7 @@ export async function runOrchestrator() {
 
       // Check 3 — Loan Default Cascade Protection
       const overdueResult = await db.query(
-        "SELECT COUNT(*) AS overdue_count FROM loans l JOIN employees e ON l.employee_id = e.id WHERE e.company_id = $1 AND l.status = 'active' AND l.updated_at < now() - interval '30 days'",
+        "SELECT COUNT(*) AS overdue_count FROM loans JOIN employees e ON loans.employee_id = e.id WHERE e.company_id = $1 AND loans.status = 'active' AND loans.remaining_balance > 0 AND loans.created_at < now() - (loans.duration_months * interval '1 month')",
         [companyId]
       );
       const overdueCount = parseInt(overdueResult.rows[0].overdue_count, 10);

@@ -7,10 +7,12 @@ CREATE TABLE IF NOT EXISTS investment_positions (
   yield_earned NUMERIC(18,6) NOT NULL DEFAULT 0,
   entry_price NUMERIC(18,6),
   tx_hash VARCHAR(100),
-  status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'closed', 'liquidated')),
+  status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'closed', 'liquidated', 'sync_failed')),
   opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   closed_at TIMESTAMPTZ
 );
 
 CREATE INDEX idx_investment_positions_company ON investment_positions(company_id);
 CREATE INDEX idx_investment_positions_status ON investment_positions(status);
+CREATE INDEX IF NOT EXISTS idx_investment_positions_company_status
+  ON investment_positions(company_id, status);

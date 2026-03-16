@@ -96,19 +96,32 @@ export async function runInvestment(companyId: string) {
   if (decision.decision === "withdraw" && activePositionsDetail.rowCount > 0) {
     for (const pos of activePositionsDetail.rows) {
       const withdrawAmount = parseFloat(pos.amount_deposited);
-      const txHash = await withdrawFromAave(companyId, withdrawAmount);
-      await db.query(
-        "UPDATE investment_positions SET status = 'closed', closed_at = now() WHERE id = $1",
-        [pos.id]
-      );
-      await logAgentAction(
-        "InvestmentAgent",
-        agentInput,
-        decision,
-        decision.rationale,
-        `Withdrew ${withdrawAmount.toFixed(6)} ETH from Aave on withdraw decision. Tx: ${txHash}`,
-        companyId
-      );
+      try {
+        const txHash = await withdrawFromAave(companyId, withdrawAmount);
+        await db.query(
+          "UPDATE investment_positions SET status = 'closed', closed_at = now() WHERE id = $1",
+          [pos.id]
+        );
+        await logAgentAction(
+          "InvestmentAgent",
+          agentInput,
+          decision,
+          decision.rationale,
+          `Withdrew ${withdrawAmount.toFixed(6)} ETH from Aave on withdraw decision. Tx: ${txHash}`,
+          companyId
+        );
+      } catch (error) {
+        await db.query("UPDATE investment_positions SET status = 'sync_failed' WHERE id = $1", [pos.id]);
+        const errorMessage = error instanceof Error ? error.message : "Unknown withdrawal error";
+        await logAgentAction(
+          "InvestmentAgent",
+          agentInput,
+          decision,
+          errorMessage,
+          `WITHDRAWAL_FAILED for ${withdrawAmount.toFixed(6)} ETH on position ${pos.id}`,
+          companyId
+        );
+      }
     }
   }
 
@@ -124,19 +137,32 @@ export async function runInvestment(companyId: string) {
       }
 
       const withdrawAmount = parseFloat(pos.amount_deposited);
-      const txHash = await withdrawFromAave(companyId, withdrawAmount);
-      await db.query(
-        "UPDATE investment_positions SET status = 'closed', closed_at = now() WHERE id = $1",
-        [pos.id]
-      );
-      await logAgentAction(
-        "InvestmentAgent",
-        agentInput,
-        decision,
-        decision.rationale,
-        `Hold-mode stop loss triggered (${priceDropPct.toFixed(2)}% drop). Withdrew ${withdrawAmount.toFixed(6)} ETH. Tx: ${txHash}`,
-        companyId
-      );
+      try {
+        const txHash = await withdrawFromAave(companyId, withdrawAmount);
+        await db.query(
+          "UPDATE investment_positions SET status = 'closed', closed_at = now() WHERE id = $1",
+          [pos.id]
+        );
+        await logAgentAction(
+          "InvestmentAgent",
+          agentInput,
+          decision,
+          decision.rationale,
+          `Hold-mode stop loss triggered (${priceDropPct.toFixed(2)}% drop). Withdrew ${withdrawAmount.toFixed(6)} ETH. Tx: ${txHash}`,
+          companyId
+        );
+      } catch (error) {
+        await db.query("UPDATE investment_positions SET status = 'sync_failed' WHERE id = $1", [pos.id]);
+        const errorMessage = error instanceof Error ? error.message : "Unknown withdrawal error";
+        await logAgentAction(
+          "InvestmentAgent",
+          agentInput,
+          decision,
+          errorMessage,
+          `WITHDRAWAL_FAILED during hold stop-loss for ${withdrawAmount.toFixed(6)} ETH on position ${pos.id}`,
+          companyId
+        );
+      }
     }
   }
 

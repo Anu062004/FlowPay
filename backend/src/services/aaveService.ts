@@ -6,7 +6,6 @@ const INVESTMENT_ABI = [
   "function depositToAave() external payable",
   "function withdrawFromAave(uint256 amount) external",
   "function getATokenBalance() external view returns (uint256)",
-  "function borrowAgainst(uint256 amount, address asset) external",
   "event Deposited(uint256 amount)",
   "event Withdrawn(uint256 amount)"
 ];
@@ -27,7 +26,7 @@ export async function depositToAave(companyId: string, amountEth: number): Promi
   }
   const contract = getInvestmentContract();
   const tx = await contract.depositToAave({
-    value: parseEther(amountEth.toFixed(18))
+    value: parseEther(amountEth.toString())
   });
   const receipt = await tx.wait();
   if (!receipt) {
@@ -50,7 +49,7 @@ export async function withdrawFromAave(companyId: string, amountEth: number): Pr
   }
 
   const contract = getInvestmentContract();
-  const amountWei = parseEther(amountEth.toFixed(18));
+  const amountWei = parseEther(amountEth.toString());
   const tx = await contract.withdrawFromAave(amountWei);
   const receipt = await tx.wait();
   if (!receipt) {

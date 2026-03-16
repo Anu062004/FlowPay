@@ -1,0 +1,15 @@
+node_modules
+.env
+.env.local
+.DS_Store
+
+# Backend
+backend/dist
+
+# Frontend
+frontend/.next
+frontend/out
+
+# Blockchain
+blockchain/cache
+blockchain/artifacts

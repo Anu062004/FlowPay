@@ -32,7 +32,15 @@ const envSchema = z.object({
   INVESTMENT_WALLET_ADDRESS: z.string().optional(),
   SMTP_URL: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
-  APP_BASE_URL: z.string().default("http://localhost:3000")
+  APP_BASE_URL: z.string().default("http://localhost:3000"),
+  PRIVATE_KEY: z.string().min(1, "PRIVATE_KEY is required"),
+  VAULT_CONTRACT_ADDRESS: z.string().min(1, "VAULT_CONTRACT_ADDRESS is required"),
+  LOAN_CONTRACT_ADDRESS: z.string().min(1, "LOAN_CONTRACT_ADDRESS is required"),
+  ORCHESTRATOR_INTERVAL_MS: z.string().default("120000"),
+  INVESTMENT_CONTRACT_ADDRESS: z.string().min(1, "Investment contract address required"),
+  AAVE_POOL_ADDRESS: z.string().default("0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951"),
+  AAVE_WETH_GATEWAY: z.string().default("0xD322A49006FC828F9B5B37Ab215F99B4E5caB19C"),
+  MAX_AAVE_EXPOSURE_PCT: z.string().default("0.30")
 });
 
 export const env = envSchema.parse(process.env);

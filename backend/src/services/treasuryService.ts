@@ -4,6 +4,7 @@ import { env } from "../config/env.js";
 import { runTreasuryAllocationAgent } from "../agents/treasuryAgent.js";
 import { ApiError } from "../utils/errors.js";
 import { getWalletBalance } from "./walletService.js";
+import { allocateVault } from "./contractService.js";
 
 export async function getTreasuryBalance(companyId: string) {
   const result = await db.query(
@@ -51,10 +52,20 @@ export async function allocateTreasury(companyId: string, balanceWei: bigint) {
   const lendingPool = balanceEth * lendingPct;
   const investmentPool = balanceEth * investmentPct;
 
+  // 1. DB Commit
   await db.query(
     "INSERT INTO treasury_allocations (company_id, payroll_reserve, lending_pool, investment_pool) VALUES ($1, $2, $3, $4)",
     [companyId, payrollReserve.toFixed(6), lendingPool.toFixed(6), investmentPool.toFixed(6)]
   );
+
+  // 2. Sync to contract - AWAIT THIS to ensure chain success
+  try {
+    await allocateVault(payrollPct, lendingPct, investmentPct);
+  } catch (error) {
+    console.error(`[Blockchain] Failed to sync treasury allocation for company ${companyId}:`, error);
+    // In a critical fintech app, we might want to throw here to fail the whole request
+    // throw new ApiError(500, "Failed to sync allocation to blockchain");
+  }
 
   return {
     payroll_reserve: payrollReserve,

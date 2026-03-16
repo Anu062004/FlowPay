@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS loans (
   duration_months INTEGER NOT NULL,
   remaining_balance NUMERIC(18,6) NOT NULL,
   status loan_status NOT NULL DEFAULT 'pending',
+  contract_synced BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

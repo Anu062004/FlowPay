@@ -51,6 +51,7 @@ export type Loan = {
   duration_months: number;
   remaining_balance: string;
   status: "pending" | "active" | "repaid" | "rejected";
+  contract_synced: boolean;
   created_at: string;
   updated_at: string;
   emi?: number;
@@ -209,3 +210,24 @@ export const updateCompanySettings = (companyId: string, settings: CompanySettin
     method: "PUT",
     body: JSON.stringify(settings),
   });
+
+// ── Agents ───────────────────────────────────────────────────
+
+export type AgentLog = {
+  id: string;
+  timestamp: string;
+  agent_name: string;
+  decision: any;
+  rationale: string;
+  action_taken: string;
+  company_id: string | null;
+};
+
+export const fetchAgentLogs = (companyId?: string) => {
+  const path = companyId ? `/agents/logs?companyId=${companyId}` : "/agents/logs";
+  return apiFetch<{ logs: AgentLog[] }>(path, {
+    headers: {
+      "X-Master-Key": process.env.NEXT_PUBLIC_MASTER_KEY ?? "replace-with-strong-32-char-secret"
+    }
+  });
+};

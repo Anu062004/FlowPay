@@ -6,6 +6,9 @@ contract FlowPayVault {
 
     event Deposit(address indexed from, uint256 amount);
     event Withdrawal(address indexed to, uint256 amount);
+    event PayrollExecuted(address indexed employee, uint256 amount);
+    event LoanDisbursed(address indexed employee, uint256 amount);
+    event TreasuryAllocated(uint256 payroll, uint256 lending, uint256 investment);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not authorized");
@@ -26,5 +29,18 @@ contract FlowPayVault {
         (bool sent, ) = to.call{value: amount}("");
         require(sent, "Withdraw failed");
         emit Withdrawal(to, amount);
+    }
+
+    function allocate(uint256 payrollPct, uint256 lendingPct, uint256 investmentPct) external onlyAdmin {
+        require(payrollPct + lendingPct + investmentPct == 100, "Must total 100%");
+        emit TreasuryAllocated(payrollPct, lendingPct, investmentPct);
+    }
+
+    function emitPayrollExecuted(address employee, uint256 amount) external onlyAdmin {
+        emit PayrollExecuted(employee, amount);
+    }
+
+    function emitLoanDisbursed(address employee, uint256 amount) external onlyAdmin {
+        emit LoanDisbursed(employee, amount);
     }
 }

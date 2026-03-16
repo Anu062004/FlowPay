@@ -134,6 +134,7 @@ export default function LendingPage() {
                     <th className="right">Outstanding</th>
                     <th style={{ minWidth: 140 }}>Repayment Progress</th>
                     <th>Status</th>
+                    <th>Sync</th>
                     <th>Issued</th>
                   </tr>
                 </thead>
@@ -164,6 +165,15 @@ export default function LendingPage() {
                             loan.status === "repaid" ? "success" :
                             loan.status === "rejected" ? "danger" : "neutral"
                           }>{loan.status}</Badge>
+                        </td>
+                        <td>
+                          {loan.contract_synced ? (
+                            <Badge variant="success">On-chain</Badge>
+                          ) : (
+                            <Badge variant="warning">
+                              <span title="Failed to sync to smart contract">Not Synced</span>
+                            </Badge>
+                          )}
                         </td>
                         <td className="text-xs text-secondary" style={{ whiteSpace: "nowrap" }}>
                           {new Date(loan.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" })}

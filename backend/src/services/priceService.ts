@@ -23,7 +23,7 @@ export async function getEthPrice(): Promise<PriceSnapshot> {
   const defaultCmcUrl =
     "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=ETH";
   const defaultCoingeckoUrl =
-    "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd";
+    "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd&include_24hr_change=true";
 
   const cmcKey =
     env.CMC_API_KEY ||
@@ -52,13 +52,29 @@ export async function getEthPrice(): Promise<PriceSnapshot> {
 
   const data = await response.json();
   const price = parseNumber(data?.ethereum?.usd ?? data?.price);
+  const changePct = parseNumber(data?.ethereum?.usd_24h_change) ?? 0;
   if (price === null) {
     throw new Error("Unable to fetch ETH price");
   }
 
-  const changePct = lastPrice ? ((price - lastPrice) / lastPrice) * 100 : 0;
   lastPrice = price;
   return { price, changePct, source: "coingecko" };
+}
+
+export async function getCurrentPrice(symbol: string): Promise<number> {
+  if (symbol.toLowerCase() === "ethereum" || symbol.toLowerCase() === "eth") {
+    const { price } = await getEthPrice();
+    return price;
+  }
+  return 0;
+}
+
+export async function get24hChange(symbol: string): Promise<number> {
+  if (symbol.toLowerCase() === "ethereum" || symbol.toLowerCase() === "eth") {
+    const { changePct } = await getEthPrice();
+    return changePct;
+  }
+  return 0;
 }
 
 export async function getTopMarketCap(limit = 10): Promise<MarketAsset[]> {

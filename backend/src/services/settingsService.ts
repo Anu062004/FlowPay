@@ -28,6 +28,7 @@ export type CompanySettings = {
     maxTradeSize: number;
     riskTolerance: string;
     rebalanceFrequency: string;
+    lending_paused?: boolean;
   };
 };
 
@@ -58,7 +59,8 @@ function buildDefaultSettings(companyName: string): CompanySettings {
       slippageProtection: true,
       maxTradeSize: 50000,
       riskTolerance: "Conservative",
-      rebalanceFrequency: "Weekly"
+      rebalanceFrequency: "Weekly",
+      lending_paused: false
     }
   };
 }

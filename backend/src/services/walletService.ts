@@ -12,6 +12,7 @@ import { ApiError } from "../utils/errors.js";
 import type { PoolClient } from "pg";
 import { startDepositWatcher } from "./depositWatcher.js";
 import { generateSeedPhrase } from "../utils/seed.js";
+import { emitVaultPayroll, emitVaultLoanDisbursed } from "./contractService.js";
 
 const rpcUrl = env.RPC_URL.replace("{WDK_API_KEY}", env.WDK_API_KEY);
 const transferMaxFee = BigInt(env.WDK_TRANSFER_MAX_FEE);
@@ -117,6 +118,14 @@ export async function sendTransaction(
     "INSERT INTO transactions (wallet_id, type, amount, tx_hash) VALUES ($1, $2, $3, $4)",
     [wallet.id, type, amountEth.toString(), txResult?.hash ?? null]
   );
+
+  if (type === "payroll") {
+    emitVaultPayroll(toAddress, amountEth.toString()).catch(console.error);
+  }
+
+  if (type === "loan_disbursement") {
+    emitVaultLoanDisbursed(toAddress, amountEth.toString()).catch(console.error);
+  }
 
   return {
     txHash: txResult?.hash ?? null,

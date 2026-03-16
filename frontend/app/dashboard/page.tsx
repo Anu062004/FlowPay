@@ -2,6 +2,10 @@
 import { useTreasuryBalance, useEmployees, useLendingHistory, useTransactions } from "../lib/hooks";
 import Link from "next/link";
 import { formatEth } from "../lib/format";
+import { AgentActivityFeed } from "../components/AgentActivityFeed";
+import { apiFetch } from "../lib/api";
+import { loadCompanyContext } from "../lib/companyContext";
+import { useEffect, useState } from "react";
 
 // ── Tiny helpers ─────────────────────────────────────────────
 const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
@@ -125,6 +129,26 @@ export default function OverviewPage() {
   ].filter(s => s.value > 0);
 
   const loading = treasury.loading || employees.loading || lending.loading;
+  const [aaveYieldEarned, setAaveYieldEarned] = useState<number>(0);
+
+  useEffect(() => {
+    const company = loadCompanyContext();
+    if (!company?.id) {
+      setAaveYieldEarned(0);
+      return;
+    }
+
+    apiFetch<{ positions?: { yield_earned: string }[] }>(`/investments?companyId=${company.id}`)
+      .then((data) => {
+        const total = (data.positions ?? []).reduce((sum, position) => {
+          return sum + parseFloat(position.yield_earned ?? "0");
+        }, 0);
+        setAaveYieldEarned(total);
+      })
+      .catch(() => {
+        setAaveYieldEarned(0);
+      });
+  }, []);
 
   return (
     <div className="stack-xl">
@@ -197,20 +221,16 @@ export default function OverviewPage() {
           </div>
         </div>
 
-        {/* Employees */}
+        {/* Aave Yield Earned */}
         <div className="metric-card">
           <div className="metric-card-header">
-            <div className="metric-card-label">Total Employees</div>
-            <div className="metric-card-icon icon-bg-success">
-              <Icon d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" size={16} />
+            <div className="metric-card-label">Aave Yield Earned</div>
+            <div className="metric-card-icon icon-bg-info">
+              <Icon d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8" size={16} />
             </div>
           </div>
-          {loading ? <Skeleton h={36} /> : (
-            <div className="metric-card-value font-num">{empList.length}</div>
-          )}
-          <div className="metric-card-change neutral">
-            {empList.filter(e => e.status === "active").length} active
-          </div>
+          <div className="metric-card-value font-num">{fmt(aaveYieldEarned)}</div>
+          <div className="metric-card-change neutral">Total realized + unrealized Aave yield</div>
         </div>
       </div>
 
@@ -302,6 +322,11 @@ export default function OverviewPage() {
           </div>
         </div>
       )}
+
+      {/* Agent Activity Feed */}
+      <div className="grid-1">
+        <AgentActivityFeed />
+      </div>
     </div>
   );
 }

@@ -12,10 +12,11 @@ import lendingRoutes from "./routes/lendingRoutes.js";
 import transactionRoutes from "./routes/transactionRoutes.js";
 import investmentRoutes from "./routes/investmentRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
+import agentRoutes from "./routes/agentRoutes.js";
 import { ApiError } from "./utils/errors.js";
 import { startAllTreasuryWatchers } from "./services/depositWatcher.js";
 import { startPayrollScheduler } from "./schedulers/payrollScheduler.js";
-import { startInvestmentScheduler } from "./schedulers/investmentScheduler.js";
+import { startOrchestratorScheduler } from "./schedulers/orchestratorScheduler.js";
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use("/lending", lendingRoutes);
 app.use("/transactions", transactionRoutes);
 app.use("/investments", investmentRoutes);
 app.use("/settings", settingsRoutes);
+app.use("/agents", agentRoutes);
 
 app.use((err: any, _req: any, res: any, _next: any) => {
   if (err instanceof ZodError) {
@@ -59,5 +61,5 @@ app.listen(env.PORT, () => {
     console.error("Failed to start deposit watchers", error);
   });
   startPayrollScheduler();
-  startInvestmentScheduler();
+  startOrchestratorScheduler();
 });

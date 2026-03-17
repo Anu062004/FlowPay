@@ -1,5 +1,4 @@
 # FlowPay
-
 FlowPay is an AI-driven treasury and payroll infrastructure for businesses. It provisions a Tether WDK custodial treasury wallet for each company, generates employee wallets, automates payroll with EMI deductions, and routes lending and investment decisions through an OpenClaw-style agent layer. The system is designed to behave like deployable fintech infrastructure, not a prototype.
 
 ---

@@ -2,6 +2,8 @@ import { db } from "../db/pool.js";
 import { sendTransaction } from "./walletService.js";
 import { ApiError } from "../utils/errors.js";
 import { env } from "../config/env.js";
+import { createOpsTask } from "./opsService.js";
+import { getTreasuryBalance } from "./treasuryService.js";
 
 function calculateEmi(amount: number, annualInterestRate: number, durationMonths: number) {
   const monthlyRate = annualInterestRate / 100 / 12;
@@ -99,4 +101,79 @@ export async function runPayroll(companyId?: string) {
   }
 
   return { processed: results.length, results };
+}
+
+export async function requestPayrollApproval(companyId?: string) {
+  const companyQuery = companyId
+    ? "SELECT id, treasury_wallet_id FROM companies WHERE id = $1"
+    : "SELECT id, treasury_wallet_id FROM companies";
+  const companyParams = companyId ? [companyId] : [];
+  const companies = await db.query(companyQuery, companyParams);
+
+  if (companies.rowCount === 0) {
+    throw new ApiError(404, "No companies found for payroll");
+  }
+
+  const approvals: Array<Record<string, unknown>> = [];
+
+  for (const company of companies.rows) {
+    if (!company.treasury_wallet_id) {
+      continue;
+    }
+
+    const existing = await db.query(
+      "SELECT 1 FROM ops_approvals WHERE company_id = $1 AND kind = 'payroll' AND status = 'pending' LIMIT 1",
+      [company.id]
+    );
+    if ((existing.rowCount ?? 0) > 0) {
+      approvals.push({ companyId: company.id, status: "pending_exists" });
+      continue;
+    }
+
+    const employees = await db.query(
+      "SELECT COUNT(*) AS active_count, COALESCE(SUM(salary), 0) AS total_salary FROM employees WHERE company_id = $1 AND status = 'active'",
+      [company.id]
+    );
+    const activeCount = parseInt(employees.rows[0].active_count, 10);
+    const totalSalary = parseFloat(employees.rows[0].total_salary);
+
+    if (activeCount === 0 || totalSalary <= 0) {
+      approvals.push({ companyId: company.id, status: "no_active_employees" });
+      continue;
+    }
+
+    let treasuryBalance = 0;
+    let treasuryAddress: string | null = null;
+    try {
+      const balance = await getTreasuryBalance(company.id);
+      treasuryBalance = parseFloat(balance.balance);
+      treasuryAddress = balance.wallet_address ?? null;
+    } catch {
+      treasuryBalance = 0;
+    }
+
+    const shortfall = Math.max(totalSalary - treasuryBalance, 0);
+    const payload = {
+      companyId: company.id,
+      activeEmployees: activeCount,
+      totalSalary,
+      treasuryBalance,
+      treasuryAddress,
+      shortfall,
+      currency: env.TREASURY_TOKEN_SYMBOL ?? "ETH",
+      requestedAt: new Date().toISOString()
+    };
+
+    const { task, approvalId } = await createOpsTask({
+      companyId: company.id,
+      type: "payroll_approval",
+      subject: "FlowPay payroll approval required",
+      payload,
+      approvalKind: "payroll"
+    });
+
+    approvals.push({ companyId: company.id, taskId: task.id, approvalId, status: "pending" });
+  }
+
+  return { requested: approvals.length, approvals };
 }

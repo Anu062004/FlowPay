@@ -7,6 +7,7 @@ import { withdrawFromAave } from "../services/aaveService.js";
 import { getEthPrice } from "../services/priceService.js";
 import { getTreasuryBalance } from "../services/treasuryService.js";
 import { runInvestment } from "../services/investmentService.js";
+import { createOpsTask } from "../services/opsService.js";
 
 type ActivePosition = {
   id: string;
@@ -236,6 +237,26 @@ export async function runOrchestrator() {
             "CRITICAL payroll coverage alert raised.",
             companyId
           );
+          const shortfall = Math.max(monthlyPayroll - balanceEth, 0);
+          try {
+            await createOpsTask({
+              companyId,
+              type: "treasury_topup",
+              subject: "FlowPay treasury top-up required",
+              payload: {
+                companyId,
+                shortfall,
+                monthlyPayroll,
+                balanceEth,
+                hoursToPayroll,
+                treasuryAddress: initialBalance.wallet_address,
+                tokenSymbol: initialBalance.token_symbol ?? "ETH",
+                requestedAt: new Date().toISOString()
+              }
+            });
+          } catch (error) {
+            console.error("Failed to create treasury top-up task", error);
+          }
           continue;
         }
       }

@@ -93,3 +93,35 @@ CREATE TABLE IF NOT EXISTS company_settings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS ops_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  recipient_email TEXT,
+  subject TEXT,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  approval_id UUID,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS ops_approvals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+  task_id UUID REFERENCES ops_tasks(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  decided_at TIMESTAMPTZ,
+  decided_by TEXT,
+  decision_payload JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS idx_ops_tasks_status ON ops_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_ops_tasks_company ON ops_tasks(company_id);
+CREATE INDEX IF NOT EXISTS idx_ops_tasks_type ON ops_tasks(type);
+CREATE INDEX IF NOT EXISTS idx_ops_approvals_status ON ops_approvals(status);
+CREATE INDEX IF NOT EXISTS idx_ops_approvals_company ON ops_approvals(company_id);

@@ -20,6 +20,7 @@ const Icons = {
   investments:  "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6",
   transactions: "M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4",
   settings:     "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
+  admin:        "M12 3l7 4v5c0 5-3.5 9-7 11-3.5-2-7-6-7-11V7l7-4z",
   wallet:       "M3 10h18M7 15h.01M11 15h.01M3 7h18a1 1 0 011 1v9a1 1 0 01-1 1H3a1 1 0 01-1-1V8a1 1 0 011-1z",
   loans:        "M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z",
   bell:         "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9",
@@ -35,6 +36,7 @@ const employerNavItems = [
   { label: "Lending",      href: "/lending",               icon: Icons.lending },
   { label: "Investments",  href: "/investments",           icon: Icons.investments },
   { label: "Transactions", href: "/transactions",          icon: Icons.transactions },
+  { label: "Admin Control",href: "/admin",                 icon: Icons.admin },
   { label: "Settings",     href: "/settings",              icon: Icons.settings },
 ];
 
@@ -49,7 +51,7 @@ const employeeNavItems = [
 const DASHBOARD_PATHS = [
   "/dashboard", "/treasury", "/employees", "/payroll",
   "/lending", "/investments", "/transactions", "/settings",
-  "/employee",
+  "/admin", "/employee",
 ];
 
 function isEmployee(path: string) { return path.startsWith("/employee"); }
@@ -63,6 +65,7 @@ function getTitle(path: string): { section: string; page: string } {
     "/lending":               "Lending",
     "/investments":           "Investments",
     "/transactions":          "Transactions",
+    "/admin":                 "Admin Control",
     "/settings":              "Settings",
     "/employee/overview":     "My Account",
     "/employee/wallet":       "My Wallet",

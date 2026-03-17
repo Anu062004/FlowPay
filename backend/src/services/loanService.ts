@@ -6,6 +6,8 @@ import { getEthPrice } from "./priceService.js";
 import { issueContractLoan } from "./contractService.js";
 import { logAgentAction } from "./agentLogService.js";
 import { getCompanySettings } from "./settingsService.js";
+import { createOpsTask } from "./opsService.js";
+import { env } from "../config/env.js";
 
 function calculateEmi(amount: number, annualInterestRate: number, durationMonths: number) {
   const monthlyRate = annualInterestRate / 100 / 12;
@@ -34,7 +36,7 @@ export async function requestLoan(employeeId: string, requestedAmount: number) {
   }
 
   const result = await db.query(
-    `SELECT e.id, e.salary, e.credit_score, e.wallet_id, e.company_id, w.wallet_address, c.treasury_wallet_id
+    `SELECT e.id, e.full_name, e.email, e.salary, e.credit_score, e.wallet_id, e.company_id, w.wallet_address, c.treasury_wallet_id
      FROM employees e
      JOIN wallets w ON e.wallet_id = w.id
      JOIN companies c ON e.company_id = c.id
@@ -102,51 +104,142 @@ export async function requestLoan(employeeId: string, requestedAmount: number) {
   const totalRepayable = emi * decision.duration;
 
   // 4. Execution
+  const autoThreshold = parseFloat(env.LOAN_AUTO_APPROVAL_THRESHOLD || "0.02");
+
   const loanResult = await db.query(
-    "INSERT INTO loans (employee_id, amount, interest_rate, duration_months, remaining_balance, status, contract_synced) VALUES ($1, $2, $3, $4, $5, 'active', false) RETURNING id",
-    [employeeId, decision.amount, decision.interest, decision.duration, totalRepayable]
+    "INSERT INTO loans (employee_id, amount, interest_rate, duration_months, remaining_balance, status, contract_synced) VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING id",
+    [
+      employeeId,
+      decision.amount,
+      decision.interest,
+      decision.duration,
+      totalRepayable,
+      decision.amount <= autoThreshold ? "active" : "pending"
+    ]
   );
 
-  const loanId = loanResult.rows[0].id;
+  const loanId = loanResult.rows[0].id as string;
 
-  try {
-    // A. Send Funds (WDK)
-    await sendTransaction(
-      employee.treasury_wallet_id,
-      employee.wallet_address,
-      decision.amount,
-      "loan_disbursement"
-    );
+  if (decision.amount <= autoThreshold) {
+    try {
+      await sendTransaction(
+        employee.treasury_wallet_id,
+        employee.wallet_address,
+        decision.amount,
+        "loan_disbursement"
+      );
 
-    // B. Sync to contract (Ethers)
-    issueContractLoan(
-      employee.wallet_address,
-      decision.amount.toString(),
-      decision.interest,
-      decision.duration
-    )
-      .then(async () => {
-        await db.query("UPDATE loans SET contract_synced = true WHERE id = $1", [loanId]);
-        console.log(`[Blockchain] Successfully synced loan ${loanId} to contract`);
-      })
-      .catch(err => {
-        console.error(`[Blockchain] Failed to sync loan ${loanId} to contract:`, err.message);
-        // contract_synced remains false by default
-      });
+      issueContractLoan(
+        employee.wallet_address,
+        decision.amount.toString(),
+        decision.interest,
+        decision.duration
+      )
+        .then(async () => {
+          await db.query("UPDATE loans SET contract_synced = true WHERE id = $1", [loanId]);
+          console.log(`[Blockchain] Successfully synced loan ${loanId} to contract`);
+        })
+        .catch(err => {
+          console.error(`[Blockchain] Failed to sync loan ${loanId} to contract:`, err.message);
+        });
+    } catch (error) {
+      await db.query("UPDATE loans SET status = 'rejected' WHERE id = $1", [loanId]);
+      throw error;
+    }
 
-  } catch (error) {
-    // If WDK fails, we should ideally rollback or mark as failed
-    await db.query("UPDATE loans SET status = 'rejected' WHERE id = $1", [loanId]);
-    throw error;
+    return {
+      decision: "approve",
+      loanId,
+      amount: decision.amount,
+      interest: decision.interest,
+      duration: decision.duration,
+      emi,
+      rationale: decision.rationale,
+      autoApproved: true
+    };
   }
 
-  return {
-    decision: "approve",
+  const payload = {
+    companyId: employee.company_id,
+    employeeId: employee.id,
+    employeeName: employee.full_name,
+    employeeEmail: employee.email,
     loanId,
+    amount: decision.amount,
+    interest: decision.interest,
+    duration: decision.duration,
+    emi,
+    rationale: decision.rationale,
+    autoApprovalThreshold: autoThreshold
+  };
+
+  const { approvalId } = await createOpsTask({
+    companyId: employee.company_id,
+    type: "loan_approval",
+    subject: `FlowPay loan approval required for ${employee.full_name}`,
+    payload,
+    approvalKind: "loan"
+  });
+
+  return {
+    decision: "pending_approval",
+    loanId,
+    approvalId,
     amount: decision.amount,
     interest: decision.interest,
     duration: decision.duration,
     emi,
     rationale: decision.rationale
   };
+}
+
+export async function executeApprovedLoan(loanId: string) {
+  const result = await db.query(
+    `SELECT l.id, l.amount, l.interest_rate, l.duration_months, l.status,
+            e.id as employee_id, e.company_id, w.wallet_address, c.treasury_wallet_id
+     FROM loans l
+     JOIN employees e ON e.id = l.employee_id
+     JOIN wallets w ON w.id = e.wallet_id
+     JOIN companies c ON c.id = e.company_id
+     WHERE l.id = $1`,
+    [loanId]
+  );
+  if ((result.rowCount ?? 0) === 0) {
+    throw new ApiError(404, "Loan not found");
+  }
+
+  const row = result.rows[0];
+  if (row.status !== "pending") {
+    throw new ApiError(400, "Loan is not pending approval");
+  }
+
+  await sendTransaction(
+    row.treasury_wallet_id,
+    row.wallet_address,
+    parseFloat(row.amount),
+    "loan_disbursement"
+  );
+
+  issueContractLoan(
+    row.wallet_address,
+    row.amount.toString(),
+    parseFloat(row.interest_rate),
+    parseInt(row.duration_months, 10)
+  )
+    .then(async () => {
+      await db.query("UPDATE loans SET contract_synced = true WHERE id = $1", [loanId]);
+      console.log(`[Blockchain] Successfully synced loan ${loanId} to contract`);
+    })
+    .catch(err => {
+      console.error(`[Blockchain] Failed to sync loan ${loanId} to contract:`, err.message);
+    });
+
+  await db.query("UPDATE loans SET status = 'active', updated_at = now() WHERE id = $1", [loanId]);
+
+  return { loanId, status: "active" };
+}
+
+export async function rejectPendingLoan(loanId: string) {
+  await db.query("UPDATE loans SET status = 'rejected', updated_at = now() WHERE id = $1", [loanId]);
+  return { loanId, status: "rejected" };
 }

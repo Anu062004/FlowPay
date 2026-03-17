@@ -34,7 +34,13 @@ export async function addEmployee(input: {
     const wallet = await createEmployeeWallet(employee.id, client);
     await client.query("COMMIT");
 
-    await sendEmployeeInvite(employee.email, activationToken);
+    await sendEmployeeInvite({
+      email: employee.email,
+      activationToken,
+      companyId: input.companyId,
+      employeeId: employee.id,
+      activationUrl: `${env.APP_BASE_URL}/employees/activate?token=${activationToken}`
+    });
 
     return {
       employee,

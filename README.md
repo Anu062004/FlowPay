@@ -129,11 +129,15 @@ OPENAI_API_KEY=...
 
 Gmail API (invites):
 ```
-GMAIL_CLIENT_ID=...
-GMAIL_CLIENT_SECRET=...
+EMAIL_PROVIDER_MODE=live
+CLAWGENCY_PLATFORM_EMAIL=...
+GMAIL_ACCESS_TOKEN=
+GMAIL_REPLY_LABEL=flowpay
+GOOGLE_OAUTH_CLIENT_ID=...
+GOOGLE_OAUTH_CLIENT_SECRET=...
 GMAIL_REFRESH_TOKEN=...
-GMAIL_REDIRECT_URI=https://developers.google.com/oauthplayground
-GMAIL_SENDER_EMAIL=...
+GMAIL_OAUTH_REDIRECT_URI=http://localhost:3000/api/email/oauth/callback
+GMAIL_REFRESH_TOKEN_FILE=.secrets/gmail-refresh-token.json
 EMAIL_FROM=FlowPay <no-reply@flowpay.local>
 ```
 
@@ -318,6 +322,7 @@ Agent decision output must pass validation or request is rejected.
 ## License
 
 MIT (hackathon MVP).
+
 
 
 

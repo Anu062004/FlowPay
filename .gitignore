@@ -1,10 +1,15 @@
 node_modules
 .env
 .env.local
+.env.*
 .DS_Store
+
+.secrets/
+flowpay-deploy.tgz
 
 # Backend
 backend/dist
+backend/.env*
 
 # Frontend
 frontend/.next

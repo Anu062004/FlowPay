@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { runPayroll } from "../services/payrollService.js";
+import { requestPayrollApproval } from "../services/payrollService.js";
 import { asyncHandler } from "../utils/errors.js";
 import { db } from "../db/pool.js";
 import { uuidQueryParam } from "../utils/validation.js";
@@ -43,7 +43,7 @@ router.post(
   "/run",
   asyncHandler(async (req, res) => {
     const payload = runSchema.parse(req.body ?? {});
-    const result = await runPayroll(payload.companyId);
+    const result = await requestPayrollApproval(payload.companyId);
     res.status(200).json(result);
   })
 );

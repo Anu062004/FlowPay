@@ -32,6 +32,7 @@ const envSchema = z.object({
   GEMINI_MODEL: z.string().default("gemini-1.5-pro"),
   PAYROLL_CRON: z.string().default("0 9 1 * *"),
   INVESTMENT_CRON: z.string().default("0 */6 * * *"),
+  REPORT_CRON: z.string().default("0 9 * * 1"),
   MAX_TX_AMOUNT: z.string().default("100000"),
   TREASURY_PAYROLL_RESERVE_PCT: z.string().default("0.6"),
   TREASURY_LENDING_PCT: z.string().default("0.2"),
@@ -42,12 +43,22 @@ const envSchema = z.object({
   CMC_API_URL: z.string().optional(),
   CMC_LISTINGS_URL: z.string().optional(),
   INVESTMENT_WALLET_ADDRESS: z.string().optional(),
+  EMAIL_PROVIDER_MODE: z.string().optional(),
+  CLAWGENCY_PLATFORM_EMAIL: z.string().optional(),
+  GMAIL_ACCESS_TOKEN: z.string().optional(),
+  GMAIL_REPLY_LABEL: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  GMAIL_OAUTH_REDIRECT_URI: z.string().optional(),
+  GMAIL_REFRESH_TOKEN_FILE: z.string().optional(),
+  GMAIL_REFRESH_TOKEN: z.string().optional(),
   GMAIL_CLIENT_ID: z.string().optional(),
   GMAIL_CLIENT_SECRET: z.string().optional(),
-  GMAIL_REFRESH_TOKEN: z.string().optional(),
   GMAIL_REDIRECT_URI: z.string().optional(),
   GMAIL_SENDER_EMAIL: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
+  ADMIN_EMAILS: z.string().optional(),
+  HUMAN_TASKS_PROVIDER: z.enum(["local", "openclaw"]).default("local"),
   APP_BASE_URL: z.string().default("http://localhost:3000"),
   VAULT_CONTRACT_ADDRESS: z.string().min(1, "VAULT_CONTRACT_ADDRESS is required"),
   LOAN_CONTRACT_ADDRESS: z.string().min(1, "LOAN_CONTRACT_ADDRESS is required"),
@@ -62,7 +73,8 @@ const envSchema = z.object({
   WETH_ADDRESS: z.string().optional(),
   AAVE_WRAP_NATIVE: z.string().default("true"),
   AAVE_UNWRAP_NATIVE: z.string().default("true"),
-  MAX_AAVE_EXPOSURE_PCT: z.string().default("0.30")
+  MAX_AAVE_EXPOSURE_PCT: z.string().default("0.30"),
+  LOAN_AUTO_APPROVAL_THRESHOLD: z.string().default("0.02")
 });
 
 export const env = envSchema.parse(process.env);

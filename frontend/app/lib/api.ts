@@ -72,11 +72,13 @@ export type Transaction = {
   tx_hash: string | null;
   created_at: string;
   wallet_address?: string;
+  token_symbol?: string;
 };
 
 export type TreasuryBalance = {
   balance: string;          // from walletService
   wallet_address?: string;
+  token_symbol?: string;
 };
 
 export type PayrollHistoryEntry = {

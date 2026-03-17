@@ -8,7 +8,11 @@ import { PageHeader } from "../../components/PageHeader";
 export default function CompanyRegisterPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  type RegisterCompanyResponse = {
+    company: { id: string; name: string };
+    treasury_wallet: { wallet_address: string };
+  };
+  const [result, setResult] = useState<RegisterCompanyResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -16,7 +20,7 @@ export default function CompanyRegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch("/companies/register", {
+      const data = await apiFetch<RegisterCompanyResponse>("/companies/register", {
         method: "POST",
         body: JSON.stringify({ name })
       });

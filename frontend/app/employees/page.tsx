@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useEmployees } from "../lib/hooks";
 import { addEmployee, type Employee } from "../lib/api";
-import { loadCompanyContext } from "../lib/companyContext";
+import { loadCompanyContext, saveEmployeeContext } from "../lib/companyContext";
 
 const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -39,9 +40,11 @@ function fmt(val: string | number | null | undefined, prefix = "$"): string {
 }
 
 export default function EmployeesPage() {
+  const router = useRouter();
   const { data, loading, error, refetch } = useEmployees();
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const companyCtx = loadCompanyContext();
 
   // Form state
   const [form, setForm] = useState({ fullName: "", email: "", salary: "", creditScore: "" });
@@ -61,13 +64,12 @@ export default function EmployeesPage() {
   const activeLoansCount = employees.filter(e => e.loan_status === "active").length;
 
   async function handleAddEmployee() {
-    const ctx = loadCompanyContext();
-    if (!ctx?.id) { setSaveError("No company selected."); return; }
+    if (!companyCtx?.id) { setSaveError("No company selected."); return; }
     setSaving(true);
     setSaveError(null);
     try {
       await addEmployee({
-        companyId: ctx.id,
+        companyId: companyCtx.id,
         fullName: form.fullName,
         email: form.email,
         salary: parseFloat(form.salary),
@@ -81,6 +83,16 @@ export default function EmployeesPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleViewEmployee(emp: Employee) {
+    if (!emp?.id) return;
+    saveEmployeeContext({
+      id: emp.id,
+      fullName: emp.full_name ?? undefined,
+      companyId: emp.company_id ?? companyCtx?.id
+    });
+    router.push("/employee/overview");
   }
 
   return (
@@ -204,7 +216,12 @@ export default function EmployeesPage() {
                         </Badge>
                       </td>
                       <td className="right">
-                        <button className="btn btn-ghost btn-sm">View</button>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => handleViewEmployee(emp)}
+                        >
+                          View
+                        </button>
                       </td>
                     </tr>
                   ))}

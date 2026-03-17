@@ -1,32 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { apiFetch } from "../../lib/api";
+import { apiFetch, type Employee } from "../../lib/api";
 import { PageHeader } from "../../components/PageHeader";
 import { saveEmployeeContext } from "../../lib/companyContext";
 
-export default function EmployeeActivatePage() {
+export const dynamic = "force-dynamic";
+
+function EmployeeActivateInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
+  type ActivateResponse = { employeeId: string };
 
   const handleActivate = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
     try {
-      const data = await apiFetch("/employees/activate", {
+      const data = await apiFetch<ActivateResponse>("/employees/activate", {
         method: "POST",
         body: JSON.stringify({ token, password })
       });
       setStatus(`Account activated for employee ${data.employeeId}`);
       setEmployeeId(data.employeeId);
       try {
-        const profile = await apiFetch(`/employees/${data.employeeId}`);
+        const profile = await apiFetch<Employee>(`/employees/${data.employeeId}`);
         saveEmployeeContext({
           id: profile.id,
           fullName: profile.full_name ?? undefined,
@@ -63,5 +66,13 @@ export default function EmployeeActivatePage() {
         </form>
       )}
     </div>
+  );
+}
+
+export default function EmployeeActivatePage() {
+  return (
+    <Suspense fallback={<div className="stack"><PageHeader title="Activate Employee Account" subtitle="Loading..." /></div>}>
+      <EmployeeActivateInner />
+    </Suspense>
   );
 }

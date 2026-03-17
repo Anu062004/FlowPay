@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "../lib/api";
+import { apiFetch, type Company } from "../lib/api";
 import { CompanyContext, loadCompanyContext, saveCompanyContext, clearCompanyContext } from "../lib/companyContext";
 
 export default function CompanyContextBar() {
@@ -15,7 +15,7 @@ export default function CompanyContextBar() {
   const refresh = async () => {
     if (!context?.id) return;
     try {
-      const data = await apiFetch(`/companies/${context.id}`);
+      const data = await apiFetch<Company>(`/companies/${context.id}`);
       const next = {
         id: data.id,
         name: data.name,

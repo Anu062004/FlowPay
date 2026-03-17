@@ -1,4 +1,4 @@
-"use client";
+ï»¿"use client";
 import { useEffect, useState } from "react";
 import { useMyLoans } from "../../lib/hooks";
 import { type Loan } from "../../lib/api";
@@ -68,7 +68,7 @@ export default function EmployeeLoansPage() {
           <div className="card-body">
             <div className="empty-state" style={{ padding: "48px 0" }}>
               <div className="empty-state-title">No active loans</div>
-              <div className="empty-state-desc">You are all clear — no outstanding loan balance.</div>
+              <div className="empty-state-desc">You are all clear â€” no outstanding loan balance.</div>
             </div>
           </div>
         </div>
@@ -76,7 +76,7 @@ export default function EmployeeLoansPage() {
         <div className="card">
           <div className="card-header">
             <div>
-              <div className="card-title">Active Loan — {activeLoan.id?.slice(0, 8)}...</div>
+              <div className="card-title">Active Loan â€” {activeLoan.id?.slice(0, 8)}...</div>
               <div className="card-subtitle">
                 Issued {new Date(activeLoan.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </div>
@@ -183,3 +183,4 @@ export default function EmployeeLoansPage() {
     </div>
   );
 }
+

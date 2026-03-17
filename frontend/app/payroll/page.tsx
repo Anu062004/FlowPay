@@ -21,8 +21,8 @@ function fmt(val: string | number | null | undefined): string {
   return isNaN(n) ? "—" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function Skeleton() {
-  return <div style={{ height: 18, background: "var(--gray-100)", borderRadius: 4 }} />;
+function Skeleton({ h = 18 }: { h?: number }) {
+  return <div style={{ height: h, background: "var(--gray-100)", borderRadius: 4 }} />;
 }
 
 // Simple bar chart from real employee salary data

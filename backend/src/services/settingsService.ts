@@ -67,7 +67,7 @@ function buildDefaultSettings(companyName: string): CompanySettings {
 
 export async function getCompanySettings(companyId: string): Promise<CompanySettings> {
   const company = await db.query("SELECT id, name FROM companies WHERE id = $1", [companyId]);
-  if (company.rowCount === 0) {
+  if ((company.rowCount ?? 0) === 0) {
     throw new ApiError(404, "Company not found");
   }
 
@@ -76,7 +76,7 @@ export async function getCompanySettings(companyId: string): Promise<CompanySett
     [companyId]
   );
 
-  if (existing.rowCount > 0) {
+  if ((existing.rowCount ?? 0) > 0) {
     return existing.rows[0] as CompanySettings;
   }
 
@@ -96,7 +96,7 @@ export async function upsertCompanySettings(
   settings: CompanySettings
 ): Promise<CompanySettings> {
   const company = await db.query("SELECT id FROM companies WHERE id = $1", [companyId]);
-  if (company.rowCount === 0) {
+  if ((company.rowCount ?? 0) === 0) {
     throw new ApiError(404, "Company not found");
   }
 

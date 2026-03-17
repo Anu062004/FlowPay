@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   type transaction_type NOT NULL,
   amount NUMERIC(18,6) NOT NULL,
   tx_hash TEXT,
+  token_symbol TEXT NOT NULL DEFAULT 'ETH',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

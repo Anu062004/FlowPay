@@ -93,7 +93,7 @@ export async function runInvestment(companyId: string) {
     [companyId]
   );
 
-  if (decision.decision === "withdraw" && activePositionsDetail.rowCount > 0) {
+  if (decision.decision === "withdraw" && (activePositionsDetail.rowCount ?? 0) > 0) {
     for (const pos of activePositionsDetail.rows) {
       const withdrawAmount = parseFloat(pos.amount_deposited);
       try {
@@ -125,7 +125,7 @@ export async function runInvestment(companyId: string) {
     }
   }
 
-  if (decision.decision === "hold" && activePositionsDetail.rowCount > 0) {
+  if (decision.decision === "hold" && (activePositionsDetail.rowCount ?? 0) > 0) {
     for (const pos of activePositionsDetail.rows) {
       const entryPrice = parseFloat(pos.entry_price);
       if (!Number.isFinite(entryPrice) || entryPrice <= 0) {

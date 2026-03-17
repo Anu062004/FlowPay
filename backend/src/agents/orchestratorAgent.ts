@@ -1,4 +1,4 @@
-import parser from "cron-parser";
+import { CronExpressionParser } from "cron-parser";
 import { db } from "../db/pool.js";
 import { runTreasuryAllocationAgent } from "./treasuryAgent.js";
 import { env } from "../config/env.js";
@@ -131,7 +131,7 @@ async function withdrawAllPositions(companyId: string): Promise<number> {
 }
 
 function getHoursToNextPayroll(): number {
-  const interval = parser.parseExpression(env.PAYROLL_CRON);
+  const interval = CronExpressionParser.parse(env.PAYROLL_CRON);
   const nextPayroll = interval.next().toDate();
   const now = new Date();
   return (nextPayroll.getTime() - now.getTime()) / (1000 * 60 * 60);

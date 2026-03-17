@@ -15,8 +15,8 @@ const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   </svg>
 );
 
-function fmt(val: string | number | undefined | null): string {
-  return formatEth(val);
+function fmt(val: string | number | undefined | null, symbol?: string): string {
+  return formatEth(val, 6, symbol ?? "ETH");
 }
 
 function Badge({ variant, children }: { variant: string; children: React.ReactNode }) {
@@ -112,6 +112,7 @@ export default function OverviewPage() {
   const transactions = useTransactions(5);
 
   const balance = parseFloat(treasury.data?.balance ?? "0");
+  const balanceSymbol = treasury.data?.token_symbol ?? "ETH";
   const empList = employees.data?.employees ?? [];
   const lendingSummary = lending.data?.summary;
   const txList = transactions.data?.transactions ?? [];
@@ -181,7 +182,7 @@ export default function OverviewPage() {
             </div>
           </div>
           {loading ? <Skeleton h={36} /> : (
-            <div className="metric-card-value font-num">{fmt(balance)}</div>
+            <div className="metric-card-value font-num">{fmt(balance, balanceSymbol)}</div>
           )}
           <div style={{ margin: "8px 0" }}>
             <Sparkline values={txAmounts.slice(0, 7)} color="#10b981" />
@@ -198,7 +199,7 @@ export default function OverviewPage() {
             </div>
           </div>
           {loading ? <Skeleton h={36} /> : (
-            <div className="metric-card-value font-num">{fmt(totalPayroll)}</div>
+            <div className="metric-card-value font-num">{fmt(totalPayroll, balanceSymbol)}</div>
           )}
           <div className="metric-card-change neutral">
             {empList.length} employees enrolled
@@ -214,7 +215,7 @@ export default function OverviewPage() {
             </div>
           </div>
           {loading ? <Skeleton h={36} /> : (
-            <div className="metric-card-value font-num">{fmt(lendingSummary?.remaining_balance)}</div>
+            <div className="metric-card-value font-num">{fmt(lendingSummary?.remaining_balance, balanceSymbol)}</div>
           )}
           <div className="metric-card-change neutral">
             {lendingSummary?.active_loans ?? "—"} active loans outstanding
@@ -229,7 +230,7 @@ export default function OverviewPage() {
               <Icon d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8" size={16} />
             </div>
           </div>
-          <div className="metric-card-value font-num">{fmt(aaveYieldEarned)}</div>
+          <div className="metric-card-value font-num">{fmt(aaveYieldEarned, balanceSymbol)}</div>
           <div className="metric-card-change neutral">Total realized + unrealized Aave yield</div>
         </div>
       </div>
@@ -265,7 +266,7 @@ export default function OverviewPage() {
                   <tr>
                     <th>Date</th>
                     <th>Type</th>
-                    <th className="right">Amount (ETH)</th>
+                    <th className="right">Amount ({balanceSymbol})</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -279,7 +280,7 @@ export default function OverviewPage() {
                           {TX_TYPE_LABELS[tx.type] ?? tx.type}
                         </Badge>
                       </td>
-                      <td className="data-table-num">{fmt(tx.amount)}</td>
+                      <td className="data-table-num">{fmt(tx.amount, tx.token_symbol ?? balanceSymbol)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -1,6 +1,7 @@
 import { db } from "../db/pool.js";
 import { sendTransaction } from "./walletService.js";
 import { ApiError } from "../utils/errors.js";
+import { env } from "../config/env.js";
 
 function calculateEmi(amount: number, annualInterestRate: number, durationMonths: number) {
   const monthlyRate = annualInterestRate / 100 / 12;
@@ -66,9 +67,10 @@ export async function runPayroll(companyId?: string) {
       }
 
       if (totalEmi > 0) {
+        const tokenSymbol = env.TREASURY_TOKEN_SYMBOL ?? "ETH";
         await db.query(
-          "INSERT INTO transactions (wallet_id, type, amount) VALUES ($1, 'emi_repayment', $2)",
-          [company.treasury_wallet_id, totalEmi.toFixed(6)]
+          "INSERT INTO transactions (wallet_id, type, amount, token_symbol) VALUES ($1, 'emi_repayment', $2, $3)",
+          [company.treasury_wallet_id, totalEmi.toFixed(6), tokenSymbol]
         );
       }
 

@@ -3,6 +3,8 @@ import { z } from "zod";
 import { asyncHandler } from "../utils/errors.js";
 import { db } from "../db/pool.js";
 import { uuidQueryParam } from "../utils/validation.js";
+import { env } from "../config/env.js";
+import { getTokenTransfers } from "../services/indexerService.js";
 
 const router = Router();
 
@@ -21,6 +23,7 @@ router.get(
          t.type,
          t.amount,
          t.tx_hash,
+         t.token_symbol,
          t.created_at,
          w.wallet_address
        FROM transactions t
@@ -49,6 +52,32 @@ router.get(
   })
 );
 
+// â”€â”€ GET /transactions/onchain?companyId=&token=&blockchain= â”€â”€â”€â”€â”€
+// Raw on-chain token transfers from WDK Indexer
+router.get(
+  "/onchain",
+  asyncHandler(async (req, res) => {
+    const companyId = uuidQueryParam.parse(req.query.companyId);
+    const token = (req.query.token as string | undefined) ?? env.TREASURY_TOKEN_SYMBOL ?? "usdt";
+    const blockchain = (req.query.blockchain as string | undefined) ?? env.TREASURY_TOKEN_BLOCKCHAIN;
+    const limit = Math.min(parseInt((req.query.limit as string) ?? "50"), 200);
+
+    const walletResult = await db.query(
+      `SELECT w.wallet_address
+       FROM companies c
+       JOIN wallets w ON c.treasury_wallet_id = w.id
+       WHERE c.id = $1`,
+      [companyId]
+    );
+    if (walletResult.rowCount === 0) {
+      return res.status(404).json({ error: "Treasury wallet not found" });
+    }
+    const address = walletResult.rows[0].wallet_address;
+    const data = await getTokenTransfers({ blockchain, token, address, limit });
+    res.status(200).json({ address, token, blockchain, ...data });
+  })
+);
+
 // ── GET /transactions/me/:employeeId ─────────────────────────
 // Personal transaction history for an employee's wallet
 router.get(
@@ -61,6 +90,7 @@ router.get(
          t.type,
          t.amount,
          t.tx_hash,
+         t.token_symbol,
          t.created_at
        FROM transactions t
        JOIN wallets w ON t.wallet_id = w.id

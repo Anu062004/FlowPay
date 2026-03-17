@@ -20,7 +20,7 @@ function calculateEmi(amount: number, annualInterestRate: number, durationMonths
 export async function requestLoan(employeeId: string, requestedAmount: number) {
   // Check if lending is paused
   const empCompanyResult = await db.query("SELECT company_id FROM employees WHERE id = $1", [employeeId]);
-  if (empCompanyResult.rowCount > 0) {
+  if ((empCompanyResult.rowCount ?? 0) > 0) {
     const settings = await getCompanySettings(empCompanyResult.rows[0].company_id);
     if (settings.agent?.lending_paused === true) {
       throw new ApiError(403, "Lending temporarily paused due to elevated default risk");
@@ -42,7 +42,7 @@ export async function requestLoan(employeeId: string, requestedAmount: number) {
     [employeeId]
   );
 
-  if (result.rowCount === 0) {
+  if ((result.rowCount ?? 0) === 0) {
     throw new ApiError(404, "Employee not found or missing wallet");
   }
 
@@ -119,7 +119,12 @@ export async function requestLoan(employeeId: string, requestedAmount: number) {
     );
 
     // B. Sync to contract (Ethers)
-    issueContractLoan(employee.wallet_address, decision.amount.toString(), decision.interest, decision.duration)
+    issueContractLoan(
+      employee.wallet_address,
+      decision.amount.toString(),
+      decision.interest,
+      decision.duration
+    )
       .then(async () => {
         await db.query("UPDATE loans SET contract_synced = true WHERE id = $1", [loanId]);
         console.log(`[Blockchain] Successfully synced loan ${loanId} to contract`);

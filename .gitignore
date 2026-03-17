@@ -13,3 +13,4 @@ frontend/out
 # Blockchain
 blockchain/cache
 blockchain/artifacts
+blockchain/typechain-types

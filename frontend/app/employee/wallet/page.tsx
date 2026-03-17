@@ -72,12 +72,12 @@ export default function EmployeeWalletPage() {
     <div className="stack-xl">
       <div className="page-header">
         <h1 className="page-title">My Wallet</h1>
-        <p className="page-subtitle">Personal Aleo wallet{ctx.fullName ? ` · ${ctx.fullName}` : ""}</p>
+        <p className="page-subtitle">Personal Ethereum wallet{ctx.fullName ? ` · ${ctx.fullName}` : ""}</p>
       </div>
 
       {/* Wallet card */}
       <div className="wallet-card">
-        <div className="wallet-card-label">Personal Wallet · Aleo Mainnet</div>
+        <div className="wallet-card-label">Personal Wallet · Ethereum Sepolia</div>
         {loading ? (
           <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 32, fontWeight: 700 }}>Loading…</div>
         ) : (
@@ -124,7 +124,7 @@ export default function EmployeeWalletPage() {
                   <label className="form-label">Destination Wallet Address</label>
                   <input className="form-input font-mono" placeholder="aleo1…"
                     value={dest} onChange={e => setDest(e.target.value)} />
-                  <span className="form-hint">Must be a valid Aleo Mainnet address.</span>
+                  <span className="form-hint">Must be a valid Ethereum Sepolia address.</span>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Amount (USD)</label>
@@ -186,3 +186,4 @@ export default function EmployeeWalletPage() {
     </div>
   );
 }
+

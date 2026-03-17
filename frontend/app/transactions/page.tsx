@@ -14,8 +14,8 @@ function Badge({ variant, children }: { variant: string; children: React.ReactNo
   return <span className={`badge badge-${variant}`}><span className="badge-dot" />{children}</span>;
 }
 
-function fmt(val: string | number | null | undefined): string {
-  return formatEth(val);
+function fmt(val: string | number | null | undefined, symbol?: string): string {
+  return formatEth(val, 6, symbol ?? "ETH");
 }
 
 function Skeleton() {
@@ -52,6 +52,7 @@ export default function TransactionsPage() {
 
   // Summary KPIs
   const totalVolume = txList.reduce((s, t) => s + parseFloat(t.amount), 0);
+  const volumeSymbol = txList.find(t => t.token_symbol)?.token_symbol ?? "ETH";
   const confirmed = txList.filter(t => t.tx_hash).length;
 
   return (
@@ -75,7 +76,7 @@ export default function TransactionsPage() {
           { label: "Total Transactions", value: loading ? "—" : String(data?.total ?? txList.length) },
           { label: "On-chain Confirmed", value: loading ? "—" : String(confirmed) },
           { label: "Pending / No Hash",  value: loading ? "—" : String(txList.length - confirmed) },
-          { label: "Total Volume (ETH)",       value: loading ? "—" : fmt(totalVolume) },
+          { label: `Total Volume (${volumeSymbol})`, value: loading ? "—" : fmt(totalVolume, volumeSymbol) },
         ].map((s, i) => (
           <div key={i} className="metric-card">
             <div className="metric-card-label">{s.label}</div>
@@ -131,7 +132,7 @@ export default function TransactionsPage() {
                   <tr>
                     <th>Date & Time</th>
                     <th>Type</th>
-                    <th className="right">Amount (ETH)</th>
+                    <th className="right">Amount</th>
                     <th>Tx Hash</th>
                     <th className="right">Status</th>
                   </tr>
@@ -150,7 +151,7 @@ export default function TransactionsPage() {
                           {TYPE_LABEL[tx.type] ?? tx.type}
                         </Badge>
                       </td>
-                      <td className="data-table-num">{fmt(tx.amount)}</td>
+                      <td className="data-table-num">{fmt(tx.amount, tx.token_symbol ?? "ETH")}</td>
                       <td>
                         {tx.tx_hash
                           ? <span className="font-mono text-xs text-secondary">{tx.tx_hash.slice(0, 14)}…{tx.tx_hash.slice(-6)}</span>

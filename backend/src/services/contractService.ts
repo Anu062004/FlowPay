@@ -1,5 +1,6 @@
 import { ethers } from "ethers";
 import { env } from "../config/env.js";
+import { sendAdminTransaction } from "./wdkAdmin.js";
 
 // ABI for FlowPayVault
 const VAULT_ABI = [
@@ -14,40 +15,35 @@ const LOAN_ABI = [
   "function repayEMI(uint256 loanId, uint256 amount) external"
 ];
 
-export async function getVaultContract() {
-  const provider = new ethers.JsonRpcProvider(env.RPC_URL.replace("{WDK_API_KEY}", env.WDK_API_KEY));
-  const wallet = new ethers.Wallet(env.PRIVATE_KEY, provider);
-  return new ethers.Contract(env.VAULT_CONTRACT_ADDRESS, VAULT_ABI, wallet);
-}
-
-export async function getLoanContract() {
-  const provider = new ethers.JsonRpcProvider(env.RPC_URL.replace("{WDK_API_KEY}", env.WDK_API_KEY));
-  const wallet = new ethers.Wallet(env.PRIVATE_KEY, provider);
-  return new ethers.Contract(env.LOAN_CONTRACT_ADDRESS, LOAN_ABI, wallet);
-}
-
-export async function emitVaultPayroll(employeeAddress: string, amountEth: string) {
-  const vault = await getVaultContract();
+export async function emitVaultPayroll(employeeAddress: string, amountEth: string): Promise<string> {
   const amountWei = ethers.parseEther(amountEth);
-  const tx = await vault.emitPayrollExecuted(employeeAddress, amountWei);
-  const receipt = await tx.wait();
-  return receipt.hash;
+  return sendAdminTransaction(
+    env.VAULT_CONTRACT_ADDRESS,
+    VAULT_ABI,
+    "emitPayrollExecuted",
+    [employeeAddress, amountWei]
+  );
 }
 
-export async function emitVaultLoanDisbursed(employeeAddress: string, amountEth: string) {
-  const vault = await getVaultContract();
+export async function emitVaultLoanDisbursed(employeeAddress: string, amountEth: string): Promise<string> {
   const amountWei = ethers.parseEther(amountEth);
-  const tx = await vault.emitLoanDisbursed(employeeAddress, amountWei);
-  const receipt = await tx.wait();
-  return receipt.hash;
+  return sendAdminTransaction(
+    env.VAULT_CONTRACT_ADDRESS,
+    VAULT_ABI,
+    "emitLoanDisbursed",
+    [employeeAddress, amountWei]
+  );
 }
 
-export async function allocateVault(payrollPct: number, lendingPct: number, investmentPct: number) {
+export async function allocateVault(
+  payrollPct: number,
+  lendingPct: number,
+  investmentPct: number
+): Promise<string> {
   if (payrollPct > 1 || lendingPct > 1 || investmentPct > 1) {
     throw new Error("Percentages must be decimals in [0,1]");
   }
-  const vault = await getVaultContract();
-  
+
   // Fix rounding: Ensure sum is exactly 100
   let p = Math.floor(payrollPct * 100);
   let l = Math.floor(lendingPct * 100);
@@ -62,23 +58,38 @@ export async function allocateVault(payrollPct: number, lendingPct: number, inve
     else i += diff;
   }
 
-  const tx = await vault.allocate(p, l, i);
-  const receipt = await tx.wait();
-  return receipt.hash;
+  return sendAdminTransaction(
+    env.VAULT_CONTRACT_ADDRESS,
+    VAULT_ABI,
+    "allocate",
+    [p, l, i]
+  );
 }
 
-export async function issueContractLoan(employeeAddress: string, amountEth: string, interestRate: number, duration: number) {
-  const loanContract = await getLoanContract();
+export async function issueContractLoan(
+  employeeAddress: string,
+  amountEth: string,
+  interestRate: number,
+  duration: number
+): Promise<string> {
   const amountWei = ethers.parseEther(amountEth);
-  const tx = await loanContract.issueLoan(employeeAddress, amountWei, Math.floor(interestRate), duration);
-  const receipt = await tx.wait();
-  return receipt.hash;
+  return sendAdminTransaction(
+    env.LOAN_CONTRACT_ADDRESS,
+    LOAN_ABI,
+    "issueLoan",
+    [employeeAddress, amountWei, Math.floor(interestRate), duration]
+  );
 }
 
-export async function repayContractEMI(contractLoanId: number, amountEth: string) {
-  const loanContract = await getLoanContract();
+export async function repayContractEMI(
+  contractLoanId: number,
+  amountEth: string
+): Promise<string> {
   const amountWei = ethers.parseEther(amountEth);
-  const tx = await loanContract.repayEMI(contractLoanId, amountWei);
-  const receipt = await tx.wait();
-  return receipt.hash;
+  return sendAdminTransaction(
+    env.LOAN_CONTRACT_ADDRESS,
+    LOAN_ABI,
+    "repayEMI",
+    [contractLoanId, amountWei]
+  );
 }

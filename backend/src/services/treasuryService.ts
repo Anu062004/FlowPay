@@ -5,6 +5,7 @@ import { runTreasuryAllocationAgent } from "../agents/treasuryAgent.js";
 import { ApiError } from "../utils/errors.js";
 import { getWalletBalance } from "./walletService.js";
 import { allocateVault } from "./contractService.js";
+import { formatTokenAmount } from "../utils/amounts.js";
 
 export async function getTreasuryBalance(companyId: string) {
   const result = await db.query(
@@ -18,12 +19,17 @@ export async function getTreasuryBalance(companyId: string) {
   return {
     ...balance,
     balance: balance.balanceEth,
-    wallet_address: balance.walletAddress
+    wallet_address: balance.walletAddress,
+    token_symbol: balance.tokenSymbol
   };
 }
 
 export async function allocateTreasury(companyId: string, balanceWei: bigint) {
-  const balanceEth = parseFloat(formatEther(balanceWei));
+  const useToken = Boolean(env.TREASURY_TOKEN_ADDRESS && env.TREASURY_TOKEN_SYMBOL);
+  const decimals = useToken ? parseInt(env.TREASURY_TOKEN_DECIMALS, 10) : 18;
+  const balanceEth = useToken
+    ? parseFloat(formatTokenAmount(balanceWei, decimals))
+    : parseFloat(formatEther(balanceWei));
   const payrollResult = await db.query(
     "SELECT COALESCE(SUM(salary), 0) as total_salary FROM employees WHERE company_id = $1",
     [companyId]

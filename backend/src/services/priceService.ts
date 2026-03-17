@@ -1,4 +1,6 @@
 import { env } from "../config/env.js";
+import { BitfinexPricingClient } from "@tetherto/wdk-pricing-bitfinex-http";
+import { PricingProvider } from "@tetherto/wdk-pricing-provider";
 
 let lastPrice: number | null = null;
 
@@ -19,46 +21,43 @@ function parseNumber(value: unknown): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
-export async function getEthPrice(): Promise<PriceSnapshot> {
-  const defaultCmcUrl =
-    "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=ETH";
-  const defaultCoingeckoUrl =
-    "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd&include_24hr_change=true";
-
-  const cmcKey =
-    env.CMC_API_KEY ||
-    (env.PRICE_API_URL?.includes("coinmarketcap") ? env.PRICE_API_KEY : undefined);
-  const cmcUrl = env.CMC_API_URL ?? env.PRICE_API_URL ?? defaultCmcUrl;
-
-  if (cmcKey) {
-    const response = await fetch(cmcUrl, {
-      headers: { "X-CMC_PRO_API_KEY": cmcKey }
-    });
-    const data = await response.json();
-    const quote = data?.data?.ETH?.quote?.USD;
-    const price = parseNumber(quote?.price);
-    const changePct = parseNumber(quote?.percent_change_24h) ?? 0;
-    if (price === null) {
-      throw new Error("Unable to fetch ETH price from CoinMarketCap");
-    }
-    lastPrice = price;
-    return { price, changePct, source: "coinmarketcap" };
+function extractSeriesPrice(point: unknown): number | null {
+  if (typeof point === "number") return point;
+  if (Array.isArray(point)) {
+    // Bitfinex candle format: [mts, open, close, high, low, volume]
+    return parseNumber(point[2] ?? point[1]);
   }
+  if (point && typeof point === "object") {
+    const obj = point as Record<string, unknown>;
+    return parseNumber(obj.close ?? obj.price ?? obj.value);
+  }
+  return null;
+}
 
-  const url = env.PRICE_API_URL ?? defaultCoingeckoUrl;
-  const response = await fetch(url, {
-    headers: env.PRICE_API_KEY ? { Authorization: `Bearer ${env.PRICE_API_KEY}` } : undefined
-  });
+const pricingClient = new BitfinexPricingClient();
+const pricingProvider = new PricingProvider({
+  client: pricingClient,
+  priceCacheDurationMs: 5 * 60 * 1000
+});
 
-  const data = await response.json();
-  const price = parseNumber(data?.ethereum?.usd ?? data?.price);
-  const changePct = parseNumber(data?.ethereum?.usd_24h_change) ?? 0;
-  if (price === null) {
-    throw new Error("Unable to fetch ETH price");
+export async function getEthPrice(): Promise<PriceSnapshot> {
+  const price = await pricingProvider.getLastPrice("ETH", "USD");
+  const end = Date.now();
+  const start = end - 24 * 60 * 60 * 1000;
+  let changePct = 0;
+  try {
+    const series = await pricingProvider.getHistoricalPrice({ from: "ETH", to: "USD", start, end });
+    const first = extractSeriesPrice(series?.[0]);
+    const last = extractSeriesPrice(series?.[series.length - 1]);
+    if (first && last) {
+      changePct = ((last - first) / first) * 100;
+    }
+  } catch {
+    changePct = 0;
   }
 
   lastPrice = price;
-  return { price, changePct, source: "coingecko" };
+  return { price, changePct, source: "bitfinex" };
 }
 
 export async function getCurrentPrice(symbol: string): Promise<number> {

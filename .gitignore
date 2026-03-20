@@ -32,3 +32,4 @@ frontend/__*.html
 blockchain/cache
 blockchain/artifacts
 blockchain/typechain-types
+.vercel

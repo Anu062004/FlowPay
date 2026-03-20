@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useEmployees } from "../lib/hooks";
-import { addEmployee, type Employee } from "../lib/api";
+import { addEmployee, resendEmployeeInvite, type Employee } from "../lib/api";
 import { loadCompanyContext, saveEmployeeContext } from "../lib/companyContext";
 
 const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
@@ -50,6 +50,9 @@ export default function EmployeesPage() {
   const [form, setForm] = useState({ fullName: "", email: "", salary: "", creditScore: "" });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [resendingInviteId, setResendingInviteId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const employees = data?.employees ?? [];
   const filtered = employees.filter(e =>
@@ -67,6 +70,8 @@ export default function EmployeesPage() {
     if (!companyCtx?.id) { setSaveError("No company selected."); return; }
     setSaving(true);
     setSaveError(null);
+    setActionMessage(null);
+    setActionError(null);
     try {
       await addEmployee({
         companyId: companyCtx.id,
@@ -77,6 +82,7 @@ export default function EmployeesPage() {
       });
       setShowAdd(false);
       setForm({ fullName: "", email: "", salary: "", creditScore: "" });
+      setActionMessage(`Invite sent to ${form.email}`);
       refetch();
     } catch (err: any) {
       setSaveError(err.message ?? "Failed to add employee");
@@ -90,9 +96,26 @@ export default function EmployeesPage() {
     saveEmployeeContext({
       id: emp.id,
       fullName: emp.full_name ?? undefined,
-      companyId: emp.company_id ?? companyCtx?.id
+      companyId: emp.company_id ?? companyCtx?.id,
+      companyName: emp.company_name ?? companyCtx?.name,
+      walletAddress: emp.wallet_address ?? null
     });
     router.push("/employee/overview");
+  }
+
+  async function handleResendInvite(emp: Employee) {
+    if (!emp.id) return;
+    setResendingInviteId(emp.id);
+    setActionMessage(null);
+    setActionError(null);
+    try {
+      const result = await resendEmployeeInvite(emp.id);
+      setActionMessage(`Invite resent to ${result.email}`);
+    } catch (err: any) {
+      setActionError(err.message ?? "Failed to resend invite");
+    } finally {
+      setResendingInviteId(null);
+    }
   }
 
   return (
@@ -142,6 +165,17 @@ export default function EmployeesPage() {
           </div>
         </div>
 
+        {actionMessage ? (
+          <div className="card-body" style={{ paddingBottom: 0 }}>
+            <div className="alert alert-success">{actionMessage}</div>
+          </div>
+        ) : null}
+        {actionError ? (
+          <div className="card-body" style={{ paddingBottom: 0 }}>
+            <div className="alert alert-danger">{actionError}</div>
+          </div>
+        ) : null}
+
         {error ? (
           <div className="card-body"><div className="alert alert-danger">{error}</div></div>
         ) : loading ? (
@@ -152,12 +186,9 @@ export default function EmployeesPage() {
               <div className="empty-state-title">{employees.length === 0 ? "No employees yet" : "No results"}</div>
               <div className="empty-state-desc">
                 {employees.length === 0
-                  ? "Add your first employee to get started."
+                  ? "Use the Add Employee action above to onboard your first team member."
                   : "Try a different search term."}
               </div>
-              {employees.length === 0 && (
-                <button className="btn btn-primary" onClick={() => setShowAdd(true)}>Add Employee</button>
-              )}
             </div>
           </div>
         ) : (
@@ -191,7 +222,7 @@ export default function EmployeesPage() {
                           </div>
                           <div>
                             <div style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>{emp.full_name}</div>
-                            <div className="text-xs text-secondary">{emp.email}</div>
+                            <div className="text-xs text-secondary">{emp.email || "No email on file"}</div>
                           </div>
                         </div>
                       </td>
@@ -216,6 +247,15 @@ export default function EmployeesPage() {
                         </Badge>
                       </td>
                       <td className="right">
+                        {emp.status === "invited" ? (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => handleResendInvite(emp)}
+                            disabled={resendingInviteId === emp.id}
+                          >
+                            {resendingInviteId === emp.id ? "Sending..." : "Resend Invite"}
+                          </button>
+                        ) : null}
                         <button
                           className="btn btn-ghost btn-sm"
                           onClick={() => handleViewEmployee(emp)}

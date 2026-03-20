@@ -4,6 +4,7 @@ import { getLendingHistory } from "../services/lendingService.js";
 import { asyncHandler } from "../utils/errors.js";
 import { uuidQueryParam } from "../utils/validation.js";
 import { db } from "../db/pool.js";
+import { assertCompanyScope, assertEmployeeScope, requireCompanySession, requireEmployeeSession } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -11,8 +12,10 @@ const router = Router();
 // Employer view: all loans for a company + summary
 router.get(
   "/history",
+  requireCompanySession,
   asyncHandler(async (req, res) => {
     const companyId = uuidQueryParam.parse(req.query.companyId);
+    assertCompanyScope(res, companyId);
     const result = await getLendingHistory(companyId);
     res.status(200).json(result);
   })
@@ -22,8 +25,10 @@ router.get(
 // Employee portal: their own loans with installment schedule
 router.get(
   "/me/:employeeId",
+  requireEmployeeSession,
   asyncHandler(async (req, res) => {
     const employeeId = z.string().uuid().parse(req.params.employeeId);
+    assertEmployeeScope(res, employeeId);
 
     const loans = await db.query(
       `SELECT
@@ -53,10 +58,13 @@ router.get(
             (Math.pow(1 + monthlyRate, durationMonths) - 1);
 
       const totalRepayable = emi * durationMonths;
-      const amountPaid = totalRepayable - parseFloat(loan.remaining_balance);
-      const monthsPaid = Math.round(amountPaid / (emi || 1));
+      const amountPaid = Math.max(totalRepayable - parseFloat(loan.remaining_balance), 0);
+      const monthsPaid = Math.max(
+        0,
+        Math.min(Math.round(amountPaid / (emi || 1)), durationMonths)
+      );
 
-      return { ...loan, emi: Math.round(emi * 100) / 100, months_paid: monthsPaid };
+      return { ...loan, emi: Math.round(emi * 1_000_000) / 1_000_000, months_paid: monthsPaid };
     });
 
     res.status(200).json({ loans: enriched });

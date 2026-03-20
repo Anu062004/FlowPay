@@ -7,12 +7,39 @@
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
+function clearStoredContexts() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem("flowpay_company");
+  window.localStorage.removeItem("flowpay_employee");
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
+    cache: "no-store",
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
     ...init,
   });
   const data = await res.json();
+  if ((res.status === 401 || res.status === 403) && typeof window !== "undefined") {
+    const authEntryPaths = new Set([
+      "/companies/login",
+      "/employees/login",
+      "/companies/register",
+      "/employees/register-self",
+      "/employees/activate"
+    ]);
+
+    if (!authEntryPaths.has(path)) {
+      clearStoredContexts();
+      window.setTimeout(() => {
+        window.location.href = "/";
+      }, 0);
+    }
+  }
   if (!res.ok) throw new Error(data?.error ?? `API error ${res.status}`);
   return data as T;
 }
@@ -22,6 +49,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 export type Company = {
   id: string;
   name: string;
+  email: string;
   treasury_address: string | null;
   created_at: string;
 };
@@ -58,6 +86,41 @@ export type Loan = {
   months_paid?: number;
 };
 
+export type LoanRequestResult = {
+  decision: "approve" | "reject";
+  loanId?: string;
+  amount?: number;
+  interest?: number;
+  duration?: number;
+  emi?: number;
+  rationale?: string;
+  autoApproved?: boolean;
+  policy?: AgentPolicyResult;
+};
+
+export type LoanRepaymentResult = {
+  loanId: string;
+  status: "repaid";
+  amountRepaid: number;
+  txHash: string | null;
+};
+
+export type EmployeeWallet = {
+  wallet_address: string;
+  balance: string;
+  max_withdrawable: string;
+  token_symbol: string;
+  chain: string;
+};
+
+export type WithdrawalResult = {
+  txHash: string | null;
+  amount: string;
+  from: string;
+  to: string;
+  token_symbol: string;
+};
+
 export type LendingSummary = {
   active_loans: string;
   total_loans: string;
@@ -67,7 +130,7 @@ export type LendingSummary = {
 
 export type Transaction = {
   id: string;
-  type: "deposit" | "payroll" | "loan_disbursement" | "emi_repayment" | "investment" | "treasury_allocation";
+  type: "deposit" | "payroll" | "loan_disbursement" | "emi_repayment" | "withdrawal" | "investment" | "treasury_allocation";
   amount: string;
   tx_hash: string | null;
   created_at: string;
@@ -109,13 +172,27 @@ export type CompanySettings = {
     ipAllowlist: boolean;
     auditLog: boolean;
     sessionTimeout: string;
+    accessPinConfigured?: boolean;
   };
   agent: {
     enabled: boolean;
+    executionSource: string;
     slippageProtection: boolean;
     maxTradeSize: number;
     riskTolerance: string;
     rebalanceFrequency: string;
+    lending_paused?: boolean;
+    walletPolicy: {
+      allowTreasuryAllocation: boolean;
+      allowLoanDisbursal: boolean;
+      allowPayroll: boolean;
+      allowAaveRebalance: boolean;
+      maxSingleTransfer: number;
+      maxDailyOutflow: number;
+      maxLoanAmount: number;
+      maxAaveAllocationPct: number;
+      humanReviewAbove: number;
+    };
   };
   updated_at?: string;
 };
@@ -128,10 +205,27 @@ export const fetchCompany = (id: string) =>
 export const fetchCompanies = () =>
   apiFetch<{ companies: Company[] }>("/companies");
 
-export const registerCompany = (name: string) =>
-  apiFetch<{ id: string; name: string }>("/companies/register", {
+export const registerCompany = (body: { name: string; email: string; accessPin: string }) =>
+  apiFetch<{ company: Company; treasury_wallet: { wallet_address: string } }>("/companies/register", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(body),
+  });
+
+export const loginCompany = (body: { access: string; accessPin: string; email?: string }) =>
+  apiFetch<{ company: Company }>("/companies/login", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const logoutCompany = () =>
+  apiFetch<{ status: string }>("/companies/logout", {
+    method: "POST",
+  });
+
+export const updateCompanyAccessPin = (accessPin: string) =>
+  apiFetch<{ status: string; accessPinConfigured: boolean }>("/companies/access-pin", {
+    method: "POST",
+    body: JSON.stringify({ accessPin }),
   });
 
 // ── Treasury ─────────────────────────────────────────────────
@@ -147,6 +241,26 @@ export const fetchEmployees = (companyId: string) =>
 export const fetchEmployee = (id: string) =>
   apiFetch<Employee>(`/employees/${id}`);
 
+export const fetchEmployeeWallet = (employeeId: string) =>
+  apiFetch<EmployeeWallet>(`/employees/${employeeId}/wallet`);
+
+export const registerEmployeeWallet = (body: { fullName: string; email?: string; password: string }) =>
+  apiFetch<{ employee: Employee; wallet: { wallet_address: string } }>("/employees/register-self", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const loginEmployee = (body: { access: string; password: string; email?: string }) =>
+  apiFetch<{ employee: Employee }>("/employees/login", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const logoutEmployee = () =>
+  apiFetch<{ status: string }>("/employees/logout", {
+    method: "POST",
+  });
+
 export const addEmployee = (body: {
   companyId: string;
   fullName: string;
@@ -155,6 +269,21 @@ export const addEmployee = (body: {
   creditScore?: number;
 }) =>
   apiFetch<{ employee: Employee }>("/employees/add", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const resendEmployeeInvite = (employeeId: string) =>
+  apiFetch<{ employeeId: string; email: string; status: string; activationUrl: string }>(
+    `/employees/${employeeId}/resend-invite`,
+    { method: "POST" }
+  );
+
+export const withdrawEmployeeFunds = (employeeId: string, body: {
+  destinationAddress: string;
+  amount: number;
+}) =>
+  apiFetch<WithdrawalResult>(`/employees/${employeeId}/withdraw`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -170,7 +299,7 @@ export const fetchMyLoans = (employeeId: string) =>
   apiFetch<{ loans: Loan[] }>(`/lending/me/${employeeId}`);
 
 export const requestLoan = (employeeId: string, requestedAmount: number) =>
-  apiFetch<{ decision: string; loanId?: string; amount?: number; emi?: number }>(
+  apiFetch<LoanRequestResult>(
     "/loans/request",
     { method: "POST", body: JSON.stringify({ employeeId, requestedAmount }) }
   );
@@ -223,13 +352,40 @@ export type AgentLog = {
   rationale: string;
   action_taken: string;
   company_id: string | null;
+  workflow_id?: string | null;
+  workflow_name?: string | null;
+  stage?: string | null;
+  source?: string | null;
+  policy_result?: AgentPolicyResult | null;
+  execution_status?: string | null;
+  metadata?: Record<string, any> | null;
 };
 
-export const fetchAgentLogs = (companyId?: string) => {
-  const path = companyId ? `/agents/logs?companyId=${companyId}` : "/agents/logs";
-  return apiFetch<{ logs: AgentLog[] }>(path, {
-    headers: {
-      "X-Master-Key": process.env.NEXT_PUBLIC_MASTER_KEY ?? "replace-with-strong-32-char-secret"
-    }
-  });
+export type AgentPolicyResult = {
+  status: "allow" | "review" | "block";
+  reasons: string[];
+  checks?: Array<Record<string, unknown>>;
+  amount?: number;
+  limits?: Record<string, unknown>;
+  metrics?: Record<string, unknown>;
 };
+
+export async function fetchAgentLogs(companyId?: string): Promise<{ logs: AgentLog[] }> {
+  const search = new URLSearchParams();
+  if (companyId) {
+    search.set("companyId", companyId);
+  }
+  const query = search.toString();
+  const res = await fetch(`/api/admin/agents/logs${query ? `?${query}` : ""}`, {
+    cache: "no-store"
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? `API error ${res.status}`);
+  return data as { logs: AgentLog[] };
+}
+
+export const repayLoanInFull = (loanId: string, employeeId: string) =>
+  apiFetch<LoanRepaymentResult>(
+    `/loans/${loanId}/repay-full`,
+    { method: "POST", body: JSON.stringify({ employeeId }) }
+  );

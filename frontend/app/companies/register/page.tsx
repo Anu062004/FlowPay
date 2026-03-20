@@ -7,9 +7,11 @@ import { PageHeader } from "../../components/PageHeader";
 
 export default function CompanyRegisterPage() {
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [accessPin, setAccessPin] = useState("");
   const [loading, setLoading] = useState(false);
   type RegisterCompanyResponse = {
-    company: { id: string; name: string };
+    company: { id: string; name: string; email: string };
     treasury_wallet: { wallet_address: string };
   };
   const [result, setResult] = useState<RegisterCompanyResponse | null>(null);
@@ -22,12 +24,13 @@ export default function CompanyRegisterPage() {
     try {
       const data = await apiFetch<RegisterCompanyResponse>("/companies/register", {
         method: "POST",
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ name, email, accessPin })
       });
       setResult(data);
       saveCompanyContext({
         id: data.company.id,
         name: data.company.name,
+        email: data.company.email,
         treasuryAddress: data.treasury_wallet.wallet_address
       });
     } catch (err: any) {
@@ -41,11 +44,15 @@ export default function CompanyRegisterPage() {
     <div className="stack">
       <PageHeader
         title="Register Company"
-        subtitle="Create a treasury wallet for your business using Tether WDK."
+        subtitle="Create a treasury wallet for your business using Tether WDK and protect it with a company PIN."
       />
       <form className="card stack" onSubmit={handleSubmit}>
         <label className="label">Company Name</label>
         <input value={name} onChange={(e) => setName(e.target.value)} required />
+        <label className="label">Work Email</label>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <label className="label">Company PIN</label>
+        <input type="password" value={accessPin} onChange={(e) => setAccessPin(e.target.value)} minLength={4} required />
         <button type="submit" disabled={loading}>
           {loading ? "Creating..." : "Create Treasury Wallet"}
         </button>
@@ -58,6 +65,10 @@ export default function CompanyRegisterPage() {
             <div>
               <div className="label">Company ID</div>
               <div>{result.company.id}</div>
+            </div>
+            <div>
+              <div className="label">Email</div>
+              <div>{result.company.email}</div>
             </div>
             <div>
               <div className="label">Treasury Address</div>

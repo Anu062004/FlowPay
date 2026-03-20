@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMyLoans, useMyTransactions } from "../../lib/hooks";
 import { loadEmployeeContext, type EmployeeContext } from "../../lib/companyContext";
 import Link from "next/link";
@@ -32,20 +32,17 @@ const TX_TYPE_LABEL: Record<string, string> = {
   payroll: "Salary Received",
   loan_disbursement: "Loan Disbursed",
   emi_repayment: "EMI Deduction",
+  withdrawal: "Withdrawal",
   investment: "Investment",
   treasury_allocation: "Allocation",
 };
 const TX_BADGE: Record<string, string> = {
   payroll: "success", loan_disbursement: "primary", emi_repayment: "warning",
-  deposit: "success", investment: "accent", treasury_allocation: "neutral",
+  withdrawal: "danger", deposit: "success", investment: "accent", treasury_allocation: "neutral",
 };
 
 export default function EmployeeOverviewPage() {
-  const [ctx, setCtx] = useState<EmployeeContext | null>(null);
-
-  useEffect(() => {
-    setCtx(loadEmployeeContext());
-  }, []);
+  const [ctx] = useState<EmployeeContext | null>(() => loadEmployeeContext());
 
   const loans = useMyLoans();
   const txHook = useMyTransactions();
@@ -55,10 +52,11 @@ export default function EmployeeOverviewPage() {
   const monthsPaid = activeLoan?.months_paid ?? 0;
   const term = activeLoan?.duration_months ?? 1;
 
-  // Compute wallet balance: sum of inflows minus outflows from transactions
+  // Compute wallet balance from recorded wallet inflows and outflows.
   const walletBalance = txList.reduce((s, t) => {
     if (t.type === "payroll" || t.type === "loan_disbursement") return s + parseFloat(t.amount);
-    return s; // withdrawals would appear separately (not in this ledger)
+    if (t.type === "emi_repayment" || t.type === "withdrawal") return s - parseFloat(t.amount);
+    return s;
   }, 0);
 
   // Last salary from transactions
@@ -70,7 +68,7 @@ export default function EmployeeOverviewPage() {
         <div className="page-header">
           <h1 className="page-title">My Overview</h1>
         </div>
-        <EmployeeSessionPrompt onSet={setCtx} />
+        <EmployeeSessionPrompt />
       </div>
     );
   }

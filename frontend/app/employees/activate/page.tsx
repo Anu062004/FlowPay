@@ -16,7 +16,7 @@ function EmployeeActivateInner() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
-  type ActivateResponse = { employeeId: string };
+  type ActivateResponse = { employeeId: string; employee: Employee };
 
   const handleActivate = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -28,16 +28,13 @@ function EmployeeActivateInner() {
       });
       setStatus(`Account activated for employee ${data.employeeId}`);
       setEmployeeId(data.employeeId);
-      try {
-        const profile = await apiFetch<Employee>(`/employees/${data.employeeId}`);
-        saveEmployeeContext({
-          id: profile.id,
-          fullName: profile.full_name ?? undefined,
-          companyId: profile.company_id ?? undefined
-        });
-      } catch {
-        saveEmployeeContext({ id: data.employeeId });
-      }
+      saveEmployeeContext({
+        id: data.employee.id,
+        fullName: data.employee.full_name ?? undefined,
+        companyId: data.employee.company_id ?? undefined,
+        companyName: data.employee.company_name ?? undefined,
+        walletAddress: data.employee.wallet_address ?? null
+      });
     } catch (err: any) {
       setError(err.message ?? "Activation failed");
     }

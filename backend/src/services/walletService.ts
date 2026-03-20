@@ -1,12 +1,10 @@
 import WDK from "@tetherto/wdk";
-import WalletManagerEvm, {
-  WalletAccountEvm,
-  WalletAccountReadOnlyEvm
-} from "@tetherto/wdk-wallet-evm";
+import WalletManagerEvm, { WalletAccountEvm } from "@tetherto/wdk-wallet-evm";
 import WalletManagerTon from "@tetherto/wdk-wallet-ton";
 import WalletManagerTron from "@tetherto/wdk-wallet-tron";
 import WalletManagerBtc from "@tetherto/wdk-wallet-btc";
 import WalletManagerSolana from "@tetherto/wdk-wallet-solana";
+import { Contract } from "ethers";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db/pool.js";
 import { env } from "../config/env.js";
@@ -18,17 +16,54 @@ import { startDepositWatcher } from "./depositWatcher.js";
 import { generateSeedPhrase } from "../utils/seed.js";
 import { emitVaultPayroll, emitVaultLoanDisbursed } from "./contractService.js";
 import { getTokenBalance as getIndexedTokenBalance } from "./indexerService.js";
+import { getRoundRobinRpcUrl, withRpcFailover } from "./rpcService.js";
 
-const rpcUrl = env.RPC_URL.replace("{WDK_API_KEY}", env.WDK_API_KEY);
 const transferMaxFee = BigInt(env.WDK_TRANSFER_MAX_FEE);
+const SUPPORTED_EVM_CHAINS = new Set(["ethereum", "sepolia"]);
+const EMPLOYEE_LEDGER_MIRROR_TYPES = new Set(["payroll", "loan_disbursement", "emi_repayment"]);
+export const nativeTransferMaxFee = transferMaxFee;
+const ERC20_ABI = ["function balanceOf(address owner) view returns (uint256)"];
 
 type Queryable = {
   query: (text: string, params?: unknown[]) => Promise<any>;
 };
 
+function normalizeChain(chain: string) {
+  return chain.toLowerCase();
+}
+
+function requireSupportedEvmChain(chain: string, transferType: "token" | "native") {
+  const normalized = normalizeChain(chain);
+  if (!SUPPORTED_EVM_CHAINS.has(normalized)) {
+    const label = transferType === "token" ? "Token" : "Native";
+    throw new ApiError(400, `${label} transfers are only supported on EVM chains`);
+  }
+  return normalized;
+}
+
+function mapWalletDecryptError(error: unknown): ApiError | null {
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    message.includes("Unsupported state or unable to authenticate data") ||
+    message.includes("Invalid encrypted payload") ||
+    message.includes("Invalid seed")
+  ) {
+    return new ApiError(
+      400,
+      "Treasury wallet cannot be decrypted with the current MASTER_KEY. Restore the original MASTER_KEY or recreate/fund a new treasury wallet."
+    );
+  }
+  return null;
+}
+
 function buildWdk(seedPhrase: string) {
+  const rpcUrl = getRoundRobinRpcUrl();
   const wdk = new WDK(seedPhrase);
   wdk.registerWallet("ethereum", WalletManagerEvm, {
+    provider: rpcUrl,
+    transferMaxFee
+  });
+  wdk.registerWallet("sepolia", WalletManagerEvm, {
     provider: rpcUrl,
     transferMaxFee
   });
@@ -58,10 +93,56 @@ async function getWalletRecord(walletId: string) {
   return result.rows[0];
 }
 
+async function insertTransactionRecord(params: {
+  walletId: string;
+  type: "deposit" | "payroll" | "loan_disbursement" | "emi_repayment" | "withdrawal" | "investment" | "treasury_allocation";
+  amount: string;
+  txHash: string | null;
+  tokenSymbol: string;
+  createdAt?: Date;
+}) {
+  const { walletId, type, amount, txHash, tokenSymbol, createdAt } = params;
+  if (createdAt) {
+    await db.query(
+      "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
+      [walletId, type, amount, txHash, tokenSymbol, createdAt]
+    );
+    return;
+  }
+
+  await db.query(
+    "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol) VALUES ($1, $2, $3, $4, $5)",
+    [walletId, type, amount, txHash, tokenSymbol]
+  );
+}
+
+async function mirrorEmployeeLedgerEntry(params: {
+  recipientWalletId?: string | null;
+  type: "payroll" | "loan_disbursement" | "investment" | "treasury_allocation" | "emi_repayment" | "withdrawal";
+  amount: string;
+  txHash: string | null;
+  tokenSymbol: string;
+  createdAt: Date;
+}) {
+  const { recipientWalletId, type, amount, txHash, tokenSymbol, createdAt } = params;
+  if (!recipientWalletId || !EMPLOYEE_LEDGER_MIRROR_TYPES.has(type)) {
+    return;
+  }
+
+  await insertTransactionRecord({
+    walletId: recipientWalletId,
+    type,
+    amount,
+    txHash,
+    tokenSymbol,
+    createdAt
+  });
+}
+
 async function createWallet(ownerType: "company" | "employee", ownerId: string, client?: Queryable) {
   let seedPhrase = generateSeedPhrase();
   const wdk = buildWdk(seedPhrase);
-  const chain = env.DEFAULT_CHAIN || "ethereum";
+  const chain = normalizeChain(env.DEFAULT_CHAIN || "ethereum");
   const account = (await wdk.getAccount(chain, 0)) as unknown as WalletAccountEvm;
   try {
     const walletAddress = await account.getAddress();
@@ -110,7 +191,14 @@ export async function getWalletBalance(walletId: string) {
       address: wallet.wallet_address
     });
     const decimals = parseInt(env.TREASURY_TOKEN_DECIMALS, 10);
-    const amountRaw = BigInt(indexed?.amount ?? "0");
+    const indexedAmount = indexed?.amount ?? "0";
+    let amountRaw = 0n;
+    if (typeof indexedAmount === "string") {
+      // Indexer may return decimal strings (for example "0.0"), so parse via token decimals.
+      amountRaw = parseTokenAmount(indexedAmount, decimals);
+    } else {
+      amountRaw = BigInt(indexedAmount);
+    }
     return {
       balanceWei: amountRaw.toString(),
       balanceEth: formatTokenAmount(amountRaw, decimals),
@@ -119,8 +207,9 @@ export async function getWalletBalance(walletId: string) {
     };
   }
 
-  const account = new WalletAccountReadOnlyEvm(wallet.wallet_address, { provider: rpcUrl });
-  const balanceWei = await account.getBalance();
+  const balanceWei = await withRpcFailover("wallet native balance", async (provider) =>
+    provider.getBalance(wallet.wallet_address)
+  );
   return {
     balanceWei: balanceWei.toString(),
     balanceEth: formatAmount(balanceWei),
@@ -131,8 +220,10 @@ export async function getWalletBalance(walletId: string) {
 
 export async function getTokenBalance(walletId: string, tokenAddress: string, decimals = 18) {
   const wallet = await getWalletRecord(walletId);
-  const account = new WalletAccountReadOnlyEvm(wallet.wallet_address, { provider: rpcUrl });
-  const balance = await account.getTokenBalance(tokenAddress);
+  const balance = await withRpcFailover("wallet token balance", async (provider) => {
+    const token = new Contract(tokenAddress, ERC20_ABI, provider);
+    return (await token.balanceOf(wallet.wallet_address)) as bigint;
+  });
   return {
     balanceRaw: balance.toString(),
     balance: formatTokenAmount(balance, decimals),
@@ -146,22 +237,40 @@ export async function sendTokenTransfer(
   tokenAddress: string,
   amount: string | number,
   decimals: number,
-  type: "payroll" | "loan_disbursement" | "investment" | "treasury_allocation" | "emi_repayment",
-  tokenSymbol: string
+  type: "payroll" | "loan_disbursement" | "investment" | "treasury_allocation" | "emi_repayment" | "withdrawal",
+  tokenSymbol: string,
+  recipientWalletId?: string | null
 ) {
   const wallet = await getWalletRecord(fromWalletId);
+  const chain = requireSupportedEvmChain(wallet.chain, "token");
   const amountRaw = parseTokenAmount(amount, decimals);
   const maxTx = parseFloat(env.MAX_TX_AMOUNT);
   if (parseFloat(amount.toString()) > maxTx) {
     throw new ApiError(400, `Transfer exceeds max transaction limit (${maxTx})`);
   }
 
-  if (wallet.chain !== "ethereum") {
-    throw new ApiError(400, "Token transfers are only supported on EVM chains");
+  let seedPhrase = "";
+  try {
+    seedPhrase = decryptSecret(wallet.encrypted_seed);
+  } catch (error) {
+    const mapped = mapWalletDecryptError(error);
+    if (mapped) {
+      throw mapped;
+    }
+    throw error;
   }
-  let seedPhrase = decryptSecret(wallet.encrypted_seed);
+
   const wdk = buildWdk(seedPhrase);
-  const account = (await wdk.getAccount(wallet.chain, 0)) as unknown as WalletAccountEvm;
+  let account: WalletAccountEvm;
+  try {
+    account = (await wdk.getAccount(chain, 0)) as unknown as WalletAccountEvm;
+  } catch (error) {
+    const mapped = mapWalletDecryptError(error);
+    if (mapped) {
+      throw mapped;
+    }
+    throw error;
+  }
   try {
     const balanceRaw = await account.getTokenBalance(tokenAddress);
     if (balanceRaw < amountRaw) {
@@ -174,10 +283,23 @@ export async function sendTokenTransfer(
       amount: amountRaw
     });
 
-    await db.query(
-      "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol) VALUES ($1, $2, $3, $4, $5)",
-      [wallet.id, type, amount.toString(), txResult?.hash ?? null, tokenSymbol]
-    );
+    const createdAt = new Date();
+    await insertTransactionRecord({
+      walletId: wallet.id,
+      type,
+      amount: amount.toString(),
+      txHash: txResult?.hash ?? null,
+      tokenSymbol,
+      createdAt
+    });
+    await mirrorEmployeeLedgerEntry({
+      recipientWalletId,
+      type,
+      amount: amount.toString(),
+      txHash: txResult?.hash ?? null,
+      tokenSymbol,
+      createdAt
+    });
 
     return {
       txHash: txResult?.hash ?? null,
@@ -195,7 +317,8 @@ export async function sendTransaction(
   fromWalletId: string,
   toAddress: string,
   amountEth: string | number,
-  type: "payroll" | "loan_disbursement" | "investment" | "treasury_allocation" | "emi_repayment"
+  type: "payroll" | "loan_disbursement" | "investment" | "treasury_allocation" | "emi_repayment" | "withdrawal",
+  recipientWalletId?: string | null
 ) {
   if (env.TREASURY_TOKEN_ADDRESS && env.TREASURY_TOKEN_SYMBOL) {
     const decimals = parseInt(env.TREASURY_TOKEN_DECIMALS, 10);
@@ -206,27 +329,45 @@ export async function sendTransaction(
       amountEth,
       decimals,
       type,
-      env.TREASURY_TOKEN_SYMBOL
+      env.TREASURY_TOKEN_SYMBOL,
+      recipientWalletId
     );
   }
 
   const wallet = await getWalletRecord(fromWalletId);
+  const chain = requireSupportedEvmChain(wallet.chain, "native");
   const amountWei = parseAmount(amountEth);
   const maxTx = parseFloat(env.MAX_TX_AMOUNT);
   if (parseFloat(amountEth.toString()) > maxTx) {
     throw new ApiError(400, `Transfer exceeds max transaction limit (${maxTx})`);
   }
 
-  if (wallet.chain !== "ethereum") {
-    throw new ApiError(400, "Native transfers are only supported on EVM chains");
+  let seedPhrase = "";
+  try {
+    seedPhrase = decryptSecret(wallet.encrypted_seed);
+  } catch (error) {
+    const mapped = mapWalletDecryptError(error);
+    if (mapped) {
+      throw mapped;
+    }
+    throw error;
   }
-  let seedPhrase = decryptSecret(wallet.encrypted_seed);
+
   const wdk = buildWdk(seedPhrase);
-  const account = (await wdk.getAccount(wallet.chain, 0)) as unknown as WalletAccountEvm;
+  let account: WalletAccountEvm;
+  try {
+    account = (await wdk.getAccount(chain, 0)) as unknown as WalletAccountEvm;
+  } catch (error) {
+    const mapped = mapWalletDecryptError(error);
+    if (mapped) {
+      throw mapped;
+    }
+    throw error;
+  }
   try {
     const balanceWei = await account.getBalance();
-    if (balanceWei < amountWei) {
-      throw new ApiError(400, "Insufficient wallet balance");
+    if (balanceWei < amountWei + transferMaxFee) {
+      throw new ApiError(400, "Insufficient wallet balance to cover transfer amount and network fee");
     }
 
     const txResult = await account.sendTransaction({
@@ -234,10 +375,23 @@ export async function sendTransaction(
       value: amountWei
     });
 
-    await db.query(
-      "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol) VALUES ($1, $2, $3, $4, $5)",
-      [wallet.id, type, amountEth.toString(), txResult?.hash ?? null, "ETH"]
-    );
+    const createdAt = new Date();
+    await insertTransactionRecord({
+      walletId: wallet.id,
+      type,
+      amount: amountEth.toString(),
+      txHash: txResult?.hash ?? null,
+      tokenSymbol: "ETH",
+      createdAt
+    });
+    await mirrorEmployeeLedgerEntry({
+      recipientWalletId,
+      type,
+      amount: amountEth.toString(),
+      txHash: txResult?.hash ?? null,
+      tokenSymbol: "ETH",
+      createdAt
+    });
 
     if (type === "payroll") {
       emitVaultPayroll(toAddress, amountEth.toString()).catch(console.error);

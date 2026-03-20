@@ -34,6 +34,11 @@ export async function approveRequest(approvalId: string, decidedBy?: string, dec
     throw new ApiError(400, "Approval request already processed");
   }
 
+  const auditContext = {
+    source: typeof decisionPayload?.source === "string" ? String(decisionPayload.source) : "ops_approval",
+    workflowName: "ops_approval"
+  };
+
   await db.query(
     `UPDATE ops_approvals
      SET status = 'approved', decided_at = now(), decided_by = $1, decision_payload = $2
@@ -44,14 +49,14 @@ export async function approveRequest(approvalId: string, decidedBy?: string, dec
 
   let actionResult: unknown = null;
   if (approval.kind === "payroll") {
-    actionResult = await runPayroll(approval.company_id);
+    actionResult = await runPayroll(approval.company_id, auditContext);
   } else if (approval.kind === "loan") {
     const payload = approval.task_payload ?? {};
     const loanId = (payload as any).loanId as string | undefined;
     if (!loanId) {
       throw new ApiError(400, "Loan approval missing loanId");
     }
-    actionResult = await executeApprovedLoan(loanId);
+    actionResult = await executeApprovedLoan(loanId, auditContext);
   }
 
   return { approvalId, status: "approved", actionResult };

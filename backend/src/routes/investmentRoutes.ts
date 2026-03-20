@@ -3,8 +3,9 @@ import { asyncHandler } from "../utils/errors.js";
 import { db } from "../db/pool.js";
 import { uuidQueryParam } from "../utils/validation.js";
 import { runInvestment } from "../services/investmentService.js";
-import { getEthPrice, getTopMarketCap } from "../services/priceService.js";
+import { getEthPrice, getTrackedMarketBoard } from "../services/priceService.js";
 import { z } from "zod";
+import { assertCompanyScope, requireCompanySession } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -12,8 +13,10 @@ const router = Router();
 // Summary + transaction history for the company's investment activity
 router.get(
   "/",
+  requireCompanySession,
   asyncHandler(async (req, res) => {
     const companyId = uuidQueryParam.parse(req.query.companyId);
+    assertCompanyScope(res, companyId);
 
     // Latest treasury allocation (investment pool config)
     const allocResult = await db.query(
@@ -26,6 +29,25 @@ router.get(
     );
 
     const allocation = allocResult.rows[0] ?? null;
+
+    const positionsResult = await db.query(
+      `SELECT
+         id,
+         protocol,
+         amount_deposited,
+         atoken_balance,
+         yield_earned,
+         status,
+         opened_at,
+         closed_at,
+         tx_hash,
+         entry_price
+       FROM investment_positions
+       WHERE company_id = $1
+       ORDER BY opened_at DESC
+       LIMIT 50`,
+      [companyId]
+    );
 
     // All investment transactions for this company's treasury wallet
     const txResult = await db.query(
@@ -51,7 +73,7 @@ router.get(
     );
 
     let market: { asset: string; price: number; change_pct: number; source: string } | null = null;
-    let marketTop: ReturnType<typeof getTopMarketCap> extends Promise<infer T> ? T : never = [];
+    let marketBoard: Awaited<ReturnType<typeof getTrackedMarketBoard>> | null = null;
     try {
       const price = await getEthPrice();
       market = {
@@ -65,13 +87,14 @@ router.get(
     }
 
     try {
-      marketTop = await getTopMarketCap(10);
+      marketBoard = await getTrackedMarketBoard(20);
     } catch {
-      marketTop = [];
+      marketBoard = null;
     }
 
     res.status(200).json({
       allocation,
+      positions: positionsResult.rows,
       transactions: txResult.rows,
       summary: {
         total_invested: totalInvested.toFixed(6),
@@ -79,7 +102,7 @@ router.get(
         transaction_count: txResult.rows.length,
       },
       market,
-      marketTop
+      marketBoard
     });
   })
 );
@@ -87,8 +110,10 @@ router.get(
 // ── POST /investments/run ─────────────────────────────────────
 router.post(
   "/run",
+  requireCompanySession,
   asyncHandler(async (req, res) => {
     const companyId = z.string().uuid().parse(req.body?.companyId);
+    assertCompanyScope(res, companyId);
     const result = await runInvestment(companyId);
     res.status(200).json(result);
   })

@@ -5,6 +5,20 @@ import { format } from "date-fns";
 import { fetchAgentLogs, type AgentLog } from "../lib/api";
 import { loadCompanyContext } from "../lib/companyContext";
 
+const STAGE_LABELS: Record<string, string> = {
+  workflow: "Workflow",
+  decision: "Decision",
+  policy_validation: "Policy",
+  wdk_execution: "WDK",
+  guardrail: "Guardrail"
+};
+
+const POLICY_STYLES: Record<string, string> = {
+  allow: "bg-emerald-100 text-emerald-800",
+  review: "bg-amber-100 text-amber-800",
+  block: "bg-rose-100 text-rose-800"
+};
+
 export function AgentActivityFeed() {
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,19 +56,41 @@ export function AgentActivityFeed() {
           logs.map((log) => (
             <div key={log.id} className="p-4 hover:bg-gray-50 transition-colors">
               <div className="flex items-center justify-between mb-1">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {log.agent_name}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {log.agent_name}
+                  </span>
+                  {log.stage ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">
+                      {STAGE_LABELS[log.stage] ?? log.stage}
+                    </span>
+                  ) : null}
+                  {log.policy_result?.status ? (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${POLICY_STYLES[log.policy_result.status] ?? "bg-slate-100 text-slate-700"}`}>
+                      {log.policy_result.status.toUpperCase()}
+                    </span>
+                  ) : null}
+                </div>
                 <span className="text-xs text-gray-400">
                   {format(new Date(log.timestamp), "MMM d, HH:mm:ss")}
                 </span>
               </div>
               <p className="text-sm font-semibold text-gray-900">{log.action_taken}</p>
+              <div className="mt-1 flex items-center gap-3 text-[11px] text-gray-500 flex-wrap">
+                {log.workflow_name ? <span>{log.workflow_name}</span> : null}
+                {log.source ? <span>{log.source}</span> : null}
+                {log.execution_status ? <span>{log.execution_status}</span> : null}
+              </div>
               {log.decision && (
                 <div className="mt-1 text-xs text-gray-400 bg-gray-50 p-1 rounded font-mono">
                   {JSON.stringify(log.decision)}
                 </div>
               )}
+              {log.policy_result?.reasons?.length ? (
+                <div className="mt-1 text-xs text-amber-700">
+                  {log.policy_result.reasons[0]}
+                </div>
+              ) : null}
               <p className="text-xs text-gray-500 mt-1 italic">"{log.rationale}"</p>
             </div>
           ))

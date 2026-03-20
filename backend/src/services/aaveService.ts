@@ -1,13 +1,23 @@
-import { Interface } from "ethers";
+import { Contract, Interface, MaxUint256 } from "ethers";
 import * as AaveProtocolModule from "@tetherto/wdk-protocol-lending-aave-evm";
 import type { WalletAccountEvm } from "@tetherto/wdk-wallet-evm";
 import { env } from "../config/env.js";
 import { db } from "../db/pool.js";
 import { parseTokenAmount, formatTokenAmount } from "../utils/amounts.js";
-import { withAdminContext } from "./wdkAdmin.js";
+import { getAdminSigner, hasAdminPrivateKey, withAdminContext } from "./wdkAdmin.js";
+import { getRoundRobinRpcUrl } from "./rpcService.js";
+import { withRpcRetry } from "./rpcRetryService.js";
 
-const rpcUrl = env.RPC_URL.replace("{WDK_API_KEY}", env.WDK_API_KEY);
 const WETH_ABI = ["function deposit() payable", "function withdraw(uint256)"];
+const ERC20_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)"
+];
+const AAVE_POOL_ABI = [
+  "function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode)",
+  "function withdraw(address asset, uint256 amount, address to) returns (uint256)"
+];
 const wethInterface = new Interface(WETH_ABI);
 const AaveLendingProtocol = (AaveProtocolModule as any).default ?? AaveProtocolModule;
 
@@ -71,6 +81,7 @@ function buildAaveProtocol(wdk: unknown): AaveProtocol {
   if (typeof wdkAny.registerProtocol !== "function") {
     throw new Error("WDK protocol registry unavailable; upgrade WDK SDK");
   }
+  const rpcUrl = getRoundRobinRpcUrl();
   const config = {
     provider: rpcUrl,
     poolAddress: env.AAVE_POOL_ADDRESS,
@@ -99,6 +110,98 @@ async function unwrapNative(account: WalletAccountEvm, amount: bigint, wethAddre
   await account.sendTransaction({ to: wethAddress, data, value: 0n });
 }
 
+async function ensurePoolAllowance(tokenAddress: string, amount: bigint) {
+  const signer = getAdminSigner();
+  const token = new Contract(tokenAddress, ERC20_ABI, signer);
+  const allowance = (await withRpcRetry("token allowance", () =>
+    token.allowance(signer.address, env.AAVE_POOL_ADDRESS)
+  )) as bigint;
+  if (allowance >= amount) {
+    return;
+  }
+
+  const approveTx = await withRpcRetry("token approve", () =>
+    token.approve(env.AAVE_POOL_ADDRESS, MaxUint256)
+  );
+  await withRpcRetry(`token approve wait ${approveTx.hash}`, () => approveTx.wait());
+}
+
+async function wrapNativeWithSigner(amount: bigint, wethAddress: string) {
+  const signer = getAdminSigner();
+  const weth = new Contract(wethAddress, WETH_ABI, signer);
+  const tx = await withRpcRetry("weth deposit", () => weth.deposit({ value: amount }));
+  await withRpcRetry(`weth deposit wait ${tx.hash}`, () => tx.wait());
+}
+
+async function unwrapNativeWithSigner(amount: bigint, wethAddress: string) {
+  const signer = getAdminSigner();
+  const weth = new Contract(wethAddress, WETH_ABI, signer);
+  const tx = await withRpcRetry("weth withdraw", () => weth.withdraw(amount));
+  await withRpcRetry(`weth withdraw wait ${tx.hash}`, () => tx.wait());
+}
+
+async function getSignerTokenBalance(tokenAddress: string) {
+  const signer = getAdminSigner();
+  const token = new Contract(tokenAddress, ERC20_ABI, signer);
+  return (await withRpcRetry("token balanceOf", () => token.balanceOf(signer.address))) as bigint;
+}
+
+async function depositToAaveWithSigner(tokenAddress: string, amountRaw: bigint): Promise<string> {
+  const signer = getAdminSigner();
+  const shouldWrap = env.AAVE_WRAP_NATIVE === "true";
+  const wethAddress = env.WETH_ADDRESS;
+  let balance = await getSignerTokenBalance(tokenAddress);
+
+  if (balance < amountRaw) {
+    if (
+      shouldWrap &&
+      wethAddress &&
+      tokenAddress.toLowerCase() === wethAddress.toLowerCase()
+    ) {
+      await wrapNativeWithSigner(amountRaw - balance, wethAddress);
+      balance = await getSignerTokenBalance(tokenAddress);
+    } else {
+      throw new Error("Insufficient token balance for Aave deposit");
+    }
+  }
+
+  await ensurePoolAllowance(tokenAddress, amountRaw);
+
+  const pool = new Contract(env.AAVE_POOL_ADDRESS, AAVE_POOL_ABI, signer);
+  const tx = await withRpcRetry("aave supply", () =>
+    pool.supply(tokenAddress, amountRaw, signer.address, 0)
+  );
+  const receipt = await withRpcRetry(`aave supply wait ${extractTxHash(tx)}`, () => tx.wait());
+  if (!receipt) {
+    throw new Error("Aave deposit transaction receipt is empty");
+  }
+  return extractTxHash(tx);
+}
+
+async function withdrawFromAaveWithSigner(tokenAddress: string, amountRaw: bigint): Promise<string> {
+  const signer = getAdminSigner();
+  const shouldUnwrap = env.AAVE_UNWRAP_NATIVE === "true";
+  const wethAddress = env.WETH_ADDRESS;
+  const pool = new Contract(env.AAVE_POOL_ADDRESS, AAVE_POOL_ABI, signer);
+  const tx = await withRpcRetry("aave withdraw", () =>
+    pool.withdraw(tokenAddress, amountRaw, signer.address)
+  );
+  const receipt = await withRpcRetry(`aave withdraw wait ${extractTxHash(tx)}`, () => tx.wait());
+  if (!receipt) {
+    throw new Error("Aave withdraw transaction receipt is empty");
+  }
+
+  if (
+    shouldUnwrap &&
+    wethAddress &&
+    tokenAddress.toLowerCase() === wethAddress.toLowerCase()
+  ) {
+    await unwrapNativeWithSigner(amountRaw, wethAddress);
+  }
+
+  return extractTxHash(tx);
+}
+
 export async function depositToAave(companyId: string, amountEth: number): Promise<string> {
   if (amountEth <= 0) {
     throw new Error(`Invalid deposit amount for ${companyId}`);
@@ -106,6 +209,11 @@ export async function depositToAave(companyId: string, amountEth: number): Promi
   const tokenAddress = requireEnv(env.AAVE_SUPPLY_TOKEN_ADDRESS, "AAVE_SUPPLY_TOKEN_ADDRESS");
   const decimals = parseInt(env.AAVE_SUPPLY_TOKEN_DECIMALS, 10);
   const amountRaw = parseTokenAmount(amountEth, decimals);
+
+  if (hasAdminPrivateKey()) {
+    return depositToAaveWithSigner(tokenAddress, amountRaw);
+  }
+
   const shouldWrap = env.AAVE_WRAP_NATIVE === "true";
   const wethAddress = env.WETH_ADDRESS;
 
@@ -149,6 +257,11 @@ export async function withdrawFromAave(companyId: string, amountEth: number): Pr
   const tokenAddress = requireEnv(env.AAVE_SUPPLY_TOKEN_ADDRESS, "AAVE_SUPPLY_TOKEN_ADDRESS");
   const decimals = parseInt(env.AAVE_SUPPLY_TOKEN_DECIMALS, 10);
   const amountRaw = parseTokenAmount(amountEth, decimals);
+
+  if (hasAdminPrivateKey()) {
+    return withdrawFromAaveWithSigner(tokenAddress, amountRaw);
+  }
+
   const shouldUnwrap = env.AAVE_UNWRAP_NATIVE === "true";
   const wethAddress = env.WETH_ADDRESS;
 
@@ -177,9 +290,11 @@ export async function getATokenBalance(companyId: string): Promise<number> {
   const tokenAddress = requireEnv(env.AAVE_ATOKEN_ADDRESS, "AAVE_ATOKEN_ADDRESS");
   const decimals = parseInt(env.AAVE_ATOKEN_DECIMALS, 10);
 
-  const balanceRaw = await withAdminContext(async ({ account }) => {
-    return account.getTokenBalance(tokenAddress);
-  });
+  const balanceRaw = hasAdminPrivateKey()
+    ? await getSignerTokenBalance(tokenAddress)
+    : await withAdminContext(async ({ account }) => {
+      return account.getTokenBalance(tokenAddress);
+    });
   const balance = parseFloat(formatTokenAmount(balanceRaw, decimals));
   if (!Number.isFinite(balance)) {
     throw new Error(`Invalid aToken balance for ${companyId}`);

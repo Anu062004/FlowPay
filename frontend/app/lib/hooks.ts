@@ -13,6 +13,7 @@ import {
   fetchTreasuryBalance,
   fetchEmployees,
   fetchEmployee,
+  fetchEmployeeWallet,
   fetchLendingHistory,
   fetchMyLoans,
   fetchPayrollHistory,
@@ -22,6 +23,7 @@ import {
   type Company,
   type Employee,
   type Loan,
+  type EmployeeWallet,
   type LendingSummary,
   type Transaction,
   type PayrollHistoryEntry,
@@ -38,14 +40,19 @@ function useClientContext<T>(loader: () => T | null) {
 }
 
 // ── Generic fetcher hook ──────────────────────────────────────
-function useApi<T>(fetcher: (() => Promise<T>) | null) {
+function useApi<T>(
+  fetcher: (() => Promise<T>) | null,
+  options?: { refreshMs?: number; keepDataWhileRefreshing?: boolean }
+) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (background = false) => {
     if (!fetcher) { setLoading(false); return; }
-    setLoading(true);
+    if (!background || !options?.keepDataWhileRefreshing) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const result = await fetcher();
@@ -55,11 +62,27 @@ function useApi<T>(fetcher: (() => Promise<T>) | null) {
     } finally {
       setLoading(false);
     }
-  }, [fetcher]);
+  }, [fetcher, options?.keepDataWhileRefreshing]);
 
-  useEffect(() => { run(); }, [run]);
+  const refetch = useCallback(() => run(false), [run]);
 
-  return { data, loading, error, refetch: run };
+  useEffect(() => { run(false); }, [run]);
+
+  useEffect(() => {
+    if (!fetcher || !options?.refreshMs) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      run(true);
+    }, options.refreshMs);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [fetcher, options?.refreshMs, run]);
+
+  return { data, loading, error, refetch };
 }
 
 // ── Company ──────────────────────────────────────────────────
@@ -92,6 +115,11 @@ export function useEmployees() {
 export function useEmployee(employeeId: string | null) {
   const fetcher = useCallback(() => fetchEmployee(employeeId as string), [employeeId]);
   return useApi<Employee>(employeeId ? fetcher : null);
+}
+
+export function useEmployeeWallet(employeeId: string | null) {
+  const fetcher = useCallback(() => fetchEmployeeWallet(employeeId as string), [employeeId]);
+  return useApi<EmployeeWallet>(employeeId ? fetcher : null);
 }
 
 // ── Lending ──────────────────────────────────────────────────
@@ -144,6 +172,18 @@ export type InvestmentData = {
     lending_pool: string;
     created_at: string;
   } | null;
+  positions: {
+    id: string;
+    protocol: string;
+    amount_deposited: string;
+    atoken_balance: string;
+    yield_earned: string;
+    status: "active" | "closed" | "liquidated" | "sync_failed";
+    opened_at: string;
+    closed_at: string | null;
+    tx_hash: string | null;
+    entry_price: string | null;
+  }[];
   transactions: { id: string; amount: string; tx_hash: string | null; created_at: string }[];
   summary: {
     total_invested: string;
@@ -156,7 +196,32 @@ export type InvestmentData = {
     change_pct: number;
     source: string;
   } | null;
-  marketTop: {
+  marketBoard: {
+    updatedAt: string;
+    pricingSource: string;
+    rankingSource: "cmc" | "curated";
+    crypto: {
+      rank: number;
+      name: string;
+      symbol: string;
+      category: "crypto" | "metal";
+      price: number | null;
+      changePct24h: number | null;
+      source: string;
+      available: boolean;
+    }[];
+    metals: {
+      rank: number;
+      name: string;
+      symbol: string;
+      category: "crypto" | "metal";
+      price: number | null;
+      changePct24h: number | null;
+      source: string;
+      available: boolean;
+    }[];
+  } | null;
+  marketTop?: {
     rank: number;
     name: string;
     symbol: string;
@@ -174,5 +239,8 @@ export function useInvestments() {
     () => apiFetch<InvestmentData>(`/investments?companyId=${id}`),
     [id]
   );
-  return useApi<InvestmentData>(id ? fetcher : null);
+  return useApi<InvestmentData>(id ? fetcher : null, {
+    refreshMs: 30 * 1000,
+    keepDataWhileRefreshing: true
+  });
 }

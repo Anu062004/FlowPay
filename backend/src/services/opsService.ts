@@ -5,8 +5,17 @@ import { ApiError } from "../utils/errors.js";
 export type OpsTaskType =
   | "employee_invite"
   | "payroll_approval"
+  | "payroll_prep"
   | "loan_approval"
   | "treasury_topup"
+  | "finance_snapshot"
+  | "reconciliation_report"
+  | "eod_summary"
+  | "settlement_alert"
+  | "monitoring_alert"
+  | "workflow_retry"
+  | "browser_automation"
+  | "notification_alert"
   | "kyc_request"
   | "contract_approval"
   | "support_ticket"
@@ -75,6 +84,53 @@ export async function createOpsTask(input: {
   }
 
   return { task, approvalId };
+}
+
+export async function createOpsTaskIfNotRecent(input: {
+  companyId: string;
+  type: OpsTaskType;
+  payload: Record<string, unknown>;
+  recipientEmail?: string | null;
+  subject?: string | null;
+  approvalKind?: string | null;
+  dedupeWindowMinutes?: number;
+}) {
+  const recipient = input.recipientEmail ?? getDefaultAdminEmail();
+  const subject = input.subject ?? null;
+  const dedupeWindowMinutes = Math.max(1, input.dedupeWindowMinutes ?? 60);
+
+  const duplicate = await db.query(
+    `SELECT id, approval_id
+     FROM ops_tasks
+     WHERE company_id = $1
+       AND type = $2
+       AND COALESCE(recipient_email, '') = COALESCE($3, '')
+       AND COALESCE(subject, '') = COALESCE($4, '')
+       AND payload = $5::jsonb
+       AND created_at >= now() - ($6::text || ' minutes')::interval
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [input.companyId, input.type, recipient, subject, input.payload, String(dedupeWindowMinutes)]
+  );
+
+  if ((duplicate.rowCount ?? 0) > 0) {
+    return {
+      task: duplicate.rows[0],
+      approvalId: (duplicate.rows[0].approval_id as string | null) ?? null,
+      created: false
+    };
+  }
+
+  const created = await createOpsTask({
+    companyId: input.companyId,
+    type: input.type,
+    payload: input.payload,
+    recipientEmail: recipient,
+    subject,
+    approvalKind: input.approvalKind ?? null
+  });
+
+  return { ...created, created: true };
 }
 
 export async function listOpsTasks(filters: { status?: string; companyId?: string; type?: string }) {

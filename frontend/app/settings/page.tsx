@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import CompanyContextBar from "../components/CompanyContextBar";
 import { loadCompanyContext, saveCompanyContext, type CompanyContext } from "../lib/companyContext";
-import { fetchCompanySettings, updateCompanySettings, type CompanySettings } from "../lib/api";
+import { fetchCompanySettings, updateCompanyAccessPin, updateCompanySettings, type CompanySettings } from "../lib/api";
 
 type Status = { type: "success" | "error"; message: string } | null;
 
@@ -78,6 +78,8 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pinSaving, setPinSaving] = useState(false);
+  const [newAccessPin, setNewAccessPin] = useState("");
   const [status, setStatus] = useState<Status>(null);
 
   useEffect(() => {
@@ -112,6 +114,23 @@ export default function SettingsPage() {
     setSettings((prev) => (prev ? { ...prev, agent: { ...prev.agent, ...patch } } : prev));
   };
 
+  const updateWalletPolicy = (patch: Partial<CompanySettings["agent"]["walletPolicy"]>) => {
+    setSettings((prev) => (
+      prev
+        ? {
+            ...prev,
+            agent: {
+              ...prev.agent,
+              walletPolicy: {
+                ...prev.agent.walletPolicy,
+                ...patch
+              }
+            }
+          }
+        : prev
+    ));
+  };
+
   const saveAll = async (label: string) => {
     if (!context?.id || !settings) return;
     setSaving(true);
@@ -119,10 +138,11 @@ export default function SettingsPage() {
     try {
       const { settings: next } = await updateCompanySettings(context.id, settings);
       setSettings(next);
-      if (context.name !== next.profile.companyName) {
+      if (context.name !== next.profile.companyName || context.email !== next.profile.companyEmail) {
         saveCompanyContext({
           id: context.id,
           name: next.profile.companyName,
+          email: next.profile.companyEmail || context.email,
           treasuryAddress: context.treasuryAddress ?? null
         });
       }
@@ -135,6 +155,36 @@ export default function SettingsPage() {
   };
 
   const disabled = saving || loading;
+
+  const saveAccessPin = async () => {
+    if (!newAccessPin.trim()) {
+      setStatus({ type: "error", message: "Enter a company PIN before saving." });
+      return;
+    }
+
+    setPinSaving(true);
+    setStatus(null);
+    try {
+      await updateCompanyAccessPin(newAccessPin.trim());
+      setSettings((prev) => (
+        prev
+          ? {
+              ...prev,
+              security: {
+                ...prev.security,
+                accessPinConfigured: true
+              }
+            }
+          : prev
+      ));
+      setNewAccessPin("");
+      setStatus({ type: "success", message: "Company PIN updated" });
+    } catch (err: any) {
+      setStatus({ type: "error", message: err?.message ?? "Failed to update company PIN" });
+    } finally {
+      setPinSaving(false);
+    }
+  };
 
   return (
     <div className="stack-xl">
@@ -279,6 +329,48 @@ export default function SettingsPage() {
 
             <Section title="Security" subtitle="Authentication and access controls">
               <div className="stack">
+                <div
+                  style={{
+                    padding: 16,
+                    borderRadius: 16,
+                    background: "var(--bg-muted)",
+                    border: "1px solid var(--border-subtle)"
+                  }}
+                  className="stack"
+                >
+                  <div className="row-between" style={{ alignItems: "flex-start" }}>
+                    <div>
+                      <div className="fw-medium text-sm">Company Dashboard PIN</div>
+                      <div className="text-xs text-secondary mt-1">
+                        Anyone opening the employer dashboard must provide this PIN, even if they know the wallet address or company ID.
+                      </div>
+                    </div>
+                    <span className={`badge badge-${settings.security.accessPinConfigured ? "success" : "warning"}`}>
+                      <span className="badge-dot" />
+                      {settings.security.accessPinConfigured ? "Configured" : "Not Set"}
+                    </span>
+                  </div>
+                  <div className="form-group" style={{ marginTop: 8 }}>
+                    <label className="form-label">New Company PIN</label>
+                    <input
+                      className="form-input"
+                      type="password"
+                      value={newAccessPin}
+                      onChange={(e) => setNewAccessPin(e.target.value)}
+                      placeholder="Minimum 4 characters"
+                      minLength={4}
+                    />
+                    <span className="form-hint">Set or rotate the employer access PIN.</span>
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    style={{ alignSelf: "flex-start" }}
+                    onClick={saveAccessPin}
+                    disabled={disabled || pinSaving}
+                  >
+                    {pinSaving ? "Updating..." : "Update Company PIN"}
+                  </button>
+                </div>
                 <ToggleRow
                   label="Two-Factor Authentication"
                   desc="Require 2FA for all treasury transactions"
@@ -327,8 +419,34 @@ export default function SettingsPage() {
               </div>
             </Section>
 
-            <Section title="AI Investment Agent" subtitle="Configure autonomous capital management">
+            <Section title="Agent Runtime & Wallet Guardrails" subtitle="Configure OpenClaw execution and visible safety controls">
               <div className="stack">
+                <div
+                  style={{
+                    padding: 16,
+                    borderRadius: 16,
+                    background: "var(--bg-muted)",
+                    border: "1px solid var(--border-subtle)"
+                  }}
+                  className="stack"
+                >
+                  <div className="fw-medium text-sm">Hackathon Runtime Note</div>
+                  <div className="text-xs text-secondary">
+                    This prototype uses ETH on Sepolia for testnet execution today. The OpenClaw orchestration path, WDK execution layer, and wallet policies are designed so the asset rail can be swapped to production tokens later.
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Execution Source</label>
+                  <select
+                    className="form-select"
+                    value={settings.agent.executionSource}
+                    onChange={(e) => updateAgent({ executionSource: e.target.value })}
+                  >
+                    <option>OpenClaw EC2</option>
+                    <option>Hybrid (EC2 + backend schedulers)</option>
+                  </select>
+                  <span className="form-hint">Displayed in the audit trail so judges can see that strategy starts on EC2 before backend policy validation and WDK execution.</span>
+                </div>
                 <ToggleRow
                   label="Agent Enabled"
                   desc="Allow the agent to execute trades automatically"
@@ -354,6 +472,101 @@ export default function SettingsPage() {
                     />
                   </div>
                   <span className="form-hint">Maximum size of a single automated trade.</span>
+                </div>
+                <div className="divider" />
+                <div className="fw-medium text-sm">Wallet Permissions</div>
+                <ToggleRow
+                  label="Allow Treasury Allocation"
+                  desc="Permit the agent to allocate treasury capital after deposits land."
+                  checked={settings.agent.walletPolicy.allowTreasuryAllocation}
+                  onChange={(next) => updateWalletPolicy({ allowTreasuryAllocation: next })}
+                />
+                <ToggleRow
+                  label="Allow Loan Disbursal"
+                  desc="Permit the agent to move treasury funds into employee wallets for approved loans."
+                  checked={settings.agent.walletPolicy.allowLoanDisbursal}
+                  onChange={(next) => updateWalletPolicy({ allowLoanDisbursal: next })}
+                />
+                <ToggleRow
+                  label="Allow Payroll Execution"
+                  desc="Permit automated payroll payouts and EMI auto-deduction flows."
+                  checked={settings.agent.walletPolicy.allowPayroll}
+                  onChange={(next) => updateWalletPolicy({ allowPayroll: next })}
+                />
+                <ToggleRow
+                  label="Allow Aave Rebalance"
+                  desc="Permit automated Aave deposits and rebalancing decisions."
+                  checked={settings.agent.walletPolicy.allowAaveRebalance}
+                  onChange={(next) => updateWalletPolicy({ allowAaveRebalance: next })}
+                />
+                <div className="divider" />
+                <div className="fw-medium text-sm">Hard Limits</div>
+                <div className="form-group">
+                  <label className="form-label">Max Single Transfer (USD)</label>
+                  <div className="form-input-prefix">
+                    <span className="form-input-prefix-symbol">$</span>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min={0}
+                      value={settings.agent.walletPolicy.maxSingleTransfer}
+                      onChange={(e) => updateWalletPolicy({ maxSingleTransfer: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Max Daily Outflow (USD)</label>
+                  <div className="form-input-prefix">
+                    <span className="form-input-prefix-symbol">$</span>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min={0}
+                      value={settings.agent.walletPolicy.maxDailyOutflow}
+                      onChange={(e) => updateWalletPolicy({ maxDailyOutflow: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Max Loan Amount (USD)</label>
+                  <div className="form-input-prefix">
+                    <span className="form-input-prefix-symbol">$</span>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min={0}
+                      value={settings.agent.walletPolicy.maxLoanAmount}
+                      onChange={(e) => updateWalletPolicy({ maxLoanAmount: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Max Aave Allocation (%)</label>
+                  <div className="form-input-prefix">
+                    <span className="form-input-prefix-symbol">%</span>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={settings.agent.walletPolicy.maxAaveAllocationPct}
+                      onChange={(e) => updateWalletPolicy({ maxAaveAllocationPct: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Human Review Threshold (USD)</label>
+                  <div className="form-input-prefix">
+                    <span className="form-input-prefix-symbol">$</span>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min={0}
+                      value={settings.agent.walletPolicy.humanReviewAbove}
+                      onChange={(e) => updateWalletPolicy({ humanReviewAbove: Number(e.target.value) })}
+                    />
+                  </div>
+                  <span className="form-hint">Requests above this line still run through policy validation and show as review in the audit trail.</span>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Risk Tolerance</label>

@@ -1,0 +1,401 @@
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
+import type { Request, Response } from "express";
+import { db } from "../db/pool.js";
+import { env } from "../config/env.js";
+import { ApiError } from "../utils/errors.js";
+
+const COMPANY_SESSION_COOKIE = "flowpay_company_session";
+const EMPLOYEE_SESSION_COOKIE = "flowpay_employee_session";
+const DEFAULT_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type CompanyProfile = {
+  id: string;
+  name: string;
+  email: string;
+  treasury_address: string | null;
+  created_at: string;
+};
+
+export type EmployeeProfile = {
+  id: string;
+  full_name: string;
+  email: string;
+  salary: string;
+  credit_score: number;
+  status: string;
+  created_at: string;
+  wallet_address: string | null;
+  company_id?: string | null;
+  company_name?: string | null;
+};
+
+export type CompanySession = {
+  role: "company";
+  companyId: string;
+  exp: number;
+};
+
+export type EmployeeSession = {
+  role: "employee";
+  employeeId: string;
+  companyId: string | null;
+  exp: number;
+};
+
+type ResolvedCompany = CompanyProfile & {
+  access_pin_hash: string | null;
+};
+
+type ResolvedEmployee = EmployeeProfile & {
+  password_hash: string | null;
+};
+
+function sanitizeCompany(company: ResolvedCompany): CompanyProfile {
+  const { access_pin_hash: _accessPinHash, ...publicCompany } = company;
+  return publicCompany;
+}
+
+function sanitizeEmployee(employee: ResolvedEmployee): EmployeeProfile {
+  const { password_hash: _passwordHash, ...publicEmployee } = employee;
+  return publicEmployee;
+}
+
+function cookieOptions(maxAge: number) {
+  return {
+    httpOnly: true,
+    sameSite: env.NODE_ENV === "production" ? ("none" as const) : ("lax" as const),
+    secure: env.NODE_ENV === "production",
+    path: "/",
+    maxAge
+  };
+}
+
+function parseCookies(header?: string) {
+  const cookies: Record<string, string> = {};
+  if (!header) {
+    return cookies;
+  }
+
+  for (const part of header.split(";")) {
+    const [rawName, ...rawValue] = part.trim().split("=");
+    if (!rawName || rawValue.length === 0) {
+      continue;
+    }
+    cookies[rawName] = decodeURIComponent(rawValue.join("="));
+  }
+
+  return cookies;
+}
+
+function signToken(payload: CompanySession | EmployeeSession) {
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = crypto.createHmac("sha256", env.MASTER_KEY).update(encodedPayload).digest("base64url");
+  return `${encodedPayload}.${signature}`;
+}
+
+function verifyToken<T extends CompanySession | EmployeeSession>(token: string, role: T["role"]): T | null {
+  const [encodedPayload, signature] = token.split(".");
+  if (!encodedPayload || !signature) {
+    return null;
+  }
+
+  const expected = crypto.createHmac("sha256", env.MASTER_KEY).update(encodedPayload).digest("base64url");
+  const received = Buffer.from(signature);
+  const computed = Buffer.from(expected);
+  if (received.length !== computed.length || !crypto.timingSafeEqual(received, computed)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as T;
+    if (parsed.role !== role || parsed.exp <= Date.now()) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function parseTimeoutLabel(label?: string | null) {
+  switch (label) {
+    case "1 hour":
+      return 60 * 60 * 1000;
+    case "4 hours":
+      return 4 * 60 * 60 * 1000;
+    case "8 hours":
+      return 8 * 60 * 60 * 1000;
+    case "30 minutes":
+    default:
+      return DEFAULT_SESSION_TIMEOUT_MS;
+  }
+}
+
+async function getCompanySessionTimeout(companyId?: string | null) {
+  if (!companyId) {
+    return DEFAULT_SESSION_TIMEOUT_MS;
+  }
+
+  const result = await db.query(
+    `SELECT security->>'sessionTimeout' AS session_timeout
+     FROM company_settings
+     WHERE company_id = $1`,
+    [companyId]
+  );
+
+  return parseTimeoutLabel(result.rows[0]?.session_timeout ?? null);
+}
+
+async function findCompanyByAccess(access: string) {
+  const normalized = access.trim();
+  if (!normalized) {
+    throw new ApiError(400, "Company ID or treasury wallet address is required");
+  }
+
+  const result = uuidRegex.test(normalized)
+    ? await db.query(
+        `SELECT c.id, c.name, c.email, c.created_at, c.access_pin_hash, w.wallet_address AS treasury_address
+         FROM companies c
+         LEFT JOIN wallets w ON c.treasury_wallet_id = w.id
+         WHERE c.id = $1`,
+        [normalized]
+      )
+    : await db.query(
+        `SELECT c.id, c.name, c.email, c.created_at, c.access_pin_hash, w.wallet_address AS treasury_address
+         FROM companies c
+         JOIN wallets w ON c.treasury_wallet_id = w.id
+         WHERE LOWER(w.wallet_address) = LOWER($1)`,
+        [normalized]
+      );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new ApiError(404, "Company access not found");
+  }
+
+  return result.rows[0] as ResolvedCompany;
+}
+
+async function findEmployeeByAccess(access: string) {
+  const normalized = access.trim();
+  if (!normalized) {
+    throw new ApiError(400, "Employee ID or wallet address is required");
+  }
+
+  const result = uuidRegex.test(normalized)
+    ? await db.query(
+        `SELECT
+           e.id,
+           e.full_name,
+           COALESCE(e.email, '') AS email,
+           e.salary,
+           e.credit_score,
+           e.status,
+           e.created_at,
+           e.password_hash,
+           e.company_id,
+           c.name AS company_name,
+           w.wallet_address
+         FROM employees e
+         LEFT JOIN wallets w ON e.wallet_id = w.id
+         LEFT JOIN companies c ON e.company_id = c.id
+         WHERE e.id = $1`,
+        [normalized]
+      )
+    : await db.query(
+        `SELECT
+           e.id,
+           e.full_name,
+           COALESCE(e.email, '') AS email,
+           e.salary,
+           e.credit_score,
+           e.status,
+           e.created_at,
+           e.password_hash,
+           e.company_id,
+           c.name AS company_name,
+           w.wallet_address
+         FROM employees e
+         JOIN wallets w ON e.wallet_id = w.id
+         LEFT JOIN companies c ON e.company_id = c.id
+         WHERE LOWER(w.wallet_address) = LOWER($1)`,
+        [normalized]
+      );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new ApiError(404, "Employee access not found");
+  }
+
+  return result.rows[0] as ResolvedEmployee;
+}
+
+export async function authenticateCompany(input: {
+  access: string;
+  accessPin: string;
+  email?: string;
+}) {
+  const company = await findCompanyByAccess(input.access);
+  const normalizedEmail = input.email?.trim().toLowerCase();
+
+  if (!company.access_pin_hash) {
+    if (!normalizedEmail || normalizedEmail !== company.email.trim().toLowerCase()) {
+      throw new ApiError(
+        403,
+        "This company does not have an access PIN yet. Enter the registered company email and a new PIN to secure it."
+      );
+    }
+
+    const accessPinHash = await bcrypt.hash(input.accessPin, 12);
+    await db.query("UPDATE companies SET access_pin_hash = $1 WHERE id = $2", [accessPinHash, company.id]);
+  } else {
+    const valid = await bcrypt.compare(input.accessPin, company.access_pin_hash);
+    if (!valid) {
+      throw new ApiError(401, "Invalid company PIN");
+    }
+  }
+
+  return sanitizeCompany(company);
+}
+
+export async function authenticateEmployee(input: {
+  access: string;
+  password: string;
+  email?: string;
+}) {
+  const employee = await findEmployeeByAccess(input.access);
+
+  if (employee.status !== "active") {
+    throw new ApiError(403, "Employee account is not active. Finish the activation flow first.");
+  }
+
+  if (!employee.password_hash) {
+    const normalizedEmail = input.email?.trim().toLowerCase();
+    if (!normalizedEmail || !employee.email || normalizedEmail !== employee.email.trim().toLowerCase()) {
+      throw new ApiError(
+        403,
+        "This employee does not have a password yet. Enter the invite email and a new password to secure the account."
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(input.password, 12);
+    await db.query("UPDATE employees SET password_hash = $1 WHERE id = $2", [passwordHash, employee.id]);
+  } else {
+    const valid = await bcrypt.compare(input.password, employee.password_hash);
+    if (!valid) {
+      throw new ApiError(401, "Invalid employee password");
+    }
+  }
+
+  return sanitizeEmployee(employee);
+}
+
+export async function createCompanySession(res: Response, companyId: string) {
+  const ttl = await getCompanySessionTimeout(companyId);
+  const token = signToken({
+    role: "company",
+    companyId,
+    exp: Date.now() + ttl
+  });
+  res.cookie(COMPANY_SESSION_COOKIE, token, cookieOptions(ttl));
+}
+
+export async function createEmployeeSession(res: Response, employeeId: string, companyId?: string | null) {
+  const ttl = await getCompanySessionTimeout(companyId ?? null);
+  const token = signToken({
+    role: "employee",
+    employeeId,
+    companyId: companyId ?? null,
+    exp: Date.now() + ttl
+  });
+  res.cookie(EMPLOYEE_SESSION_COOKIE, token, cookieOptions(ttl));
+}
+
+export function clearCompanySession(res: Response) {
+  res.clearCookie(COMPANY_SESSION_COOKIE, cookieOptions(0));
+}
+
+export function clearEmployeeSession(res: Response) {
+  res.clearCookie(EMPLOYEE_SESSION_COOKIE, cookieOptions(0));
+}
+
+export function readCompanySession(req: Request) {
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies[COMPANY_SESSION_COOKIE];
+  return token ? verifyToken<CompanySession>(token, "company") : null;
+}
+
+export function readEmployeeSession(req: Request) {
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies[EMPLOYEE_SESSION_COOKIE];
+  return token ? verifyToken<EmployeeSession>(token, "employee") : null;
+}
+
+export async function updateCompanyAccessPin(companyId: string, accessPin: string) {
+  const accessPinHash = await bcrypt.hash(accessPin, 12);
+  await db.query("UPDATE companies SET access_pin_hash = $1 WHERE id = $2", [accessPinHash, companyId]);
+}
+
+export async function getCompanyProfile(companyId: string) {
+  const result = await db.query(
+    `SELECT c.id, c.name, c.email, c.created_at, w.wallet_address AS treasury_address
+     FROM companies c
+     LEFT JOIN wallets w ON c.treasury_wallet_id = w.id
+     WHERE c.id = $1`,
+    [companyId]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new ApiError(404, "Company not found");
+  }
+
+  return result.rows[0] as CompanyProfile;
+}
+
+export async function getCompanyListForOwner(companyId: string) {
+  const company = await getCompanyProfile(companyId);
+  return [company];
+}
+
+export async function getEmployeeProfile(employeeId: string) {
+  const result = await db.query(
+    `SELECT
+       e.id,
+       e.full_name,
+       COALESCE(e.email, '') AS email,
+       e.salary,
+       e.credit_score,
+       e.status,
+       e.created_at,
+       w.wallet_address,
+       c.id AS company_id,
+       c.name AS company_name
+     FROM employees e
+     LEFT JOIN wallets w ON e.wallet_id = w.id
+     LEFT JOIN companies c ON e.company_id = c.id
+     WHERE e.id = $1`,
+    [employeeId]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new ApiError(404, "Employee not found");
+  }
+
+  return result.rows[0] as EmployeeProfile;
+}
+
+export async function isEmployeeOwnedByCompany(employeeId: string, companyId: string) {
+  const result = await db.query(
+    "SELECT 1 FROM employees WHERE id = $1 AND company_id = $2",
+    [employeeId, companyId]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function hasCompanyAccessPin(companyId: string) {
+  const result = await db.query("SELECT access_pin_hash FROM companies WHERE id = $1", [companyId]);
+  if ((result.rowCount ?? 0) === 0) {
+    throw new ApiError(404, "Company not found");
+  }
+  return Boolean(result.rows[0].access_pin_hash);
+}

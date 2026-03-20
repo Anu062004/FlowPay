@@ -4,6 +4,8 @@ import { ApiError } from "../utils/errors.js";
 import { env } from "../config/env.js";
 import { createOpsTask } from "./opsService.js";
 import { getTreasuryBalance } from "./treasuryService.js";
+import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
+import { evaluateAgentPolicy } from "./agentPolicyService.js";
 
 function calculateEmi(amount: number, annualInterestRate: number, durationMonths: number) {
   const monthlyRate = annualInterestRate / 100 / 12;
@@ -15,7 +17,7 @@ function calculateEmi(amount: number, annualInterestRate: number, durationMonths
   return numerator / denominator;
 }
 
-export async function runPayroll(companyId?: string) {
+export async function runPayroll(companyId?: string, auditContext: AgentLogContext = {}) {
   const companyQuery = companyId
     ? "SELECT id, treasury_wallet_id FROM companies WHERE id = $1"
     : "SELECT id, treasury_wallet_id FROM companies";
@@ -40,6 +42,18 @@ export async function runPayroll(companyId?: string) {
       [company.id]
     );
 
+    const employeePayrolls: Array<{
+      employeeId: string;
+      walletAddress: string;
+      walletId: string;
+      netSalary: number;
+      totalEmi: number;
+      loanRows: Array<any>;
+    }> = [];
+
+    let totalNetSalary = 0;
+    let totalEmiCollected = 0;
+
     for (const employee of employees.rows) {
       const salary = parseFloat(employee.salary);
       const loans = await db.query(
@@ -58,45 +72,155 @@ export async function runPayroll(companyId?: string) {
       }
 
       const netSalary = Math.max(salary - totalEmi, 0);
+      totalNetSalary += netSalary;
+      totalEmiCollected += totalEmi;
 
-      if (netSalary > 0) {
-        await sendTransaction(
-          company.treasury_wallet_id,
-          employee.wallet_address,
-          netSalary,
-          "payroll"
-        );
+      employeePayrolls.push({
+        employeeId: employee.id,
+        walletAddress: employee.wallet_address,
+        walletId: employee.wallet_id,
+        netSalary,
+        totalEmi,
+        loanRows: loans.rows
+      });
+    }
+
+    const policyResult = await evaluateAgentPolicy({
+      companyId: company.id,
+      action: "payroll",
+      amount: totalNetSalary
+    });
+
+    await logAgentAction(
+      "FlowPayPolicyEngine",
+      {
+        companyId: company.id,
+        employees: employeePayrolls.length,
+        totalNetSalary,
+        totalEmiCollected
+      },
+      {
+        action: "payroll"
+      },
+      policyResult.reasons.join(" ") || "Payroll run passed wallet policy checks.",
+      `Payroll policy status: ${policyResult.status.toUpperCase()}`,
+      company.id,
+      {
+        ...auditContext,
+        stage: "policy_validation",
+        policyResult,
+        executionStatus: policyResult.status
       }
+    );
 
-      if (totalEmi > 0) {
-        const tokenSymbol = env.TREASURY_TOKEN_SYMBOL ?? "ETH";
-        await db.query(
-          "INSERT INTO transactions (wallet_id, type, amount, token_symbol) VALUES ($1, 'emi_repayment', $2, $3)",
-          [company.treasury_wallet_id, totalEmi.toFixed(6), tokenSymbol]
-        );
-      }
+    if (policyResult.status === "block") {
+      throw new ApiError(400, policyResult.reasons[0] ?? "Payroll blocked by wallet policy");
+    }
 
-      for (const loan of loans.rows) {
-        const emi = calculateEmi(
-          parseFloat(loan.amount),
-          parseFloat(loan.interest_rate),
-          parseInt(loan.duration_months, 10)
-        );
-        const remaining = parseFloat(loan.remaining_balance) - emi;
-        if (remaining <= 0) {
-          await db.query(
-            "UPDATE loans SET remaining_balance = 0, status = 'repaid', updated_at = now() WHERE id = $1",
-            [loan.id]
+    const txHashes: Array<{ employeeId: string; txHash: string | null }> = [];
+
+    try {
+      for (const employee of employeePayrolls) {
+        if (employee.netSalary > 0) {
+          const transfer = await sendTransaction(
+            company.treasury_wallet_id,
+            employee.walletAddress,
+            employee.netSalary,
+            "payroll",
+            employee.walletId
           );
-        } else {
+          txHashes.push({
+            employeeId: employee.employeeId,
+            txHash: transfer.txHash ?? null
+          });
+        }
+
+        if (employee.totalEmi > 0) {
+          const tokenSymbol = env.TREASURY_TOKEN_SYMBOL ?? "ETH";
+          const createdAt = new Date();
           await db.query(
-            "UPDATE loans SET remaining_balance = $1, updated_at = now() WHERE id = $2",
-            [remaining.toFixed(6), loan.id]
+            "INSERT INTO transactions (wallet_id, type, amount, token_symbol, created_at) VALUES ($1, 'emi_repayment', $2, $3, $4)",
+            [company.treasury_wallet_id, employee.totalEmi.toFixed(6), tokenSymbol, createdAt]
+          );
+          await db.query(
+            "INSERT INTO transactions (wallet_id, type, amount, token_symbol, created_at) VALUES ($1, 'emi_repayment', $2, $3, $4)",
+            [employee.walletId, employee.totalEmi.toFixed(6), tokenSymbol, createdAt]
           );
         }
+
+        for (const loan of employee.loanRows) {
+          const emi = calculateEmi(
+            parseFloat(loan.amount),
+            parseFloat(loan.interest_rate),
+            parseInt(loan.duration_months, 10)
+          );
+          const remaining = parseFloat(loan.remaining_balance) - emi;
+          if (remaining <= 0) {
+            await db.query(
+              "UPDATE loans SET remaining_balance = 0, status = 'repaid', updated_at = now() WHERE id = $1",
+              [loan.id]
+            );
+          } else {
+            await db.query(
+              "UPDATE loans SET remaining_balance = $1, updated_at = now() WHERE id = $2",
+              [remaining.toFixed(6), loan.id]
+            );
+          }
+        }
+
+        results.push({ employeeId: employee.employeeId, netSalary: employee.netSalary, totalEmi: employee.totalEmi });
       }
 
-      results.push({ employeeId: employee.id, netSalary, totalEmi });
+      await logAgentAction(
+        "WDKExecutionLayer",
+        {
+          companyId: company.id,
+          employees: employeePayrolls.length,
+          totalNetSalary,
+          totalEmiCollected
+        },
+        {
+          action: "payroll"
+        },
+        "Payroll transfers executed and EMI deductions recorded.",
+        `Payroll execution completed for ${employeePayrolls.length} employees.`,
+        company.id,
+        {
+          ...auditContext,
+          stage: "wdk_execution",
+          policyResult,
+          executionStatus: "success",
+          metadata: {
+            txHashes
+          }
+        }
+      );
+    } catch (error) {
+      await logAgentAction(
+        "WDKExecutionLayer",
+        {
+          companyId: company.id,
+          employees: employeePayrolls.length,
+          totalNetSalary,
+          totalEmiCollected
+        },
+        {
+          action: "payroll"
+        },
+        error instanceof Error ? error.message : "Payroll execution failed.",
+        "Payroll execution failed.",
+        company.id,
+        {
+          ...auditContext,
+          stage: "wdk_execution",
+          policyResult,
+          executionStatus: "failed",
+          metadata: {
+            txHashes
+          }
+        }
+      );
+      throw error;
     }
   }
 

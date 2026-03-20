@@ -15,16 +15,38 @@ const auth = (req: express.Request, res: express.Response, next: express.NextFun
 
 router.get("/logs", auth, async (req, res, next) => {
   const companyId = req.query.companyId;
+  const workflowId = req.query.workflowId;
+  const stage = req.query.stage;
   try {
-    let query = "SELECT id, timestamp, agent_name, decision, rationale, action_taken, company_id FROM agent_logs";
-    const params = [];
+    let query =
+      "SELECT id, timestamp, agent_name, decision, rationale, action_taken, company_id, workflow_id, workflow_name, stage, source, policy_result, execution_status, metadata FROM agent_logs";
+    const params: unknown[] = [];
+    const clauses: string[] = [];
 
     if (companyId) {
-      query += " WHERE company_id = $1";
       params.push(companyId);
+      clauses.push(`company_id = $${params.length}`);
     }
 
-    query += " ORDER BY timestamp DESC LIMIT 20";
+    if (workflowId) {
+      params.push(workflowId);
+      clauses.push(`workflow_id = $${params.length}`);
+    }
+
+    if (stage) {
+      params.push(stage);
+      clauses.push(`stage = $${params.length}`);
+    }
+
+    if (clauses.length > 0) {
+      query += ` WHERE ${clauses.join(" AND ")}`;
+    }
+
+    const parsedLimit = parseInt(String(req.query.limit ?? "60"), 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 250) : 60;
+    params.push(limit);
+
+    query += ` ORDER BY timestamp DESC LIMIT $${params.length}`;
 
     const result = await db.query(query, params);
     res.json({ logs: result.rows });

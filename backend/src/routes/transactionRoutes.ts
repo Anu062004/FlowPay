@@ -5,6 +5,7 @@ import { db } from "../db/pool.js";
 import { uuidQueryParam } from "../utils/validation.js";
 import { env } from "../config/env.js";
 import { getTokenTransfers } from "../services/indexerService.js";
+import { assertCompanyScope, assertEmployeeScope, requireCompanySession, requireEmployeeSession } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -12,8 +13,10 @@ const router = Router();
 // Full treasury ledger for a company (all tx types)
 router.get(
   "/",
+  requireCompanySession,
   asyncHandler(async (req, res) => {
     const companyId = uuidQueryParam.parse(req.query.companyId);
+    assertCompanyScope(res, companyId);
     const limit = Math.min(parseInt((req.query.limit as string) ?? "50"), 100);
     const offset = parseInt((req.query.offset as string) ?? "0");
 
@@ -56,8 +59,10 @@ router.get(
 // Raw on-chain token transfers from WDK Indexer
 router.get(
   "/onchain",
+  requireCompanySession,
   asyncHandler(async (req, res) => {
     const companyId = uuidQueryParam.parse(req.query.companyId);
+    assertCompanyScope(res, companyId);
     const token = (req.query.token as string | undefined) ?? env.TREASURY_TOKEN_SYMBOL ?? "usdt";
     const blockchain = (req.query.blockchain as string | undefined) ?? env.TREASURY_TOKEN_BLOCKCHAIN;
     const limit = Math.min(parseInt((req.query.limit as string) ?? "50"), 200);
@@ -82,8 +87,10 @@ router.get(
 // Personal transaction history for an employee's wallet
 router.get(
   "/me/:employeeId",
+  requireEmployeeSession,
   asyncHandler(async (req, res) => {
     const employeeId = z.string().uuid().parse(req.params.employeeId);
+    assertEmployeeScope(res, employeeId);
     const result = await db.query(
       `SELECT
          t.id,

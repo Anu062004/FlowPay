@@ -1,14 +1,18 @@
 import { pool } from "../db/pool.js";
+import bcrypt from "bcryptjs";
 import { createTreasuryWallet } from "./walletService.js";
 import { startDepositWatcher } from "./depositWatcher.js";
 
-export async function registerCompany(name: string) {
+export async function registerCompany(input: { name: string; email: string; accessPin: string }) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const accessPinHash = await bcrypt.hash(input.accessPin, 12);
     const companyResult = await client.query(
-      "INSERT INTO companies (name) VALUES ($1) RETURNING id, name, created_at",
-      [name]
+      `INSERT INTO companies (name, email, access_pin_hash)
+       VALUES ($1, $2, $3)
+       RETURNING id, name, email, created_at`,
+      [input.name, input.email, accessPinHash]
     );
     const company = companyResult.rows[0];
     const wallet = await createTreasuryWallet(company.id, client);

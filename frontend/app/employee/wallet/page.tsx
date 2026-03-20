@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useMyTransactions } from "../../lib/hooks";
+import { useMemo, useState } from "react";
+import { useEmployeeWallet, useMyTransactions } from "../../lib/hooks";
+import { withdrawEmployeeFunds } from "../../lib/api";
 import { loadEmployeeContext, type EmployeeContext } from "../../lib/companyContext";
 import EmployeeSessionPrompt from "../../components/EmployeeSessionPrompt";
 
@@ -11,10 +12,10 @@ const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   </svg>
 );
 
-function fmt(val: string | number | null | undefined): string {
-  if (val === null || val === undefined) return "—";
+function fmtEth(val: string | number | null | undefined): string {
+  if (val === null || val === undefined) return "--";
   const n = parseFloat(String(val));
-  return isNaN(n) ? "—" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return isNaN(n) ? "--" : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ETH`;
 }
 
 function Skeleton({ h = 20 }: { h?: number }) {
@@ -34,36 +35,99 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function isEvmAddress(value: string) {
+  return /^0x[a-fA-F0-9]{40}$/.test(value.trim());
+}
+
 export default function EmployeeWalletPage() {
-  const [ctx, setCtx] = useState<EmployeeContext | null>(null);
-
-  useEffect(() => {
-    setCtx(loadEmployeeContext());
-  }, []);
-  const { data, loading } = useMyTransactions();
-
+  const [ctx] = useState<EmployeeContext | null>(() => loadEmployeeContext());
   const [step, setStep] = useState<"idle" | "enter" | "confirm">("idle");
   const [dest, setDest] = useState("");
   const [amount, setAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  // Compute approx balance from personal transaction history
-  const txList = data?.transactions ?? [];
-  const totalIn = txList.filter(t => t.type === "payroll" || t.type === "loan_disbursement")
-    .reduce((s, t) => s + parseFloat(t.amount), 0);
-  const totalEmiOut = txList.filter(t => t.type === "emi_repayment")
-    .reduce((s, t) => s + parseFloat(t.amount), 0);
-  const approxBalance = Math.max(totalIn - totalEmiOut, 0);
+  const txHook = useMyTransactions();
+  const walletHook = useEmployeeWallet(ctx?.id ?? null);
 
-  // Last salary
-  const lastSalary = txList.find(t => t.type === "payroll");
+  const txList = txHook.data?.transactions ?? [];
+  const totalSalary = txList
+    .filter((t) => t.type === "payroll")
+    .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+  const totalLoanProceeds = txList
+    .filter((t) => t.type === "loan_disbursement")
+    .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+  const totalOutflows = txList
+    .filter((t) => t.type === "emi_repayment" || t.type === "withdrawal")
+    .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
-  const walletAddress = null as string | null; // will be populated from employee profile endpoint
+  const lastSalary = txList.find((t) => t.type === "payroll");
+  const walletAddress = walletHook.data?.wallet_address ?? null;
+  const balance = parseFloat(walletHook.data?.balance ?? "0");
+  const maxWithdrawable = parseFloat(walletHook.data?.max_withdrawable ?? "0");
+
+  const trimmedDest = dest.trim();
+  const numericAmount = parseFloat(amount);
+  const canContinue = useMemo(() => {
+    return (
+      Boolean(walletAddress) &&
+      isEvmAddress(trimmedDest) &&
+      Number.isFinite(numericAmount) &&
+      numericAmount > 0 &&
+      numericAmount <= maxWithdrawable
+    );
+  }, [maxWithdrawable, numericAmount, trimmedDest, walletAddress]);
+
+  async function handleContinue() {
+    if (!isEvmAddress(trimmedDest)) {
+      setActionError("Enter a valid Sepolia/EVM wallet address.");
+      return;
+    }
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setActionError("Enter a valid withdrawal amount.");
+      return;
+    }
+    if (numericAmount > maxWithdrawable) {
+      setActionError(`Amount exceeds your max withdrawable balance of ${fmtEth(maxWithdrawable)}.`);
+      return;
+    }
+    setActionError(null);
+    setStep("confirm");
+  }
+
+  async function handleConfirmWithdrawal() {
+    if (!ctx?.id) {
+      return;
+    }
+
+    setSubmitting(true);
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const result = await withdrawEmployeeFunds(ctx.id, {
+        destinationAddress: trimmedDest,
+        amount: numericAmount
+      });
+      setActionMessage(
+        `Withdrawal submitted. Sent ${fmtEth(result.amount)} to ${result.to.slice(0, 10)}...${result.to.slice(-6)}${result.txHash ? ` (tx ${result.txHash.slice(0, 12)}...).` : "."}`
+      );
+      setDest("");
+      setAmount("");
+      setStep("idle");
+      await Promise.all([walletHook.refetch(), txHook.refetch()]);
+    } catch (err: any) {
+      setActionError(err?.message ?? "Failed to withdraw funds.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   if (!ctx) {
     return (
       <div className="stack-xl">
         <div className="page-header"><h1 className="page-title">My Wallet</h1></div>
-        <EmployeeSessionPrompt onSet={setCtx} />
+        <EmployeeSessionPrompt />
       </div>
     );
   }
@@ -72,49 +136,92 @@ export default function EmployeeWalletPage() {
     <div className="stack-xl">
       <div className="page-header">
         <h1 className="page-title">My Wallet</h1>
-        <p className="page-subtitle">Personal Ethereum wallet{ctx.fullName ? ` · ${ctx.fullName}` : ""}</p>
+        <p className="page-subtitle">Personal Ethereum Sepolia wallet{ctx.fullName ? ` · ${ctx.fullName}` : ""}</p>
       </div>
 
-      {/* Wallet card */}
+      {actionMessage ? (
+        <div className="alert alert-success">
+          <span className="alert-icon"><Icon d="M5 13l4 4L19 7" size={16} /></span>
+          <span>{actionMessage}</span>
+        </div>
+      ) : null}
+      {actionError ? (
+        <div className="alert alert-danger">
+          <span className="alert-icon"><Icon d="M6 18L18 6M6 6l12 12" size={16} /></span>
+          <span>{actionError}</span>
+        </div>
+      ) : null}
+      {walletHook.error ? (
+        <div className="alert alert-danger">{walletHook.error}</div>
+      ) : null}
+
       <div className="wallet-card">
-        <div className="wallet-card-label">Personal Wallet · Ethereum Sepolia</div>
-        {loading ? (
+        <div className="wallet-card-label">Personal Wallet · {walletHook.data?.chain ?? "sepolia"}</div>
+        {walletHook.loading ? (
           <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 32, fontWeight: 700 }}>Loading…</div>
         ) : (
-          <div className="wallet-card-balance">{fmt(approxBalance)}</div>
+          <div className="wallet-card-balance">{fmtEth(walletHook.data?.balance)}</div>
         )}
-        <div className="wallet-card-sub">Estimated balance from payroll history</div>
+        <div className="wallet-card-sub">
+          {walletAddress ? (
+            <span className="font-mono" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              {walletAddress.slice(0, 10)}...{walletAddress.slice(-8)}
+              <CopyButton text={walletAddress} />
+            </span>
+          ) : "Wallet address unavailable"}
+        </div>
         <div className="wallet-card-actions">
-          <button className="btn btn-accent" style={{ fontSize: 12, padding: "6px 14px" }}
-            onClick={() => setStep("enter")}>
+          <button
+            className="btn btn-accent"
+            style={{ fontSize: 12, padding: "6px 14px" }}
+            onClick={() => {
+              setActionError(null);
+              setStep("enter");
+            }}
+            disabled={walletHook.loading || !walletAddress || maxWithdrawable <= 0}
+          >
             Withdraw
           </button>
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid-3">
         {[
-          { label: "Total Salary Received", value: loading ? "—" : fmt(txList.filter(t => t.type === "payroll").reduce((s, t) => s + parseFloat(t.amount), 0)) },
-          { label: "EMI Deducted (Total)",  value: loading ? "—" : fmt(totalEmiOut) },
-          { label: "Last Salary",           value: loading ? "—" : (lastSalary ? fmt(lastSalary.amount) : "—") },
+          { label: "Wallet Balance", value: walletHook.loading ? "--" : fmtEth(balance), sub: "Live on-chain balance" },
+          { label: "Max Withdrawable", value: walletHook.loading ? "--" : fmtEth(maxWithdrawable), sub: "Gas reserve kept aside" },
+          { label: "Last Salary", value: txHook.loading ? "--" : (lastSalary ? fmtEth(lastSalary.amount) : "--"), sub: "Most recent payroll credit" },
         ].map((s, i) => (
           <div key={i} className="metric-card">
             <div className="metric-card-label">{s.label}</div>
-            {loading ? <Skeleton h={28} /> : (
+            {walletHook.loading || txHook.loading ? <Skeleton h={28} /> : (
+              <div className="metric-card-value font-num" style={{ fontSize: "var(--text-3xl)" }}>{s.value}</div>
+            )}
+            <div className="metric-card-change neutral">{s.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid-3">
+        {[
+          { label: "Salary Received", value: txHook.loading ? "--" : fmtEth(totalSalary) },
+          { label: "Loan Proceeds", value: txHook.loading ? "--" : fmtEth(totalLoanProceeds) },
+          { label: "Total Outflows", value: txHook.loading ? "--" : fmtEth(totalOutflows) },
+        ].map((s, i) => (
+          <div key={i} className="metric-card">
+            <div className="metric-card-label">{s.label}</div>
+            {txHook.loading ? <Skeleton h={28} /> : (
               <div className="metric-card-value font-num" style={{ fontSize: "var(--text-3xl)" }}>{s.value}</div>
             )}
           </div>
         ))}
       </div>
 
-      {/* Withdrawal flow */}
       {step === "enter" && (
         <div className="modal-backdrop" onClick={() => setStep("idle")}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">Withdraw Funds</div>
-              <button className="btn btn-ghost btn-icon" onClick={() => setStep("idle")}>
+              <button className="btn btn-ghost btn-icon" onClick={() => setStep("idle")} disabled={submitting}>
                 <Icon d="M6 18L18 6M6 6l12 12" size={16} />
               </button>
             </div>
@@ -122,18 +229,25 @@ export default function EmployeeWalletPage() {
               <div className="stack">
                 <div className="form-group">
                   <label className="form-label">Destination Wallet Address</label>
-                  <input className="form-input font-mono" placeholder="aleo1…"
-                    value={dest} onChange={e => setDest(e.target.value)} />
+                  <input
+                    className="form-input font-mono"
+                    placeholder="0x..."
+                    value={dest}
+                    onChange={e => setDest(e.target.value)}
+                  />
                   <span className="form-hint">Must be a valid Ethereum Sepolia address.</span>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Amount (USD)</label>
-                  <div className="form-input-prefix">
-                    <span className="form-input-prefix-symbol">$</span>
-                    <input className="form-input" type="number" placeholder="0.00"
-                      value={amount} onChange={e => setAmount(e.target.value)} />
-                  </div>
-                  <span className="form-hint">Available (estimated): {fmt(approxBalance)}</span>
+                  <label className="form-label">Amount (ETH)</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    step="0.000001"
+                    placeholder="0.005000"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                  />
+                  <span className="form-hint">Available to send: {fmtEth(maxWithdrawable)}. A small amount stays reserved for network gas.</span>
                 </div>
                 <div className="alert alert-warning">
                   <span className="alert-icon"><Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} /></span>
@@ -142,30 +256,31 @@ export default function EmployeeWalletPage() {
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setStep("idle")}>Cancel</button>
-              <button className="btn btn-primary" onClick={() => setStep("confirm")}
-                disabled={!dest || !amount}>Continue</button>
+              <button className="btn btn-secondary" onClick={() => setStep("idle")} disabled={submitting}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleContinue} disabled={!walletAddress || submitting}>
+                Continue
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {step === "confirm" && (
-        <div className="modal-backdrop" onClick={() => setStep("idle")}>
+        <div className="modal-backdrop" onClick={() => !submitting && setStep("idle")}>
           <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">Confirm Withdrawal</div>
-              <button className="btn btn-ghost btn-icon" onClick={() => setStep("idle")}>
+              <button className="btn btn-ghost btn-icon" onClick={() => setStep("idle")} disabled={submitting}>
                 <Icon d="M6 18L18 6M6 6l12 12" size={16} />
               </button>
             </div>
             <div className="modal-body">
               <div className="stack">
                 {[
-                  ["Amount", `${fmt(amount)}`],
-                  ["Network Fee", "~$0.02"],
-                  ["Net Sent", fmt(Math.max(parseFloat(amount) - 0.02, 0))],
-                  ["To", `${dest.slice(0, 12)}…${dest.slice(-8)}`],
+                  ["Amount", fmtEth(numericAmount)],
+                  ["Wallet Balance", fmtEth(balance)],
+                  ["Max Withdrawable", fmtEth(maxWithdrawable)],
+                  ["To", `${trimmedDest.slice(0, 12)}...${trimmedDest.slice(-8)}`],
                 ].map(([k, v], i) => (
                   <div key={i} className="row-between" style={{
                     padding: "10px 0", borderBottom: i < 3 ? "1px solid var(--border-subtle)" : "none"
@@ -174,11 +289,17 @@ export default function EmployeeWalletPage() {
                     <span className="fw-semi font-mono text-sm">{v}</span>
                   </div>
                 ))}
+                <div className="alert alert-warning">
+                  <span className="alert-icon"><Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} /></span>
+                  <span>Network gas is paid separately from your wallet balance. If the balance changes, the transfer may fail.</span>
+                </div>
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setStep("enter")}>Back</button>
-              <button className="btn btn-danger" onClick={() => setStep("idle")}>Confirm Withdrawal</button>
+              <button className="btn btn-secondary" onClick={() => setStep("enter")} disabled={submitting}>Back</button>
+              <button className="btn btn-danger" onClick={handleConfirmWithdrawal} disabled={!canContinue || submitting}>
+                {submitting ? "Submitting..." : "Confirm Withdrawal"}
+              </button>
             </div>
           </div>
         </div>
@@ -186,4 +307,3 @@ export default function EmployeeWalletPage() {
     </div>
   );
 }
-

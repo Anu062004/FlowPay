@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import type { Transaction } from "../../lib/api";
 import { useMyTransactions } from "../../lib/hooks";
 import { loadEmployeeContext, type EmployeeContext } from "../../lib/companyContext";
 import EmployeeSessionPrompt from "../../components/EmployeeSessionPrompt";
@@ -16,48 +17,65 @@ function Badge({ variant, children }: { variant: string; children: React.ReactNo
 }
 
 function fmt(val: string | number | null | undefined): string {
-  if (val === null || val === undefined) return "—";
+  if (val === null || val === undefined) return "--";
   const n = parseFloat(String(val));
-  return isNaN(n) ? "—" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return isNaN(n) ? "--" : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ETH`;
 }
 
 function Skeleton() {
   return <div style={{ height: 18, background: "var(--gray-100)", borderRadius: 4 }} />;
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button className="wallet-address-copy" onClick={() => {
+      navigator.clipboard.writeText(text).catch(() => {});
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }}>
+      <Icon d={copied ? "M5 13l4 4L19 7" : "M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"} size={14} />
+    </button>
+  );
+}
+
 const TX_LABEL: Record<string, string> = {
   payroll: "Salary Received",
   loan_disbursement: "Loan Disbursement",
   emi_repayment: "EMI Deduction",
+  withdrawal: "Withdrawal",
   deposit: "Deposit",
   investment: "Investment",
 };
+
 const TX_BADGE: Record<string, string> = {
-  payroll: "success", loan_disbursement: "primary", emi_repayment: "warning",
-  deposit: "success", investment: "accent",
+  payroll: "success",
+  loan_disbursement: "primary",
+  emi_repayment: "warning",
+  withdrawal: "danger",
+  deposit: "success",
+  investment: "accent",
 };
 
 export default function EmployeeTransactionsPage() {
-  const [ctx, setCtx] = useState<EmployeeContext | null>(null);
-
-  useEffect(() => {
-    setCtx(loadEmployeeContext());
-  }, []);
+  const [ctx] = useState<EmployeeContext | null>(() => loadEmployeeContext());
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   const { data, loading, error, refetch } = useMyTransactions();
-
   const txList = data?.transactions ?? [];
 
-  const totalIn = txList.filter(t => t.type === "payroll" || t.type === "loan_disbursement")
+  const totalIn = txList
+    .filter((t) => t.type === "payroll" || t.type === "loan_disbursement")
     .reduce((s, t) => s + parseFloat(t.amount), 0);
-  const totalEmi = txList.filter(t => t.type === "emi_repayment")
+  const totalEmi = txList
+    .filter((t) => t.type === "emi_repayment")
     .reduce((s, t) => s + parseFloat(t.amount), 0);
 
   if (!ctx) {
     return (
       <div className="stack-xl">
         <div className="page-header"><h1 className="page-title">My Transactions</h1></div>
-        <EmployeeSessionPrompt onSet={setCtx} />
+        <EmployeeSessionPrompt />
       </div>
     );
   }
@@ -75,12 +93,11 @@ export default function EmployeeTransactionsPage() {
         </button>
       </div>
 
-      {/* KPIs */}
       <div className="grid-3">
         {[
-          { label: "Total Received",      value: loading ? "—" : fmt(totalIn),    sub: "Salary + loan proceeds" },
-          { label: "Total EMI Deducted",  value: loading ? "—" : fmt(totalEmi),   sub: `${txList.filter(t => t.type === "emi_repayment").length} deductions` },
-          { label: "Transactions",        value: loading ? "—" : String(txList.length), sub: "All time" },
+          { label: "Total Received", value: loading ? "--" : fmt(totalIn), sub: "Salary + loan proceeds" },
+          { label: "Total EMI Deducted", value: loading ? "--" : fmt(totalEmi), sub: `${txList.filter((t) => t.type === "emi_repayment").length} deductions` },
+          { label: "Transactions", value: loading ? "--" : String(txList.length), sub: "All time" },
         ].map((s, i) => (
           <div key={i} className="metric-card">
             <div className="metric-card-label">{s.label}</div>
@@ -92,7 +109,6 @@ export default function EmployeeTransactionsPage() {
         ))}
       </div>
 
-      {/* Table */}
       <div className="card">
         <div className="card-header">
           <div className="card-title">Transaction History</div>
@@ -118,6 +134,7 @@ export default function EmployeeTransactionsPage() {
                     <th>Type</th>
                     <th className="right">Amount</th>
                     <th>Tx Hash</th>
+                    <th>Details</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -138,8 +155,13 @@ export default function EmployeeTransactionsPage() {
                         </td>
                         <td>
                           {tx.tx_hash
-                            ? <span className="font-mono text-xs text-secondary">{tx.tx_hash.slice(0, 12)}…</span>
-                            : <span className="text-tertiary text-xs">—</span>}
+                            ? <span className="font-mono text-xs text-secondary">{tx.tx_hash.slice(0, 12)}...</span>
+                            : <span className="text-tertiary text-xs">--</span>}
+                        </td>
+                        <td>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setSelectedTx(tx)}>
+                            View
+                          </button>
                         </td>
                       </tr>
                     );
@@ -153,6 +175,66 @@ export default function EmployeeTransactionsPage() {
           </>
         )}
       </div>
+
+      {selectedTx ? (
+        <div className="modal-backdrop" onClick={() => setSelectedTx(null)}>
+          <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">Transaction Details</div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setSelectedTx(null)}>
+                <Icon d="M6 18L18 6M6 6l12 12" size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="stack">
+                <div className="row-between" style={{ paddingBottom: 12, borderBottom: "1px solid var(--border-subtle)" }}>
+                  <span className="text-sm text-secondary">Type</span>
+                  <Badge variant={TX_BADGE[selectedTx.type] ?? "neutral"}>
+                    {TX_LABEL[selectedTx.type] ?? selectedTx.type}
+                  </Badge>
+                </div>
+                <div className="row-between" style={{ paddingBottom: 12, borderBottom: "1px solid var(--border-subtle)" }}>
+                  <span className="text-sm text-secondary">Amount</span>
+                  <span className="fw-semi font-mono text-sm">{fmt(selectedTx.amount)}</span>
+                </div>
+                <div className="row-between" style={{ paddingBottom: 12, borderBottom: "1px solid var(--border-subtle)" }}>
+                  <span className="text-sm text-secondary">Date</span>
+                  <span className="fw-semi text-sm">
+                    {new Date(selectedTx.created_at).toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit"
+                    })}
+                  </span>
+                </div>
+                <div style={{ paddingBottom: 12, borderBottom: "1px solid var(--border-subtle)" }}>
+                  <div className="text-sm text-secondary" style={{ marginBottom: 8 }}>FlowPay Transaction ID</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className="font-mono text-xs text-secondary" style={{ wordBreak: "break-all" }}>{selectedTx.id}</span>
+                    <CopyButton text={selectedTx.id} />
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-secondary" style={{ marginBottom: 8 }}>Blockchain Tx Hash</div>
+                  {selectedTx.tx_hash ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span className="font-mono text-xs text-secondary" style={{ wordBreak: "break-all" }}>{selectedTx.tx_hash}</span>
+                      <CopyButton text={selectedTx.tx_hash} />
+                    </div>
+                  ) : (
+                    <span className="text-sm text-tertiary">No on-chain hash recorded for this entry.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setSelectedTx(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

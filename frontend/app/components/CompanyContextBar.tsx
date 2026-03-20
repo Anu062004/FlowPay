@@ -19,6 +19,7 @@ export default function CompanyContextBar() {
       const next = {
         id: data.id,
         name: data.name,
+        email: data.email,
         treasuryAddress: data.treasury_address ?? null
       } as CompanyContext;
       saveCompanyContext(next);
@@ -45,6 +46,12 @@ export default function CompanyContextBar() {
         <div className="stack" style={{ gap: 6 }}>
           <div className="label">Active Company</div>
           <div style={{ fontWeight: 600 }}>{context.name ?? "Unnamed Company"}</div>
+          {context.email ? (
+            <>
+              <div className="label">Company Email</div>
+              <div style={{ fontSize: 13 }}>{context.email}</div>
+            </>
+          ) : null}
           <div className="label">Company ID</div>
           <div style={{ fontSize: 13 }}>{context.id}</div>
           {context.treasuryAddress ? (

@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "enabled": true,
+    "token": "replace-with-openclaw-hook-token",
+    "path": "/hooks",
+    "defaultSessionKey": "hook:flowpay",
+    "allowRequestSessionKey": false
+  },
+  "skills": {
+    "entries": {
+      "flowpay-wallet-ops": {
+        "enabled": true,
+        "env": {
+          "FLOWPAY_ADMIN_CLI": "/opt/flowpay/backend/dist/tools/flowpayAdminCli.js"
+        }
+      }
+    }
+  }
+}

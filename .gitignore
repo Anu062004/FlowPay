@@ -6,14 +6,27 @@ node_modules
 
 .secrets/
 flowpay-deploy.tgz
+flowpay-backend-deploy-*
+tmp_openclaw_*.py
+openclaw-*.pem
+openclaw-ec2-connect
+openclaw-ec2-connect.pub
+openclaw-userdata-*.sh
 
 # Backend
 backend/dist
 backend/.env*
+backend/.*.log
+backend/.*.err.log
 
 # Frontend
 frontend/.next
 frontend/out
+frontend/.vercel
+frontend/.*.log
+frontend/.*.err.log
+frontend/tsconfig.tsbuildinfo
+frontend/__*.html
 
 # Blockchain
 blockchain/cache

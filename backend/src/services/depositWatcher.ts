@@ -1,12 +1,10 @@
-import { JsonRpcProvider, formatEther } from "ethers";
+import { formatEther } from "ethers";
 import { env } from "../config/env.js";
 import { db } from "../db/pool.js";
 import { allocateTreasury } from "./treasuryService.js";
 import { getTokenBalance, getTokenTransfers } from "./indexerService.js";
 import { formatTokenAmount } from "../utils/amounts.js";
-
-const rpcUrl = env.RPC_URL.replace("{WDK_API_KEY}", env.WDK_API_KEY);
-const provider = new JsonRpcProvider(rpcUrl);
+import { withRpcFailover } from "./rpcService.js";
 const pollIntervalMs = 30000;
 const useTokenIndexer = Boolean(env.TREASURY_TOKEN_ADDRESS && env.TREASURY_TOKEN_SYMBOL);
 
@@ -175,7 +173,9 @@ async function pollWallet(walletId: string) {
     return;
   }
 
-  const currentBlock = await provider.getBlockNumber();
+  const currentBlock = await withRpcFailover("deposit watcher getBlockNumber", (provider) =>
+    provider.getBlockNumber()
+  );
   if (watcher.lastBlock !== undefined && currentBlock <= watcher.lastBlock) return;
 
   const addressLower = watcher.address.toLowerCase();
@@ -183,7 +183,9 @@ async function pollWallet(walletId: string) {
   const startBlock = watcher.lastBlock ?? Math.max(currentBlock - 120, 0);
 
   for (let blockNumber = startBlock + 1; blockNumber <= currentBlock; blockNumber += 1) {
-    const block = (await provider.getBlock(blockNumber, true)) as any;
+    const block = (await withRpcFailover(`deposit watcher getBlock ${blockNumber}`, (provider) =>
+      provider.getBlock(blockNumber, true)
+    )) as any;
     const transactions = (block?.transactions ?? []) as any[];
     for (const tx of transactions) {
       if (!tx?.to) continue;
@@ -226,7 +228,9 @@ async function pollWallet(walletId: string) {
   watcher.lastBlock = currentBlock;
 
   if (sawDeposit) {
-    const balance = await provider.getBalance(watcher.address);
+    const balance = await withRpcFailover("deposit watcher getBalance", (provider) =>
+      provider.getBalance(watcher.address)
+    );
     await allocateTreasury(watcher.companyId, balance);
     watcher.lastBalance = balance;
   }
@@ -267,8 +271,12 @@ export async function startDepositWatcher(walletId: string, companyId: string, a
     return;
   }
 
-  const balance = await provider.getBalance(address);
-  const currentBlock = await provider.getBlockNumber();
+  const balance = await withRpcFailover("deposit watcher initialize balance", (provider) =>
+    provider.getBalance(address)
+  );
+  const currentBlock = await withRpcFailover("deposit watcher initialize blockNumber", (provider) =>
+    provider.getBlockNumber()
+  );
   const lastBlock = Math.max(currentBlock - 120, 0);
 
   watchers.set(walletId, {

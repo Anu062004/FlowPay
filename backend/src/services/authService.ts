@@ -5,7 +5,7 @@ import { db } from "../db/pool.js";
 import { env } from "../config/env.js";
 import { ApiError } from "../utils/errors.js";
 import { sendCompanyRecoveryEmail, sendEmployeeRecoveryEmail } from "./emailService.js";
-import { getEmployeeCreditScoreOnCore } from "./contractService.js";
+import { syncEmployeeCreditScoreOnCore } from "./contractService.js";
 
 const COMPANY_SESSION_COOKIE = "flowpay_company_session";
 const EMPLOYEE_SESSION_COOKIE = "flowpay_employee_session";
@@ -65,7 +65,7 @@ function sanitizeEmployee(employee: ResolvedEmployee): EmployeeProfile {
   return publicEmployee;
 }
 
-async function hydrateEmployeeCreditScore<T extends { id: string; wallet_address: string | null; credit_score: number }>(
+async function hydrateEmployeeCreditScore<T extends { id: string; wallet_address: string | null; credit_score: number; salary: string | number }>(
   employee: T
 ): Promise<T> {
   if (!employee.wallet_address) {
@@ -73,7 +73,7 @@ async function hydrateEmployeeCreditScore<T extends { id: string; wallet_address
   }
 
   try {
-    const creditScore = await getEmployeeCreditScoreOnCore(employee.wallet_address);
+    const creditScore = await syncEmployeeCreditScoreOnCore(employee.wallet_address, employee.salary);
     if (creditScore !== employee.credit_score) {
       await db.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [creditScore, employee.id]);
     }

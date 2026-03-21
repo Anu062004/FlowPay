@@ -8,6 +8,8 @@ const CORE_ABI = [
   "function initializeEmployee(address employee, uint256 monthlySalary, uint8 employmentType) external",
   "function executePayroll(address employee, uint256 amount) external",
   "function disburseLoan(address employee, uint256 amount) external",
+  "function recordEMIRepaid(address employee) external",
+  "function recordLoanClosed(address employee) external",
   "function recordEMIMissed(address employee) external",
   "function getScore(address employee) external view returns (uint256)",
   "function getLoanTerms(address employee) external view returns (bool allowed, uint256 maxAmount, uint256 interestRatePct)",
@@ -29,6 +31,14 @@ function getCoreContract() {
 
 function getLoanContract() {
   return new ethers.Contract(env.LOAN_CONTRACT_ADDRESS, LOAN_ABI, getRpcProvider());
+}
+
+function parseMonthlySalaryEth(monthlySalaryEth: string | number) {
+  const parsed = typeof monthlySalaryEth === "number"
+    ? monthlySalaryEth
+    : Number.parseFloat(monthlySalaryEth);
+
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export async function getCoreEmployeeState(employeeAddress: string) {
@@ -90,6 +100,20 @@ export async function getEmployeeCreditScoreOnCore(employeeAddress: string) {
   return Number(score);
 }
 
+export async function syncEmployeeCreditScoreOnCore(
+  employeeAddress: string,
+  monthlySalaryEth: string | number,
+  employmentType = 1
+) {
+  const monthlySalary = parseMonthlySalaryEth(monthlySalaryEth);
+  if (monthlySalary > 0) {
+    const state = await ensureEmployeeInitializedOnCore(employeeAddress, monthlySalary, employmentType);
+    return state.score;
+  }
+
+  return getEmployeeCreditScoreOnCore(employeeAddress);
+}
+
 export async function checkLoanEligibilityOnCore(employeeAddress: string) {
   const contract = getLoanContract();
   const [allowed, maxAmount, interestRatePct] = await contract.checkEligibility(employeeAddress) as [
@@ -124,6 +148,15 @@ export async function recordLoanDisbursementOnCore(employeeAddress: string): Pro
     CORE_ABI,
     "disburseLoan",
     [employeeAddress, 0n]
+  );
+}
+
+export async function recordLoanClosureOnCore(employeeAddress: string): Promise<string> {
+  return sendAdminTransaction(
+    env.CORE_CONTRACT_ADDRESS,
+    CORE_ABI,
+    "recordLoanClosed",
+    [employeeAddress]
   );
 }
 

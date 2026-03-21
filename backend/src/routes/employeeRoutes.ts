@@ -23,7 +23,7 @@ import {
   requireCompanySession,
   requireEmployeeSession
 } from "../middleware/auth.js";
-import { getEmployeeCreditScoreOnCore } from "../services/contractService.js";
+import { syncEmployeeCreditScoreOnCore } from "../services/contractService.js";
 
 const router = Router();
 
@@ -122,7 +122,7 @@ router.get(
       let creditScore = row.credit_score;
       if (row.wallet_address) {
         try {
-          creditScore = await getEmployeeCreditScoreOnCore(row.wallet_address);
+          creditScore = await syncEmployeeCreditScoreOnCore(row.wallet_address, row.salary);
           if (creditScore !== row.credit_score) {
             await db.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [creditScore, row.id]);
           }

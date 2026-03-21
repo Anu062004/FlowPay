@@ -6,9 +6,10 @@ import { getEthPrice } from "./priceService.js";
 import {
   checkLoanEligibilityOnCore,
   ensureEmployeeInitializedOnCore,
-  getEmployeeCreditScoreOnCore,
   issueContractLoan,
   recordLoanDisbursementOnCore,
+  recordLoanClosureOnCore,
+  syncEmployeeCreditScoreOnCore,
   repayContractEMI
 } from "./contractService.js";
 import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
@@ -94,8 +95,12 @@ function buildFallbackLoanDecision(input: {
   };
 }
 
-async function syncEmployeeCreditScore(employeeId: string, walletAddress: string) {
-  const score = await getEmployeeCreditScoreOnCore(walletAddress);
+async function syncEmployeeCreditScore(
+  employeeId: string,
+  walletAddress: string,
+  salary: string | number
+) {
+  const score = await syncEmployeeCreditScoreOnCore(walletAddress, salary);
   await db.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [score, employeeId]);
   return score;
 }
@@ -144,7 +149,7 @@ export async function requestLoan(
 
   const salary = parseFloat(employee.salary);
   await ensureEmployeeInitializedOnCore(employee.wallet_address, salary, 1);
-  const creditScore = await syncEmployeeCreditScore(employeeId, employee.wallet_address);
+  const creditScore = await syncEmployeeCreditScore(employeeId, employee.wallet_address, employee.salary);
   const eligibility = await checkLoanEligibilityOnCore(employee.wallet_address);
   const maxEligibleAmount = parseFloat(eligibility.maxAmountEth);
 
@@ -322,7 +327,7 @@ export async function requestLoan(
         } catch (error) {
           console.error(`[Blockchain] Loan disbursal event sync failed for loan ${loanId}:`, error);
         }
-        await syncEmployeeCreditScore(employeeId, employee.wallet_address);
+        await syncEmployeeCreditScore(employeeId, employee.wallet_address, employee.salary);
         console.log(`[Blockchain] Successfully synced loan ${loanId} to contract`);
       })
       .catch(err => {
@@ -501,7 +506,7 @@ export async function executeApprovedLoan(loanId: string, auditContext: AgentLog
       } catch (error) {
         console.error(`[Blockchain] Loan disbursal event sync failed for approved loan ${loanId}:`, error);
       }
-      await syncEmployeeCreditScore(row.employee_id, row.wallet_address);
+      await syncEmployeeCreditScore(row.employee_id, row.wallet_address, row.salary);
       console.log(`[Blockchain] Successfully synced loan ${loanId} to contract`);
     })
     .catch(err => {
@@ -526,6 +531,7 @@ export async function repayLoanInFull(loanId: string, employeeId: string) {
        l.contract_loan_id,
        l.remaining_balance,
        l.status,
+       e.salary,
        e.wallet_id AS employee_wallet_id,
        ew.wallet_address AS employee_wallet_address,
        tw.id AS treasury_wallet_id,
@@ -575,9 +581,20 @@ export async function repayLoanInFull(loanId: string, employeeId: string) {
   if (loan.contract_loan_id) {
     try {
       await repayContractEMI(Number(loan.contract_loan_id), remainingBalance.toString());
-      await syncEmployeeCreditScore(employeeId, loan.employee_wallet_address);
+      await syncEmployeeCreditScore(employeeId, loan.employee_wallet_address, loan.salary);
     } catch (error) {
       console.error(`[Blockchain] Failed to sync EMI repayment for loan ${loanId}:`, error);
+    }
+  } else {
+    try {
+      const salary = parseFloat(loan.salary);
+      if (Number.isFinite(salary) && salary > 0) {
+        await ensureEmployeeInitializedOnCore(loan.employee_wallet_address, salary, 1);
+        await recordLoanClosureOnCore(loan.employee_wallet_address);
+        await syncEmployeeCreditScore(employeeId, loan.employee_wallet_address, loan.salary);
+      }
+    } catch (error) {
+      console.error(`[Blockchain] Failed to sync legacy loan closure for loan ${loanId}:`, error);
     }
   }
 

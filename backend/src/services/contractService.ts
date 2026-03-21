@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import { env } from "../config/env.js";
 import { sendAdminTransaction } from "./wdkAdmin.js";
+import { parseAmount } from "../utils/amounts.js";
 
 // ABI for FlowPayVault
 const VAULT_ABI = [
@@ -16,7 +17,7 @@ const LOAN_ABI = [
 ];
 
 export async function emitVaultPayroll(employeeAddress: string, amountEth: string): Promise<string> {
-  const amountWei = ethers.parseEther(amountEth);
+  const amountWei = parseAmount(amountEth);
   return sendAdminTransaction(
     env.VAULT_CONTRACT_ADDRESS,
     VAULT_ABI,
@@ -26,7 +27,7 @@ export async function emitVaultPayroll(employeeAddress: string, amountEth: strin
 }
 
 export async function emitVaultLoanDisbursed(employeeAddress: string, amountEth: string): Promise<string> {
-  const amountWei = ethers.parseEther(amountEth);
+  const amountWei = parseAmount(amountEth);
   return sendAdminTransaction(
     env.VAULT_CONTRACT_ADDRESS,
     VAULT_ABI,
@@ -72,7 +73,7 @@ export async function issueContractLoan(
   interestRate: number,
   duration: number
 ): Promise<string> {
-  const amountWei = ethers.parseEther(amountEth);
+  const amountWei = parseAmount(amountEth);
   return sendAdminTransaction(
     env.LOAN_CONTRACT_ADDRESS,
     LOAN_ABI,
@@ -85,7 +86,7 @@ export async function repayContractEMI(
   contractLoanId: number,
   amountEth: string
 ): Promise<string> {
-  const amountWei = ethers.parseEther(amountEth);
+  const amountWei = parseAmount(amountEth);
   return sendAdminTransaction(
     env.LOAN_CONTRACT_ADDRESS,
     LOAN_ABI,

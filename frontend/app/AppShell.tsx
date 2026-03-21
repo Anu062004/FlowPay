@@ -65,14 +65,25 @@ const employeeNavItems = [
   { label: "Settings", href: "/employee/settings", icon: Icons.settings }
 ];
 
-const DASHBOARD_PATHS = [
-  "/dashboard", "/treasury", "/employees", "/payroll",
-  "/lending", "/investments", "/transactions", "/settings",
-  "/admin", "/employee"
+const EMPLOYER_WORKSPACE_PATHS = [
+  "/dashboard",
+  "/treasury",
+  "/employees",
+  "/employees/new",
+  "/payroll",
+  "/lending",
+  "/investments",
+  "/transactions",
+  "/settings",
+  "/admin"
 ];
 
 function isEmployeePath(path: string) {
-  return path.startsWith("/employee");
+  return path === "/employee" || path.startsWith("/employee/");
+}
+
+function isEmployerWorkspacePath(path: string) {
+  return EMPLOYER_WORKSPACE_PATHS.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }
 
 function getTitle(path: string): { section: string; page: string } {
@@ -144,7 +155,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathnameValue = usePathname();
   const pathname = pathnameValue ?? "/";
   const router = useRouter();
-  const isDashboard = DASHBOARD_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  const isDashboard = isEmployeePath(pathname) || isEmployerWorkspacePath(pathname);
   const employeeView = isEmployeePath(pathname);
   const navItems = employeeView ? employeeNavItems : employerNavItems;
   const { section, page } = getTitle(pathname);

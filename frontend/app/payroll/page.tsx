@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { runPayroll } from "../lib/api";
+import { runPayroll, type PayrollRunResult } from "../lib/api";
 import { formatEth } from "../lib/format";
 import { useEmployees, usePayrollHistory } from "../lib/hooks";
 import { loadCompanyContext } from "../lib/companyContext";
@@ -36,6 +36,14 @@ function Skeleton({ h = 18 }: { h?: number }) {
 
 function fmtEth(value: string | number | null | undefined) {
   return formatEth(value, 6, "ETH");
+}
+
+function isSameUtcPayrollMonth(isoDate: string, reference: Date) {
+  const value = new Date(isoDate);
+  return (
+    value.getUTCFullYear() === reference.getUTCFullYear() &&
+    value.getUTCMonth() === reference.getUTCMonth()
+  );
 }
 
 function PayrollBar({ employees }: { employees: { full_name: string; salary: string }[] }) {
@@ -98,14 +106,24 @@ export default function PayrollPage() {
   const historyHook = usePayrollHistory();
   const [showConfirm, setShowConfirm] = useState(false);
   const [running, setRunning] = useState(false);
-  const [runResult, setRunResult] = useState<{ processed: number } | null>(null);
+  const [runResult, setRunResult] = useState<PayrollRunResult | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
 
   const employees = employeesHook.data?.employees ?? [];
   const history = historyHook.data?.history ?? [];
+  const now = new Date();
+  const currentPayrollLabel = now.toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC"
+  });
   const activeEmployees = employees.filter((employee) => employee.status === "active");
+  const paidEmployees = activeEmployees.filter((employee) => employee.paid_this_period);
+  const dueEmployees = activeEmployees.filter((employee) => !employee.paid_this_period);
   const totalGrossPayroll = activeEmployees.reduce((sum, employee) => sum + parseFloat(employee.salary), 0);
-  const totalDisbursed = history.reduce((sum, entry) => sum + parseFloat(entry.amount), 0);
+  const grossDuePayroll = dueEmployees.reduce((sum, employee) => sum + parseFloat(employee.salary), 0);
+  const monthlyHistory = history.filter((entry) => isSameUtcPayrollMonth(entry.created_at, now));
+  const totalDisbursed = monthlyHistory.reduce((sum, entry) => sum + parseFloat(entry.amount), 0);
 
   async function handleRunPayroll() {
     const companyContext = loadCompanyContext();
@@ -115,6 +133,7 @@ export default function PayrollPage() {
       const result = await runPayroll(companyContext?.id);
       setRunResult(result);
       setShowConfirm(false);
+      employeesHook.refetch();
       historyHook.refetch();
     } catch (err: any) {
       setRunError(err.message ?? "Payroll failed");
@@ -131,7 +150,7 @@ export default function PayrollPage() {
           <p className="page-subtitle">Automated salary disbursement and payroll history in ETH.</p>
         </div>
         <div className="row">
-          <button className="btn btn-primary" onClick={() => setShowConfirm(true)}>
+          <button className="btn btn-primary" onClick={() => setShowConfirm(true)} disabled={dueEmployees.length === 0}>
             <Icon d="M12 4v16m8-8H4" size={14} />
             Process Payroll
           </button>
@@ -144,7 +163,9 @@ export default function PayrollPage() {
             <Icon d="M5 13l4 4L19 7" size={16} />
           </span>
           <span>
-            Payroll processed successfully. <strong>{runResult.processed}</strong> employees paid.
+            {runResult.processed > 0
+              ? <>Payroll processed successfully. <strong>{runResult.processed}</strong> employees paid for {runResult.payrollMonthLabel}.</>
+              : <>Payroll is already complete for {runResult.payrollMonthLabel}. No employees were due.</>}
           </span>
         </div>
       ) : null}
@@ -152,9 +173,9 @@ export default function PayrollPage() {
       <div className="grid-4">
         {[
           { label: "Total Monthly Salary", value: employeesHook.loading ? "--" : fmtEth(totalGrossPayroll) },
-          { label: "Active Employees", value: employeesHook.loading ? "--" : String(activeEmployees.length) },
-          { label: "Payroll Runs", value: historyHook.loading ? "--" : String(history.length) },
-          { label: "Total Disbursed", value: historyHook.loading ? "--" : fmtEth(totalDisbursed) },
+          { label: "Due This Month", value: employeesHook.loading ? "--" : `${dueEmployees.length}` },
+          { label: "Payroll Runs This Month", value: historyHook.loading ? "--" : String(monthlyHistory.length) },
+          { label: "Disbursed This Month", value: historyHook.loading ? "--" : fmtEth(totalDisbursed) },
         ].map((item) => (
           <div key={item.label} className="metric-card">
             <div className="metric-card-label">{item.label}</div>
@@ -173,7 +194,9 @@ export default function PayrollPage() {
         <div className="card">
           <div className="card-header">
             <div className="card-title">Salary Breakdown</div>
-            <div className="card-subtitle">Gross salary configured for each active employee.</div>
+            <div className="card-subtitle">
+              {dueEmployees.length} due and {paidEmployees.length} already paid for {currentPayrollLabel}.
+            </div>
           </div>
           {employeesHook.loading ? (
             <div className="card-body">
@@ -212,7 +235,9 @@ export default function PayrollPage() {
                         {parseFloat(employee.outstanding_balance) > 0 ? fmtEth(employee.outstanding_balance) : "--"}
                       </td>
                       <td>
-                        <Badge variant="success">{employee.status}</Badge>
+                        <Badge variant={employee.paid_this_period ? "success" : "warning"}>
+                          {employee.paid_this_period ? "paid this month" : "due"}
+                        </Badge>
                       </td>
                     </tr>
                   ))}
@@ -225,7 +250,7 @@ export default function PayrollPage() {
         <div className="card">
           <div className="card-header">
             <div className="card-title">Salary Distribution</div>
-            <div className="card-subtitle">Top employee salaries by configured monthly amount.</div>
+            <div className="card-subtitle">Configured monthly salaries across active employees.</div>
           </div>
           <div className="card-body">
             {employeesHook.loading ? <Skeleton h={100} /> : <PayrollBar employees={activeEmployees} />}
@@ -238,14 +263,14 @@ export default function PayrollPage() {
           <div className="card-title">Payroll History</div>
           <div className="card-subtitle">Completed payroll runs recorded on-chain.</div>
         </div>
-        {historyHook.loading ? (
+          {historyHook.loading ? (
           <div className="card-body">
             <div className="stack">
               <Skeleton />
               <Skeleton />
             </div>
           </div>
-        ) : history.length === 0 ? (
+          ) : history.length === 0 ? (
           <div className="card-body">
             <div className="empty-state" style={{ padding: "32px 0" }}>
               <div className="empty-state-title">No payroll runs yet</div>
@@ -275,7 +300,7 @@ export default function PayrollPage() {
                       })}
                     </td>
                     <td className="data-table-num">{fmtEth(entry.amount)}</td>
-                    <td className="text-sm">{entry.employee_count}</td>
+                    <td className="text-sm">{String(entry.employee_count)}</td>
                     <td>
                       {entry.tx_hash ? (
                         <span className="font-mono text-xs text-secondary">
@@ -308,15 +333,16 @@ export default function PayrollPage() {
             <div className="modal-body">
               <div className="stack">
                 {[
-                  ["Employees to pay", String(activeEmployees.length)],
-                  ["Total gross payout", fmtEth(totalGrossPayroll)],
+                  ["Employees to pay", String(dueEmployees.length)],
+                  ["Already paid this month", String(paidEmployees.length)],
+                  ["Total gross payout", fmtEth(grossDuePayroll)],
                 ].map(([label, value], index) => (
                   <div
                     key={label}
                     className="row-between"
                     style={{
                       padding: "10px 0",
-                      borderBottom: index === 0 ? "1px solid var(--border-subtle)" : "none",
+                      borderBottom: index < 2 ? "1px solid var(--border-subtle)" : "none",
                     }}
                   >
                     <span className="text-sm text-secondary">{label}</span>
@@ -324,6 +350,14 @@ export default function PayrollPage() {
                   </div>
                 ))}
                 {runError ? <div className="alert alert-danger">{runError}</div> : null}
+                {dueEmployees.length === 0 ? (
+                  <div className="alert alert-success">
+                    <span className="alert-icon">
+                      <Icon d="M5 13l4 4L19 7" size={16} />
+                    </span>
+                    <span>Payroll is already complete for {currentPayrollLabel}. Only unpaid employees are processed each month.</span>
+                  </div>
+                ) : null}
                 <div className="alert alert-warning">
                   <span className="alert-icon">
                     <Icon
@@ -331,7 +365,7 @@ export default function PayrollPage() {
                       size={16}
                     />
                   </span>
-                  <span>This will immediately disburse salaries on-chain. This action cannot be undone.</span>
+                  <span>This will only pay employees who are still due for {currentPayrollLabel}. Already-paid employees are skipped.</span>
                 </div>
               </div>
             </div>
@@ -339,7 +373,7 @@ export default function PayrollPage() {
               <button className="btn btn-secondary" onClick={() => setShowConfirm(false)}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleRunPayroll} disabled={running}>
+              <button className="btn btn-primary" onClick={handleRunPayroll} disabled={running || dueEmployees.length === 0}>
                 {running ? "Processing..." : "Confirm & Run Payroll"}
               </button>
             </div>

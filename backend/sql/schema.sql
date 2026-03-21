@@ -92,6 +92,19 @@ CREATE TABLE IF NOT EXISTS treasury_allocations (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS payroll_disbursements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  payroll_month DATE NOT NULL,
+  gross_salary NUMERIC(18,6) NOT NULL,
+  net_salary NUMERIC(18,6) NOT NULL,
+  emi_deducted NUMERIC(18,6) NOT NULL DEFAULT 0,
+  tx_hash TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (company_id, employee_id, payroll_month)
+);
+
 CREATE TABLE IF NOT EXISTS company_settings (
   company_id UUID PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
   profile JSONB NOT NULL,
@@ -149,6 +162,10 @@ CREATE TABLE IF NOT EXISTS agent_logs (
 CREATE INDEX IF NOT EXISTS idx_ops_tasks_status ON ops_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_ops_tasks_company ON ops_tasks(company_id);
 CREATE INDEX IF NOT EXISTS idx_ops_tasks_type ON ops_tasks(type);
+CREATE INDEX IF NOT EXISTS idx_payroll_disbursements_company_month
+  ON payroll_disbursements(company_id, payroll_month DESC);
+CREATE INDEX IF NOT EXISTS idx_payroll_disbursements_employee_month
+  ON payroll_disbursements(employee_id, payroll_month DESC);
 CREATE INDEX IF NOT EXISTS idx_ops_approvals_status ON ops_approvals(status);
 CREATE INDEX IF NOT EXISTS idx_ops_approvals_company ON ops_approvals(company_id);
 CREATE INDEX IF NOT EXISTS idx_agent_logs_timestamp ON agent_logs(timestamp DESC);

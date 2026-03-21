@@ -23,18 +23,14 @@ router.get(
     assertCompanyScope(res, companyId);
     const result = await db.query(
       `SELECT
-         t.id,
-         t.amount,
-         t.created_at,
-         t.tx_hash,
-         COUNT(e.id) AS employee_count
-       FROM transactions t
-       JOIN wallets w ON t.wallet_id = w.id
-       JOIN companies c ON c.treasury_wallet_id = w.id
-       LEFT JOIN employees e ON e.company_id = c.id AND e.status = 'active'
-       WHERE c.id = $1 AND t.type = 'payroll'
-       GROUP BY t.id
-       ORDER BY t.created_at DESC
+         pd.id,
+         pd.net_salary AS amount,
+         pd.created_at,
+         pd.tx_hash,
+         1 AS employee_count
+       FROM payroll_disbursements pd
+       WHERE pd.company_id = $1
+       ORDER BY pd.created_at DESC
        LIMIT 24`,
       [companyId]
     );

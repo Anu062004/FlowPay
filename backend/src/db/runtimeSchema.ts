@@ -131,4 +131,29 @@ export async function ensureRuntimeSchema() {
     ALTER TABLE treasury_allocations
     ADD COLUMN IF NOT EXISTS main_reserve NUMERIC(18,6) NOT NULL DEFAULT 0
   `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS payroll_disbursements (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+      payroll_month DATE NOT NULL,
+      gross_salary NUMERIC(18,6) NOT NULL,
+      net_salary NUMERIC(18,6) NOT NULL,
+      emi_deducted NUMERIC(18,6) NOT NULL DEFAULT 0,
+      tx_hash TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (company_id, employee_id, payroll_month)
+    )
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_payroll_disbursements_company_month
+      ON payroll_disbursements(company_id, payroll_month DESC)
+  `);
+
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_payroll_disbursements_employee_month
+      ON payroll_disbursements(employee_id, payroll_month DESC)
+  `);
 }

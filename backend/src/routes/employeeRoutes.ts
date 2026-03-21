@@ -79,14 +79,34 @@ router.get(
          e.status,
          e.created_at,
          w.wallet_address,
-         COUNT(l.id) FILTER (WHERE l.status = 'active') AS active_loans,
-         COALESCE(SUM(l.remaining_balance) FILTER (WHERE l.status = 'active'), 0) AS outstanding_balance,
-         MAX(CASE WHEN l.status = 'active' THEN l.status ELSE NULL END) AS loan_status
+         COALESCE(loan_summary.active_loans, 0) AS active_loans,
+         COALESCE(loan_summary.outstanding_balance, 0) AS outstanding_balance,
+         loan_summary.loan_status,
+         payroll_summary.last_payroll_at,
+         COALESCE(payroll_summary.paid_this_period, false) AS paid_this_period
        FROM employees e
        LEFT JOIN wallets w ON e.wallet_id = w.id
-       LEFT JOIN loans l ON l.employee_id = e.id
+       LEFT JOIN LATERAL (
+         SELECT
+           COUNT(*) FILTER (WHERE l.status = 'active') AS active_loans,
+           COALESCE(SUM(l.remaining_balance) FILTER (WHERE l.status = 'active'), 0) AS outstanding_balance,
+           MAX(CASE WHEN l.status = 'active' THEN l.status ELSE NULL END) AS loan_status
+         FROM loans l
+         WHERE l.employee_id = e.id
+       ) loan_summary ON true
+       LEFT JOIN LATERAL (
+         SELECT
+           MAX(pd.created_at) AS last_payroll_at,
+           COALESCE(
+             BOOL_OR(
+               pd.payroll_month = date_trunc('month', now() AT TIME ZONE 'UTC')::date
+             ),
+             false
+           ) AS paid_this_period
+         FROM payroll_disbursements pd
+         WHERE pd.employee_id = e.id
+       ) payroll_summary ON true
        WHERE e.company_id = $1
-       GROUP BY e.id, w.wallet_address
        ORDER BY e.created_at DESC`,
       [companyId]
     );

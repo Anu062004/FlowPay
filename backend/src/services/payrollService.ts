@@ -17,30 +17,90 @@ function calculateEmi(amount: number, annualInterestRate: number, durationMonths
   return numerator / denominator;
 }
 
+function getPayrollMonthStart(reference = new Date()) {
+  return new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), 1));
+}
+
+function getPayrollMonthKey(reference = new Date()) {
+  return getPayrollMonthStart(reference).toISOString().slice(0, 10);
+}
+
+function getPayrollMonthLabel(reference = new Date()) {
+  return reference.toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC"
+  });
+}
+
+async function getCompanyPayrollEmployees(companyId: string, payrollMonthKey: string) {
+  const result = await db.query(
+    `SELECT
+       e.id,
+       e.salary,
+       e.wallet_id,
+       w.wallet_address,
+       pd_current.created_at AS paid_at_this_period,
+       last_paid.last_payroll_at
+     FROM employees e
+     JOIN wallets w ON e.wallet_id = w.id
+     LEFT JOIN payroll_disbursements pd_current
+       ON pd_current.employee_id = e.id
+      AND pd_current.company_id = e.company_id
+      AND pd_current.payroll_month = $2::date
+     LEFT JOIN LATERAL (
+       SELECT MAX(pd.created_at) AS last_payroll_at
+       FROM payroll_disbursements pd
+       WHERE pd.employee_id = e.id
+     ) last_paid ON true
+     WHERE e.company_id = $1
+       AND e.status = 'active'
+     ORDER BY e.created_at ASC`,
+    [companyId, payrollMonthKey]
+  );
+
+  return result.rows as Array<{
+    id: string;
+    salary: string;
+    wallet_id: string;
+    wallet_address: string;
+    paid_at_this_period: string | null;
+    last_payroll_at: string | null;
+  }>;
+}
+
 export async function runPayroll(companyId?: string, auditContext: AgentLogContext = {}) {
   const companyQuery = companyId
     ? "SELECT id, treasury_wallet_id FROM companies WHERE id = $1"
     : "SELECT id, treasury_wallet_id FROM companies";
   const companyParams = companyId ? [companyId] : [];
   const companies = await db.query(companyQuery, companyParams);
+  const payrollMonthKey = getPayrollMonthKey();
+  const payrollMonthLabel = getPayrollMonthLabel();
 
   if (companies.rowCount === 0) {
     throw new ApiError(404, "No companies found for payroll");
   }
 
   const results = [];
+  const companySummaries: Array<{
+    companyId: string;
+    payrollMonth: string;
+    payrollMonthLabel: string;
+    activeEmployees: number;
+    eligibleEmployees: number;
+    alreadyPaidEmployees: number;
+    processedEmployees: number;
+    totalNetSalary: number;
+  }> = [];
 
   for (const company of companies.rows) {
     if (!company.treasury_wallet_id) {
       continue;
     }
-    const employees = await db.query(
-      `SELECT e.id, e.salary, e.wallet_id, w.wallet_address
-       FROM employees e
-       JOIN wallets w ON e.wallet_id = w.id
-       WHERE e.company_id = $1 AND e.status = 'active'`,
-      [company.id]
-    );
+    const activeEmployees = await getCompanyPayrollEmployees(company.id, payrollMonthKey);
+    const dueEmployees = activeEmployees.filter((employee) => !employee.paid_at_this_period);
+    const alreadyPaidEmployees = activeEmployees.length - dueEmployees.length;
 
     const employeePayrolls: Array<{
       employeeId: string;
@@ -54,7 +114,7 @@ export async function runPayroll(companyId?: string, auditContext: AgentLogConte
     let totalNetSalary = 0;
     let totalEmiCollected = 0;
 
-    for (const employee of employees.rows) {
+    for (const employee of dueEmployees) {
       const salary = parseFloat(employee.salary);
       const loans = await db.query(
         "SELECT id, amount, interest_rate, duration_months, remaining_balance FROM loans WHERE employee_id = $1 AND status = 'active'",
@@ -83,6 +143,20 @@ export async function runPayroll(companyId?: string, auditContext: AgentLogConte
         totalEmi,
         loanRows: loans.rows
       });
+    }
+
+    if (employeePayrolls.length === 0) {
+      companySummaries.push({
+        companyId: company.id,
+        payrollMonth: payrollMonthKey,
+        payrollMonthLabel,
+        activeEmployees: activeEmployees.length,
+        eligibleEmployees: 0,
+        alreadyPaidEmployees,
+        processedEmployees: 0,
+        totalNetSalary: 0
+      });
+      continue;
     }
 
     const policyResult = await evaluateAgentPolicy({
@@ -121,6 +195,7 @@ export async function runPayroll(companyId?: string, auditContext: AgentLogConte
 
     try {
       for (const employee of employeePayrolls) {
+        let payrollTxHash: string | null = null;
         if (employee.netSalary > 0) {
           const transfer = await sendTransaction(
             company.treasury_wallet_id,
@@ -129,9 +204,10 @@ export async function runPayroll(companyId?: string, auditContext: AgentLogConte
             "payroll",
             employee.walletId
           );
+          payrollTxHash = transfer.txHash ?? null;
           txHashes.push({
             employeeId: employee.employeeId,
-            txHash: transfer.txHash ?? null
+            txHash: payrollTxHash
           });
         }
 
@@ -168,8 +244,35 @@ export async function runPayroll(companyId?: string, auditContext: AgentLogConte
           }
         }
 
+        await db.query(
+          `INSERT INTO payroll_disbursements
+             (company_id, employee_id, payroll_month, gross_salary, net_salary, emi_deducted, tx_hash)
+           VALUES ($1, $2, $3::date, $4, $5, $6, $7)
+           ON CONFLICT (company_id, employee_id, payroll_month) DO NOTHING`,
+          [
+            company.id,
+            employee.employeeId,
+            payrollMonthKey,
+            (employee.netSalary + employee.totalEmi).toFixed(6),
+            employee.netSalary.toFixed(6),
+            employee.totalEmi.toFixed(6),
+            payrollTxHash
+          ]
+        );
+
         results.push({ employeeId: employee.employeeId, netSalary: employee.netSalary, totalEmi: employee.totalEmi });
       }
+
+      companySummaries.push({
+        companyId: company.id,
+        payrollMonth: payrollMonthKey,
+        payrollMonthLabel,
+        activeEmployees: activeEmployees.length,
+        eligibleEmployees: dueEmployees.length,
+        alreadyPaidEmployees,
+        processedEmployees: employeePayrolls.length,
+        totalNetSalary
+      });
 
       await logAgentAction(
         "WDKExecutionLayer",
@@ -224,7 +327,13 @@ export async function runPayroll(companyId?: string, auditContext: AgentLogConte
     }
   }
 
-  return { processed: results.length, results };
+  return {
+    processed: results.length,
+    payrollMonth: payrollMonthKey,
+    payrollMonthLabel,
+    companySummaries,
+    results
+  };
 }
 
 export async function requestPayrollApproval(companyId?: string) {
@@ -239,6 +348,8 @@ export async function requestPayrollApproval(companyId?: string) {
   }
 
   const approvals: Array<Record<string, unknown>> = [];
+  const payrollMonthKey = getPayrollMonthKey();
+  const payrollMonthLabel = getPayrollMonthLabel();
 
   for (const company of companies.rows) {
     if (!company.treasury_wallet_id) {
@@ -254,15 +365,19 @@ export async function requestPayrollApproval(companyId?: string) {
       continue;
     }
 
-    const employees = await db.query(
-      "SELECT COUNT(*) AS active_count, COALESCE(SUM(salary), 0) AS total_salary FROM employees WHERE company_id = $1 AND status = 'active'",
-      [company.id]
-    );
-    const activeCount = parseInt(employees.rows[0].active_count, 10);
-    const totalSalary = parseFloat(employees.rows[0].total_salary);
+    const employees = await getCompanyPayrollEmployees(company.id, payrollMonthKey);
+    const eligibleEmployees = employees.filter((employee) => !employee.paid_at_this_period);
+    const activeCount = employees.length;
+    const eligibleCount = eligibleEmployees.length;
+    const totalSalary = eligibleEmployees.reduce((sum, employee) => sum + parseFloat(employee.salary), 0);
 
-    if (activeCount === 0 || totalSalary <= 0) {
-      approvals.push({ companyId: company.id, status: "no_active_employees" });
+    if (activeCount === 0 || eligibleCount === 0 || totalSalary <= 0) {
+      approvals.push({
+        companyId: company.id,
+        status: activeCount === 0 ? "no_active_employees" : "all_paid_this_month",
+        payrollMonth: payrollMonthKey,
+        payrollMonthLabel
+      });
       continue;
     }
 
@@ -280,10 +395,14 @@ export async function requestPayrollApproval(companyId?: string) {
     const payload = {
       companyId: company.id,
       activeEmployees: activeCount,
+      eligibleEmployees: eligibleCount,
+      alreadyPaidEmployees: activeCount - eligibleCount,
       totalSalary,
       treasuryBalance,
       treasuryAddress,
       shortfall,
+      payrollMonth: payrollMonthKey,
+      payrollMonthLabel,
       currency: env.TREASURY_TOKEN_SYMBOL ?? "ETH",
       requestedAt: new Date().toISOString()
     };

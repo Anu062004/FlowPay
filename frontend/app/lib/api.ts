@@ -104,6 +104,8 @@ export type Employee = {
   loan_status: string | null;
   company_id?: string;
   company_name?: string;
+  last_payroll_at?: string | null;
+  paid_this_period?: boolean;
 };
 
 export type Loan = {
@@ -201,6 +203,22 @@ export type PayrollHistoryEntry = {
   created_at: string;
   tx_hash: string | null;
   employee_count: string;
+};
+
+export type PayrollRunResult = {
+  processed: number;
+  payrollMonth: string;
+  payrollMonthLabel: string;
+  companySummaries: Array<{
+    companyId: string;
+    payrollMonth: string;
+    payrollMonthLabel: string;
+    activeEmployees: number;
+    eligibleEmployees: number;
+    alreadyPaidEmployees: number;
+    processedEmployees: number;
+    totalNetSalary: number;
+  }>;
 };
 
 export type CompanySettings = {
@@ -396,7 +414,7 @@ export const fetchPayrollHistory = (companyId: string) =>
   );
 
 export const runPayroll = (companyId?: string) =>
-  apiFetch<{ processed: number }>("/payroll/run", {
+  apiFetch<PayrollRunResult>("/payroll/run", {
     method: "POST",
     body: JSON.stringify(companyId ? { companyId } : {}),
   });

@@ -395,6 +395,7 @@ button, input, select, textarea {
 /* ── Main content ── */
 .main-content {
   margin-left: var(--sidebar-width);
+  width: calc(100% - var(--sidebar-width));
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -405,6 +406,7 @@ button, input, select, textarea {
 /* ── Top Header ── */
 .app-shell.sidebar-collapsed .main-content {
   margin-left: 0;
+  width: 100%;
 }
 
 .top-header {
@@ -2116,7 +2118,10 @@ button, input, select, textarea {
     box-shadow: var(--shadow-modal);
   }
   .app-shell.sidebar-ready.sidebar-open .sidebar { transform: translateX(0); }
-  .main-content { margin-left: 0; }
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+  }
   .top-header { padding: 0 var(--sp-4); }
   .search-input-wrap { display: none; }
   .header-divider { display: none; }

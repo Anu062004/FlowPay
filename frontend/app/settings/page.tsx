@@ -262,7 +262,28 @@ export default function SettingsPage() {
     ));
   };
 
-  const saveAll = async (label: string) => {
+  const runPayrollNow = async (successPrefix?: string) => {
+    if (!context?.id) return null;
+
+    setPayrollRunning(true);
+    try {
+      const result = await runPayroll(context.id);
+      setStatus({
+        type: "success",
+        message:
+          result.processed > 0
+            ? `${successPrefix ? `${successPrefix} ` : ""}Agentic payroll processed ${result.processed} employee${result.processed === 1 ? "" : "s"} for ${result.payrollMonthLabel}.`
+            : `${successPrefix ? `${successPrefix} ` : ""}Agentic payroll run completed, but no unpaid employees were due for ${result.payrollMonthLabel}.`
+      });
+      return result;
+    } catch (err: any) {
+      throw new Error(err?.message ?? "Failed to run payroll today");
+    } finally {
+      setPayrollRunning(false);
+    }
+  };
+
+  const saveAll = async (label: string, options?: { triggerTodayPayroll?: boolean }) => {
     if (!context?.id || !settings) return;
     setSaving(true);
     setStatus(null);
@@ -278,7 +299,19 @@ export default function SettingsPage() {
           treasuryAddress: context.treasuryAddress ?? null
         });
       }
-      setStatus({ type: "success", message: `${label} saved` });
+
+      if (options?.triggerTodayPayroll) {
+        try {
+          await runPayrollNow(`${label} saved.`);
+        } catch (err: any) {
+          setStatus({
+            type: "error",
+            message: `${label} saved, but the immediate payroll run failed: ${err?.message ?? "Unknown payroll error"}`
+          });
+        }
+      } else {
+        setStatus({ type: "success", message: `${label} saved` });
+      }
     } catch (err: any) {
       setStatus({ type: "error", message: err?.message ?? "Failed to save settings" });
     } finally {
@@ -323,19 +356,11 @@ export default function SettingsPage() {
   };
 
   const runPayrollToday = async () => {
-    if (!context?.id) return;
-    setPayrollRunning(true);
     setStatus(null);
     try {
-      const result = await runPayroll(context.id);
-      setStatus({
-        type: "success",
-        message: `Payroll processed today for ${result.processed} employee${result.processed === 1 ? "" : "s"}.`
-      });
+      await runPayrollNow();
     } catch (err: any) {
       setStatus({ type: "error", message: err?.message ?? "Failed to run payroll today" });
-    } finally {
-      setPayrollRunning(false);
     }
   };
 
@@ -443,7 +468,7 @@ export default function SettingsPage() {
                   </select>
                   <span className="form-hint">
                     {payrollSchedule.preset === "today"
-                      ? `Testing shortcut: saving Today only resolves to ${todayPayrollLabel} in ${companyTimeZoneDisplay}, so the automated scheduler treats payroll as due today. Switch it back after testing.`
+                      ? `Testing shortcut: saving Today only resolves to ${todayPayrollLabel} in ${companyTimeZoneDisplay} and immediately triggers the agentic payroll run for any unpaid employees due today. Switch it back after testing.`
                       : "Choose which day of the month payroll should run automatically. Use the action below for one-off runs."}
                   </span>
                 </div>
@@ -508,10 +533,10 @@ export default function SettingsPage() {
                   <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
                     <button
                       className="btn btn-primary"
-                      onClick={() => saveAll("Payroll settings")}
-                      disabled={disabled}
+                      onClick={() => saveAll("Payroll settings", { triggerTodayPayroll: payrollSchedule.preset === "today" })}
+                      disabled={disabled || payrollRunning}
                     >
-                      Save Payroll Settings
+                      {saving || payrollRunning ? "Saving..." : "Save Payroll Settings"}
                     </button>
                     <button
                       className="btn btn-secondary"

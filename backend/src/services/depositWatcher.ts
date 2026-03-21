@@ -8,6 +8,10 @@ import { withRpcFailover } from "./rpcService.js";
 const pollIntervalMs = 30000;
 const useTokenIndexer = Boolean(env.TREASURY_TOKEN_ADDRESS && env.TREASURY_TOKEN_SYMBOL);
 
+function depositWatchersEnabled() {
+  return (env.DEPOSIT_WATCHERS_ENABLED ?? "true").toLowerCase() === "true";
+}
+
 type Watcher = {
   address: string;
   companyId: string;
@@ -236,7 +240,15 @@ async function pollWallet(walletId: string) {
   }
 }
 
-export async function startDepositWatcher(walletId: string, companyId: string, address: string) {
+export async function startDepositWatcher(
+  walletId: string,
+  companyId: string,
+  address: string,
+  options: { force?: boolean } = {}
+) {
+  if (!options.force && !depositWatchersEnabled()) {
+    return;
+  }
   if (watchers.has(walletId)) return;
   const timer = setInterval(() => {
     pollWallet(walletId).catch((error) => {
@@ -288,7 +300,10 @@ export async function startDepositWatcher(walletId: string, companyId: string, a
   });
 }
 
-export async function startAllTreasuryWatchers() {
+export async function startAllTreasuryWatchers(options: { force?: boolean } = {}) {
+  if (!options.force && !depositWatchersEnabled()) {
+    return;
+  }
   const result = await db.query(
     "SELECT c.id as company_id, w.id as wallet_id, w.wallet_address FROM companies c JOIN wallets w ON c.treasury_wallet_id = w.id"
   );

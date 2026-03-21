@@ -1,0 +1,17 @@
+{
+  "apiBase": "http://127.0.0.1:4000",
+  "startedAt": "2026-03-20T16:59:06Z",
+  "manualFlow": null,
+  "automationFlow": null,
+  "errors": [
+    {
+      "flow": "manual",
+      "error": "manual-ec2 register company failed: HTTP 500 payload={'error': 'Internal server error'}"
+    },
+    {
+      "flow": "automation",
+      "error": "automation-ec2 register company failed: HTTP 500 payload={'error': 'Internal server error'}"
+    }
+  ],
+  "finishedAt": "2026-03-20T16:59:27Z"
+}

@@ -1,0 +1,1805 @@
+{
+  "apiBase": "http://127.0.0.1:4000",
+  "openclawGateway": "http://127.0.0.1:18789",
+  "startedAt": "2026-03-20T18:12:53.452238+00:00",
+  "manualFlow": {
+    "registerCompany": {
+      "company": {
+        "id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "name": "LiveFlow-a00e0064",
+        "email": "liveflow-a00e0064@example.com",
+        "created_at": "2026-03-20T18:12:53.488Z"
+      },
+      "treasury_wallet": {
+        "id": "b607e5fa-2072-4408-94e7-d3155865cac9",
+        "wallet_id": "276510f7-7e12-4dd3-a932-62d6b95c471d",
+        "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+      }
+    },
+    "companyLogin": {
+      "company": {
+        "id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "name": "LiveFlow-a00e0064",
+        "email": "liveflow-a00e0064@example.com",
+        "created_at": "2026-03-20T18:12:53.488Z",
+        "treasury_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+      }
+    },
+    "companyList": {
+      "companies": [
+        {
+          "id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "name": "LiveFlow-a00e0064",
+          "email": "liveflow-a00e0064@example.com",
+          "created_at": "2026-03-20T18:12:53.488Z",
+          "treasury_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+        }
+      ]
+    },
+    "companyProfile": {
+      "id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+      "name": "LiveFlow-a00e0064",
+      "email": "liveflow-a00e0064@example.com",
+      "created_at": "2026-03-20T18:12:53.488Z",
+      "treasury_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+    },
+    "settingsUpdate": {
+      "settings": {
+        "profile": {
+          "companyName": "LiveFlow-a00e0064",
+          "legalEntity": "",
+          "companyEmail": "liveflow-a00e0064@example.com",
+          "timeZone": "UTC+0 - London"
+        },
+        "payroll": {
+          "payrollDay": "15th of each month",
+          "currency": "USDC",
+          "autoProcess": true,
+          "emiAutoDeduction": true,
+          "emailNotifications": true
+        },
+        "security": {
+          "twoFactor": true,
+          "transactionApproval": true,
+          "ipAllowlist": false,
+          "auditLog": true,
+          "sessionTimeout": "30 minutes",
+          "accessPinConfigured": true
+        },
+        "agent": {
+          "enabled": true,
+          "executionSource": "openclaw_ec2",
+          "slippageProtection": true,
+          "maxTradeSize": 50000,
+          "riskTolerance": "Conservative",
+          "rebalanceFrequency": "Weekly",
+          "lending_paused": false,
+          "walletPolicy": {
+            "allowTreasuryAllocation": true,
+            "allowLoanDisbursal": true,
+            "allowPayroll": true,
+            "allowAaveRebalance": true,
+            "maxSingleTransfer": 2500,
+            "maxDailyOutflow": 10000,
+            "maxLoanAmount": 1500,
+            "maxAaveAllocationPct": 35,
+            "humanReviewAbove": 750
+          }
+        }
+      }
+    },
+    "addEmployee": {
+      "employee": {
+        "id": "f95979c1-3a11-41f7-a041-1ab7110a62ee",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "full_name": "Employee a00e0064",
+        "email": "employee-a00e0064@example.com",
+        "salary": "0.002500",
+        "credit_score": 760,
+        "status": "invited"
+      },
+      "wallet": {
+        "id": "ae791a80-12b2-4569-8382-6443e2989443",
+        "wallet_id": "2722d74f-fe6d-41d2-8967-e3f5d8de95b4",
+        "wallet_address": "0xF76B193127D030AE8E91294ae37b6ce30914A8cF"
+      },
+      "activationToken": "2a9df04c-c0c8-4928-b76c-a4b1e5ad5ea0",
+      "activationUrl": "https://flowpay-openclaw-three.vercel.app/employees/activate?token=2a9df04c-c0c8-4928-b76c-a4b1e5ad5ea0"
+    },
+    "activateEmployee": {
+      "employeeId": "f95979c1-3a11-41f7-a041-1ab7110a62ee",
+      "status": "active",
+      "employee": {
+        "id": "f95979c1-3a11-41f7-a041-1ab7110a62ee",
+        "full_name": "Employee a00e0064",
+        "email": "employee-a00e0064@example.com",
+        "salary": "0.002500",
+        "credit_score": 760,
+        "status": "active",
+        "created_at": "2026-03-20T18:12:54.445Z",
+        "wallet_address": "0xF76B193127D030AE8E91294ae37b6ce30914A8cF",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "company_name": "LiveFlow-a00e0064"
+      }
+    },
+    "employeeLogin": {
+      "employee": {
+        "id": "f95979c1-3a11-41f7-a041-1ab7110a62ee",
+        "full_name": "Employee a00e0064",
+        "email": "employee-a00e0064@example.com",
+        "salary": "0.002500",
+        "credit_score": 760,
+        "status": "active",
+        "created_at": "2026-03-20T18:12:54.445Z",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "company_name": "LiveFlow-a00e0064",
+        "wallet_address": "0xF76B193127D030AE8E91294ae37b6ce30914A8cF"
+      }
+    },
+    "employeeProfile": {
+      "id": "f95979c1-3a11-41f7-a041-1ab7110a62ee",
+      "full_name": "Employee a00e0064",
+      "email": "employee-a00e0064@example.com",
+      "salary": "0.002500",
+      "credit_score": 760,
+      "status": "active",
+      "created_at": "2026-03-20T18:12:54.445Z",
+      "wallet_address": "0xF76B193127D030AE8E91294ae37b6ce30914A8cF",
+      "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+      "company_name": "LiveFlow-a00e0064"
+    },
+    "employeeWallet": {
+      "wallet_address": "0xF76B193127D030AE8E91294ae37b6ce30914A8cF",
+      "balance": "0.0",
+      "token_symbol": "ETH",
+      "chain": "ethereum",
+      "max_withdrawable": "0.0"
+    },
+    "adminTopup": {
+      "result": {
+        "workflowId": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+        "workflowName": "reserve_treasury_topup",
+        "source": "test_harness_manual",
+        "companyId": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "companyName": "LiveFlow-a00e0064",
+        "amount": 0.02,
+        "txHash": "0x9bdb8cba1f092b84008b16d64675dd12f7da5858a2443741014b00ca37e24a7f",
+        "tokenSymbol": "ETH",
+        "treasuryWalletAddress": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+        "reserveWalletAddress": "0x1a447e6B60de11F81D6759Dde9f19A17368Ae037"
+      }
+    },
+    "treasuryBalanceAfterTopup": {
+      "balanceWei": "20000000000000000",
+      "balanceEth": "0.02",
+      "walletAddress": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+      "tokenSymbol": "ETH",
+      "balance": "0.02",
+      "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+      "token_symbol": "ETH"
+    },
+    "requestLoan": {
+      "decision": "approve",
+      "loanId": "d04877c2-7ac8-450a-8e18-fbd77730f6d7",
+      "amount": 0.001,
+      "interest": 0.06,
+      "duration": 12,
+      "emi": 8.336041914908128e-05,
+      "rationale": "The requested amount is within the maximum limit of 2x the monthly salary, and the monthly EMI does not exceed 30% of the salary. The credit score qualifies for a lower interest rate, and the market context is stable.",
+      "autoApproved": true,
+      "policy": {
+        "status": "allow",
+        "reasons": [],
+        "checks": [
+          {
+            "name": "agent_enabled",
+            "passed": true,
+            "value": true
+          },
+          {
+            "name": "permission",
+            "passed": true,
+            "value": true,
+            "action": "loan_disbursement"
+          },
+          {
+            "name": "max_single_transfer",
+            "passed": true,
+            "limit": 2500,
+            "amount": 0.001
+          },
+          {
+            "name": "max_daily_outflow",
+            "passed": true,
+            "limit": 10000,
+            "usedToday": 0,
+            "projected": 0.001
+          },
+          {
+            "name": "max_loan_amount",
+            "passed": true,
+            "limit": 1500,
+            "amount": 0.001
+          },
+          {
+            "name": "human_review_threshold",
+            "passed": true,
+            "threshold": 750,
+            "amount": 0.001
+          }
+        ],
+        "amount": 0.001,
+        "limits": {
+          "maxSingleTransfer": 2500,
+          "maxDailyOutflow": 10000,
+          "maxLoanAmount": 1500,
+          "maxAaveAllocationPct": 35,
+          "humanReviewAbove": 750
+        },
+        "metrics": {
+          "usedDailyOutflow": 0,
+          "projectedDailyOutflow": 0.001
+        }
+      }
+    },
+    "companyLendingHistory": {
+      "summary": {
+        "active_loans": "1",
+        "total_loans": "1",
+        "total_issued": "0.001000",
+        "remaining_balance": "0.001000"
+      },
+      "loans": [
+        {
+          "id": "d04877c2-7ac8-450a-8e18-fbd77730f6d7",
+          "full_name": "Employee a00e0064",
+          "email": "employee-a00e0064@example.com",
+          "amount": "0.001000",
+          "remaining_balance": "0.001000",
+          "interest_rate": "0.06",
+          "duration_months": 12,
+          "status": "active",
+          "created_at": "2026-03-20T18:13:03.489Z"
+        }
+      ]
+    },
+    "employeeLendingHistory": {
+      "loans": [
+        {
+          "id": "d04877c2-7ac8-450a-8e18-fbd77730f6d7",
+          "amount": "0.001000",
+          "interest_rate": "0.06",
+          "duration_months": 12,
+          "remaining_balance": "0.001000",
+          "status": "active",
+          "created_at": "2026-03-20T18:13:03.489Z",
+          "updated_at": "2026-03-20T18:13:03.489Z",
+          "emi": 8.3e-05,
+          "months_paid": 0
+        }
+      ]
+    },
+    "runPayroll": {
+      "processed": 1,
+      "results": [
+        {
+          "employeeId": "f95979c1-3a11-41f7-a041-1ab7110a62ee",
+          "netSalary": 0.002416639580850919,
+          "totalEmi": 8.336041914908128e-05
+        }
+      ]
+    },
+    "payrollHistory": {
+      "history": [
+        {
+          "id": "ddda7358-8f06-40f1-8904-f585a2a16325",
+          "amount": "0.002417",
+          "created_at": "2026-03-20T18:13:04.026Z",
+          "tx_hash": "0xd125762cf2427e6227a256dfb8f4210dcdc37fd10af920e61e17da13c3041333",
+          "employee_count": "1"
+        }
+      ]
+    },
+    "treasuryTransactions": {
+      "transactions": [
+        {
+          "id": "95f21af6-cf9a-4f3a-ae21-b70c7382730b",
+          "type": "emi_repayment",
+          "amount": "0.000083",
+          "tx_hash": null,
+          "token_symbol": "",
+          "created_at": "2026-03-20T18:13:04.031Z",
+          "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+        },
+        {
+          "id": "ddda7358-8f06-40f1-8904-f585a2a16325",
+          "type": "payroll",
+          "amount": "0.002417",
+          "tx_hash": "0xd125762cf2427e6227a256dfb8f4210dcdc37fd10af920e61e17da13c3041333",
+          "token_symbol": "ETH",
+          "created_at": "2026-03-20T18:13:04.026Z",
+          "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+        },
+        {
+          "id": "576b7e31-aefc-4905-b709-20e0dbad7f84",
+          "type": "loan_disbursement",
+          "amount": "0.001000",
+          "tx_hash": "0xd98ddf2fe95fbacbfdb76f34a1148a4c71ef287c207c404f872966f5a71e1c94",
+          "token_symbol": "ETH",
+          "created_at": "2026-03-20T18:13:03.763Z",
+          "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+        }
+      ],
+      "total": 3
+    },
+    "employeeTransactions": {
+      "transactions": [
+        {
+          "id": "031f6ffb-8d97-4e6c-be29-cc2f59301bd1",
+          "type": "emi_repayment",
+          "amount": "0.000083",
+          "tx_hash": null,
+          "token_symbol": "",
+          "created_at": "2026-03-20T18:13:04.031Z"
+        },
+        {
+          "id": "34a31c96-a033-4ad5-acee-b918e1f7b78f",
+          "type": "payroll",
+          "amount": "0.002417",
+          "tx_hash": "0xd125762cf2427e6227a256dfb8f4210dcdc37fd10af920e61e17da13c3041333",
+          "token_symbol": "ETH",
+          "created_at": "2026-03-20T18:13:04.026Z"
+        },
+        {
+          "id": "6ccc8434-d4e0-45c1-afb8-36aa9676569d",
+          "type": "loan_disbursement",
+          "amount": "0.001000",
+          "tx_hash": "0xd98ddf2fe95fbacbfdb76f34a1148a4c71ef287c207c404f872966f5a71e1c94",
+          "token_symbol": "ETH",
+          "created_at": "2026-03-20T18:13:03.763Z"
+        }
+      ]
+    }
+  },
+  "clawbotFlow": {
+    "createdTask": {
+      "task": {
+        "id": "bec75ec4-36f7-403d-a406-3b8cd796071d",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "type": "treasury_topup",
+        "status": "pending",
+        "recipient_email": "amanraj4u92@gmail.com",
+        "subject": "Clawbot treasury top-up live test",
+        "payload": {
+          "amount": 0.001,
+          "companyId": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "shortfall": 0.001,
+          "balanceEth": 0.02,
+          "monthlyPayroll": 0.0025,
+          "treasuryAddress": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+        },
+        "approval_id": null,
+        "created_at": "2026-03-20T18:13:04.071Z"
+      },
+      "approvalId": null
+    },
+    "balanceBeforeTask": {
+      "balanceWei": "20000000000000000",
+      "balanceEth": "0.02",
+      "walletAddress": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+      "tokenSymbol": "ETH",
+      "balance": "0.02",
+      "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+      "token_symbol": "ETH"
+    },
+    "hookProbe": {
+      "ok": true,
+      "runId": "69a3a8d4-aec0-4d0d-a4a2-302b02981993"
+    },
+    "taskPoll": {
+      "done": false,
+      "task": {
+        "id": "bec75ec4-36f7-403d-a406-3b8cd796071d",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "type": "treasury_topup",
+        "status": "completed",
+        "recipient_email": "amanraj4u92@gmail.com",
+        "subject": "Clawbot treasury top-up live test",
+        "payload": {
+          "amount": 0.001,
+          "companyId": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "shortfall": 0.001,
+          "balanceEth": 0.02,
+          "monthlyPayroll": 0.0025,
+          "treasuryAddress": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+        },
+        "approval_id": null,
+        "created_at": "2026-03-20T18:13:04.071Z",
+        "updated_at": "2026-03-20T18:13:59.848Z",
+        "completed_at": "2026-03-20T18:13:59.848Z"
+      },
+      "balance": {
+        "balanceWei": "17583318418687081",
+        "balanceEth": "0.017583318418687081",
+        "walletAddress": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+        "tokenSymbol": "ETH",
+        "balance": "0.017583318418687081",
+        "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+        "token_symbol": "ETH"
+      },
+      "reserveLogs": [
+        {
+          "id": "b8a27ec8-855c-4054-99cc-471a01aaf6fa",
+          "timestamp": "2026-03-20T18:13:57.949Z",
+          "agent_name": "WDKExecutionLayer",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve wallet transfer sent to the company treasury wallet.",
+          "action_taken": "Treasury top-up execution succeeded.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "wdk_execution",
+          "source": "openclaw_clawbot",
+          "policy_result": {
+            "amount": 0.001,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.001,
+                "passed": true,
+                "available": 0.004999894998824
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.004999894998824
+            },
+            "reasons": []
+          },
+          "execution_status": "success",
+          "metadata": {
+            "taskId": "bec75ec4-36f7-403d-a406-3b8cd796071d",
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "219e112f-c81e-4704-9914-0e06a354134f",
+          "timestamp": "2026-03-20T18:13:57.707Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve treasury top-up passed reserve wallet policy checks.",
+          "action_taken": "Reserve treasury top-up policy status: ALLOW",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "policy_validation",
+          "source": "openclaw_clawbot",
+          "policy_result": {
+            "amount": 0.001,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.001,
+                "passed": true,
+                "available": 0.004999894998824
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.004999894998824
+            },
+            "reasons": []
+          },
+          "execution_status": "allow",
+          "metadata": {}
+        },
+        {
+          "id": "1aba4d40-ec42-4228-863d-7606136970bd",
+          "timestamp": "2026-03-20T18:13:57.705Z",
+          "agent_name": "ReserveFundingAgent",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Clawbot treasury top-up live test (auto)",
+          "action_taken": "Reserve top-up request prepared.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "decision",
+          "source": "openclaw_clawbot",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {
+            "taskId": "bec75ec4-36f7-403d-a406-3b8cd796071d",
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "28a48963-7945-4562-99eb-17e0786cd99c",
+          "timestamp": "2026-03-20T18:12:55.763Z",
+          "agent_name": "WDKExecutionLayer",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve wallet transfer sent to the company treasury wallet.",
+          "action_taken": "Treasury top-up execution succeeded.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "wdk_execution",
+          "source": "test_harness_manual",
+          "policy_result": {
+            "amount": 0.02,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.02,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.02,
+                "passed": true,
+                "available": 0.024999915999055
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.024999915999055
+            },
+            "reasons": []
+          },
+          "execution_status": "success",
+          "metadata": {
+            "taskId": null,
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "433dc04e-bda1-43ea-ae8a-7e5034da0eb9",
+          "timestamp": "2026-03-20T18:12:55.499Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve treasury top-up passed reserve wallet policy checks.",
+          "action_taken": "Reserve treasury top-up policy status: ALLOW",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "policy_validation",
+          "source": "test_harness_manual",
+          "policy_result": {
+            "amount": 0.02,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.02,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.02,
+                "passed": true,
+                "available": 0.024999915999055
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.024999915999055
+            },
+            "reasons": []
+          },
+          "execution_status": "allow",
+          "metadata": {}
+        },
+        {
+          "id": "47b08e08-b2fa-468e-b907-ceeb07fc9d8d",
+          "timestamp": "2026-03-20T18:12:55.496Z",
+          "agent_name": "ReserveFundingAgent",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Live EC2 backend manual flow test",
+          "action_taken": "Reserve top-up request prepared.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "decision",
+          "source": "test_harness_manual",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {
+            "taskId": null,
+            "tokenSymbol": "ETH"
+          }
+        }
+      ]
+    },
+    "directHookStrategyDispatch": {
+      "ok": true,
+      "runId": "cec8da77-56d9-4829-9220-0e8f08b112ca"
+    },
+    "strategyLogPoll": {
+      "done": false,
+      "matchedLogs": [],
+      "logs": [
+        {
+          "id": "b8a27ec8-855c-4054-99cc-471a01aaf6fa",
+          "timestamp": "2026-03-20T18:13:57.949Z",
+          "agent_name": "WDKExecutionLayer",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve wallet transfer sent to the company treasury wallet.",
+          "action_taken": "Treasury top-up execution succeeded.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "wdk_execution",
+          "source": "openclaw_clawbot",
+          "policy_result": {
+            "amount": 0.001,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.001,
+                "passed": true,
+                "available": 0.004999894998824
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.004999894998824
+            },
+            "reasons": []
+          },
+          "execution_status": "success",
+          "metadata": {
+            "taskId": "bec75ec4-36f7-403d-a406-3b8cd796071d",
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "219e112f-c81e-4704-9914-0e06a354134f",
+          "timestamp": "2026-03-20T18:13:57.707Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve treasury top-up passed reserve wallet policy checks.",
+          "action_taken": "Reserve treasury top-up policy status: ALLOW",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "policy_validation",
+          "source": "openclaw_clawbot",
+          "policy_result": {
+            "amount": 0.001,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.001,
+                "passed": true,
+                "available": 0.004999894998824
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.004999894998824
+            },
+            "reasons": []
+          },
+          "execution_status": "allow",
+          "metadata": {}
+        },
+        {
+          "id": "1aba4d40-ec42-4228-863d-7606136970bd",
+          "timestamp": "2026-03-20T18:13:57.705Z",
+          "agent_name": "ReserveFundingAgent",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Clawbot treasury top-up live test (auto)",
+          "action_taken": "Reserve top-up request prepared.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "decision",
+          "source": "openclaw_clawbot",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {
+            "taskId": "bec75ec4-36f7-403d-a406-3b8cd796071d",
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "eed07d2a-e10d-43f1-b598-20b323618626",
+          "timestamp": "2026-03-20T18:13:04.035Z",
+          "agent_name": "WDKExecutionLayer",
+          "decision": {
+            "action": "payroll"
+          },
+          "rationale": "Payroll transfers executed and EMI deductions recorded.",
+          "action_taken": "Payroll execution completed for 1 employees.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": null,
+          "workflow_name": null,
+          "stage": "wdk_execution",
+          "source": "backend",
+          "policy_result": {
+            "amount": 0.002417,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "payroll",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.002417,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.003417,
+                "usedToday": 0.001
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.002417,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "allow",
+            "metrics": {
+              "usedDailyOutflow": 0.001,
+              "projectedDailyOutflow": 0.003417
+            },
+            "reasons": []
+          },
+          "execution_status": "success",
+          "metadata": {
+            "txHashes": [
+              {
+                "txHash": "0xd125762cf2427e6227a256dfb8f4210dcdc37fd10af920e61e17da13c3041333",
+                "employeeId": "f95979c1-3a11-41f7-a041-1ab7110a62ee"
+              }
+            ]
+          }
+        },
+        {
+          "id": "99cc7182-a0c9-4b9f-b259-a1755bdf950b",
+          "timestamp": "2026-03-20T18:13:03.786Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "payroll"
+          },
+          "rationale": "Payroll run passed wallet policy checks.",
+          "action_taken": "Payroll policy status: ALLOW",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": null,
+          "workflow_name": null,
+          "stage": "policy_validation",
+          "source": "backend",
+          "policy_result": {
+            "amount": 0.002417,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "payroll",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.002417,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.003417,
+                "usedToday": 0.001
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.002417,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "allow",
+            "metrics": {
+              "usedDailyOutflow": 0.001,
+              "projectedDailyOutflow": 0.003417
+            },
+            "reasons": []
+          },
+          "execution_status": "allow",
+          "metadata": {}
+        },
+        {
+          "id": "49f43a36-e844-4da1-a7e5-63eb92f3dc16",
+          "timestamp": "2026-03-20T18:13:03.769Z",
+          "agent_name": "WDKExecutionLayer",
+          "decision": {
+            "action": "loan_disbursement"
+          },
+          "rationale": "Loan disbursal executed via WDK wallet transfer.",
+          "action_taken": "Loan disbursal executed. Tx: 0xd98ddf2fe95fbacbfdb76f34a1148a4c71ef287c207c404f872966f5a71e1c94",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": null,
+          "workflow_name": null,
+          "stage": "wdk_execution",
+          "source": "backend",
+          "policy_result": {
+            "amount": 0.001,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "loan_disbursement",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.001,
+                "usedToday": 0
+              },
+              {
+                "name": "max_loan_amount",
+                "limit": 1500,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.001,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "allow",
+            "metrics": {
+              "usedDailyOutflow": 0,
+              "projectedDailyOutflow": 0.001
+            },
+            "reasons": []
+          },
+          "execution_status": "success",
+          "metadata": {
+            "loanId": "d04877c2-7ac8-450a-8e18-fbd77730f6d7",
+            "txHash": "0xd98ddf2fe95fbacbfdb76f34a1148a4c71ef287c207c404f872966f5a71e1c94"
+          }
+        },
+        {
+          "id": "31cc94e0-bed4-4b2c-ad3d-5aa1ac346057",
+          "timestamp": "2026-03-20T18:13:03.487Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "loan_disbursement"
+          },
+          "rationale": "Loan disbursal passed wallet policy checks.",
+          "action_taken": "Loan disbursal policy status: ALLOW",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": null,
+          "workflow_name": null,
+          "stage": "policy_validation",
+          "source": "backend",
+          "policy_result": {
+            "amount": 0.001,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "loan_disbursement",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.001,
+                "usedToday": 0
+              },
+              {
+                "name": "max_loan_amount",
+                "limit": 1500,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.001,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "allow",
+            "metrics": {
+              "usedDailyOutflow": 0,
+              "projectedDailyOutflow": 0.001
+            },
+            "reasons": []
+          },
+          "execution_status": "allow",
+          "metadata": {}
+        },
+        {
+          "id": "75081d68-f654-46f2-b472-253b122525cb",
+          "timestamp": "2026-03-20T18:13:03.483Z",
+          "agent_name": "LoanDecisionAgent",
+          "decision": {
+            "amount": 0.001,
+            "decision": "approve",
+            "duration": 12,
+            "interest": 0.06,
+            "rationale": "The requested amount is within the maximum limit of 2x the monthly salary, and the monthly EMI does not exceed 30% of the salary. The credit score qualifies for a lower interest rate, and the market context is stable."
+          },
+          "rationale": "The requested amount is within the maximum limit of 2x the monthly salary, and the monthly EMI does not exceed 30% of the salary. The credit score qualifies for a lower interest rate, and the market context is stable.",
+          "action_taken": "Approved loan of 0.001 ETH",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": null,
+          "workflow_name": null,
+          "stage": "decision",
+          "source": "backend",
+          "policy_result": {},
+          "execution_status": null,
+          "metadata": {}
+        },
+        {
+          "id": "28a48963-7945-4562-99eb-17e0786cd99c",
+          "timestamp": "2026-03-20T18:12:55.763Z",
+          "agent_name": "WDKExecutionLayer",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve wallet transfer sent to the company treasury wallet.",
+          "action_taken": "Treasury top-up execution succeeded.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "wdk_execution",
+          "source": "test_harness_manual",
+          "policy_result": {
+            "amount": 0.02,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.02,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.02,
+                "passed": true,
+                "available": 0.024999915999055
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.024999915999055
+            },
+            "reasons": []
+          },
+          "execution_status": "success",
+          "metadata": {
+            "taskId": null,
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "433dc04e-bda1-43ea-ae8a-7e5034da0eb9",
+          "timestamp": "2026-03-20T18:12:55.499Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve treasury top-up passed reserve wallet policy checks.",
+          "action_taken": "Reserve treasury top-up policy status: ALLOW",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "policy_validation",
+          "source": "test_harness_manual",
+          "policy_result": {
+            "amount": 0.02,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.02,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.02,
+                "passed": true,
+                "available": 0.024999915999055
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.024999915999055
+            },
+            "reasons": []
+          },
+          "execution_status": "allow",
+          "metadata": {}
+        },
+        {
+          "id": "47b08e08-b2fa-468e-b907-ceeb07fc9d8d",
+          "timestamp": "2026-03-20T18:12:55.496Z",
+          "agent_name": "ReserveFundingAgent",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Live EC2 backend manual flow test",
+          "action_taken": "Reserve top-up request prepared.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "decision",
+          "source": "test_harness_manual",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {
+            "taskId": null,
+            "tokenSymbol": "ETH"
+          }
+        }
+      ]
+    },
+    "agentLogs": [
+      {
+        "id": "b8a27ec8-855c-4054-99cc-471a01aaf6fa",
+        "timestamp": "2026-03-20T18:13:57.949Z",
+        "agent_name": "WDKExecutionLayer",
+        "decision": {
+          "action": "reserve_treasury_topup"
+        },
+        "rationale": "Reserve wallet transfer sent to the company treasury wallet.",
+        "action_taken": "Treasury top-up execution succeeded.",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+        "workflow_name": "reserve_treasury_topup",
+        "stage": "wdk_execution",
+        "source": "openclaw_clawbot",
+        "policy_result": {
+          "amount": 0.001,
+          "checks": [
+            {
+              "name": "reserve_topup_enabled",
+              "value": "true",
+              "passed": true
+            },
+            {
+              "name": "max_reserve_topup_amount",
+              "limit": 0.05,
+              "amount": 0.001,
+              "passed": true
+            },
+            {
+              "name": "reserve_wallet_balance",
+              "amount": 0.001,
+              "passed": true,
+              "available": 0.004999894998824
+            }
+          ],
+          "limits": {
+            "reserveTopupMaxAmount": 0.05
+          },
+          "status": "allow",
+          "metrics": {
+            "reserveAvailable": 0.004999894998824
+          },
+          "reasons": []
+        },
+        "execution_status": "success",
+        "metadata": {
+          "taskId": "bec75ec4-36f7-403d-a406-3b8cd796071d",
+          "tokenSymbol": "ETH"
+        }
+      },
+      {
+        "id": "219e112f-c81e-4704-9914-0e06a354134f",
+        "timestamp": "2026-03-20T18:13:57.707Z",
+        "agent_name": "FlowPayPolicyEngine",
+        "decision": {
+          "action": "reserve_treasury_topup"
+        },
+        "rationale": "Reserve treasury top-up passed reserve wallet policy checks.",
+        "action_taken": "Reserve treasury top-up policy status: ALLOW",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+        "workflow_name": "reserve_treasury_topup",
+        "stage": "policy_validation",
+        "source": "openclaw_clawbot",
+        "policy_result": {
+          "amount": 0.001,
+          "checks": [
+            {
+              "name": "reserve_topup_enabled",
+              "value": "true",
+              "passed": true
+            },
+            {
+              "name": "max_reserve_topup_amount",
+              "limit": 0.05,
+              "amount": 0.001,
+              "passed": true
+            },
+            {
+              "name": "reserve_wallet_balance",
+              "amount": 0.001,
+              "passed": true,
+              "available": 0.004999894998824
+            }
+          ],
+          "limits": {
+            "reserveTopupMaxAmount": 0.05
+          },
+          "status": "allow",
+          "metrics": {
+            "reserveAvailable": 0.004999894998824
+          },
+          "reasons": []
+        },
+        "execution_status": "allow",
+        "metadata": {}
+      },
+      {
+        "id": "1aba4d40-ec42-4228-863d-7606136970bd",
+        "timestamp": "2026-03-20T18:13:57.705Z",
+        "agent_name": "ReserveFundingAgent",
+        "decision": {
+          "action": "reserve_treasury_topup"
+        },
+        "rationale": "Clawbot treasury top-up live test (auto)",
+        "action_taken": "Reserve top-up request prepared.",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+        "workflow_name": "reserve_treasury_topup",
+        "stage": "decision",
+        "source": "openclaw_clawbot",
+        "policy_result": {},
+        "execution_status": "started",
+        "metadata": {
+          "taskId": "bec75ec4-36f7-403d-a406-3b8cd796071d",
+          "tokenSymbol": "ETH"
+        }
+      },
+      {
+        "id": "eed07d2a-e10d-43f1-b598-20b323618626",
+        "timestamp": "2026-03-20T18:13:04.035Z",
+        "agent_name": "WDKExecutionLayer",
+        "decision": {
+          "action": "payroll"
+        },
+        "rationale": "Payroll transfers executed and EMI deductions recorded.",
+        "action_taken": "Payroll execution completed for 1 employees.",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "workflow_id": null,
+        "workflow_name": null,
+        "stage": "wdk_execution",
+        "source": "backend",
+        "policy_result": {
+          "amount": 0.002417,
+          "checks": [
+            {
+              "name": "agent_enabled",
+              "value": true,
+              "passed": true
+            },
+            {
+              "name": "permission",
+              "value": true,
+              "action": "payroll",
+              "passed": true
+            },
+            {
+              "name": "max_single_transfer",
+              "limit": 2500,
+              "amount": 0.002417,
+              "passed": true
+            },
+            {
+              "name": "max_daily_outflow",
+              "limit": 10000,
+              "passed": true,
+              "projected": 0.003417,
+              "usedToday": 0.001
+            },
+            {
+              "name": "human_review_threshold",
+              "amount": 0.002417,
+              "passed": true,
+              "threshold": 750
+            }
+          ],
+          "limits": {
+            "maxLoanAmount": 1500,
+            "maxDailyOutflow": 10000,
+            "humanReviewAbove": 750,
+            "maxSingleTransfer": 2500,
+            "maxAaveAllocationPct": 35
+          },
+          "status": "allow",
+          "metrics": {
+            "usedDailyOutflow": 0.001,
+            "projectedDailyOutflow": 0.003417
+          },
+          "reasons": []
+        },
+        "execution_status": "success",
+        "metadata": {
+          "txHashes": [
+            {
+              "txHash": "0xd125762cf2427e6227a256dfb8f4210dcdc37fd10af920e61e17da13c3041333",
+              "employeeId": "f95979c1-3a11-41f7-a041-1ab7110a62ee"
+            }
+          ]
+        }
+      },
+      {
+        "id": "99cc7182-a0c9-4b9f-b259-a1755bdf950b",
+        "timestamp": "2026-03-20T18:13:03.786Z",
+        "agent_name": "FlowPayPolicyEngine",
+        "decision": {
+          "action": "payroll"
+        },
+        "rationale": "Payroll run passed wallet policy checks.",
+        "action_taken": "Payroll policy status: ALLOW",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "workflow_id": null,
+        "workflow_name": null,
+        "stage": "policy_validation",
+        "source": "backend",
+        "policy_result": {
+          "amount": 0.002417,
+          "checks": [
+            {
+              "name": "agent_enabled",
+              "value": true,
+              "passed": true
+            },
+            {
+              "name": "permission",
+              "value": true,
+              "action": "payroll",
+              "passed": true
+            },
+            {
+              "name": "max_single_transfer",
+              "limit": 2500,
+              "amount": 0.002417,
+              "passed": true
+            },
+            {
+              "name": "max_daily_outflow",
+              "limit": 10000,
+              "passed": true,
+              "projected": 0.003417,
+              "usedToday": 0.001
+            },
+            {
+              "name": "human_review_threshold",
+              "amount": 0.002417,
+              "passed": true,
+              "threshold": 750
+            }
+          ],
+          "limits": {
+            "maxLoanAmount": 1500,
+            "maxDailyOutflow": 10000,
+            "humanReviewAbove": 750,
+            "maxSingleTransfer": 2500,
+            "maxAaveAllocationPct": 35
+          },
+          "status": "allow",
+          "metrics": {
+            "usedDailyOutflow": 0.001,
+            "projectedDailyOutflow": 0.003417
+          },
+          "reasons": []
+        },
+        "execution_status": "allow",
+        "metadata": {}
+      },
+      {
+        "id": "49f43a36-e844-4da1-a7e5-63eb92f3dc16",
+        "timestamp": "2026-03-20T18:13:03.769Z",
+        "agent_name": "WDKExecutionLayer",
+        "decision": {
+          "action": "loan_disbursement"
+        },
+        "rationale": "Loan disbursal executed via WDK wallet transfer.",
+        "action_taken": "Loan disbursal executed. Tx: 0xd98ddf2fe95fbacbfdb76f34a1148a4c71ef287c207c404f872966f5a71e1c94",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "workflow_id": null,
+        "workflow_name": null,
+        "stage": "wdk_execution",
+        "source": "backend",
+        "policy_result": {
+          "amount": 0.001,
+          "checks": [
+            {
+              "name": "agent_enabled",
+              "value": true,
+              "passed": true
+            },
+            {
+              "name": "permission",
+              "value": true,
+              "action": "loan_disbursement",
+              "passed": true
+            },
+            {
+              "name": "max_single_transfer",
+              "limit": 2500,
+              "amount": 0.001,
+              "passed": true
+            },
+            {
+              "name": "max_daily_outflow",
+              "limit": 10000,
+              "passed": true,
+              "projected": 0.001,
+              "usedToday": 0
+            },
+            {
+              "name": "max_loan_amount",
+              "limit": 1500,
+              "amount": 0.001,
+              "passed": true
+            },
+            {
+              "name": "human_review_threshold",
+              "amount": 0.001,
+              "passed": true,
+              "threshold": 750
+            }
+          ],
+          "limits": {
+            "maxLoanAmount": 1500,
+            "maxDailyOutflow": 10000,
+            "humanReviewAbove": 750,
+            "maxSingleTransfer": 2500,
+            "maxAaveAllocationPct": 35
+          },
+          "status": "allow",
+          "metrics": {
+            "usedDailyOutflow": 0,
+            "projectedDailyOutflow": 0.001
+          },
+          "reasons": []
+        },
+        "execution_status": "success",
+        "metadata": {
+          "loanId": "d04877c2-7ac8-450a-8e18-fbd77730f6d7",
+          "txHash": "0xd98ddf2fe95fbacbfdb76f34a1148a4c71ef287c207c404f872966f5a71e1c94"
+        }
+      },
+      {
+        "id": "31cc94e0-bed4-4b2c-ad3d-5aa1ac346057",
+        "timestamp": "2026-03-20T18:13:03.487Z",
+        "agent_name": "FlowPayPolicyEngine",
+        "decision": {
+          "action": "loan_disbursement"
+        },
+        "rationale": "Loan disbursal passed wallet policy checks.",
+        "action_taken": "Loan disbursal policy status: ALLOW",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "workflow_id": null,
+        "workflow_name": null,
+        "stage": "policy_validation",
+        "source": "backend",
+        "policy_result": {
+          "amount": 0.001,
+          "checks": [
+            {
+              "name": "agent_enabled",
+              "value": true,
+              "passed": true
+            },
+            {
+              "name": "permission",
+              "value": true,
+              "action": "loan_disbursement",
+              "passed": true
+            },
+            {
+              "name": "max_single_transfer",
+              "limit": 2500,
+              "amount": 0.001,
+              "passed": true
+            },
+            {
+              "name": "max_daily_outflow",
+              "limit": 10000,
+              "passed": true,
+              "projected": 0.001,
+              "usedToday": 0
+            },
+            {
+              "name": "max_loan_amount",
+              "limit": 1500,
+              "amount": 0.001,
+              "passed": true
+            },
+            {
+              "name": "human_review_threshold",
+              "amount": 0.001,
+              "passed": true,
+              "threshold": 750
+            }
+          ],
+          "limits": {
+            "maxLoanAmount": 1500,
+            "maxDailyOutflow": 10000,
+            "humanReviewAbove": 750,
+            "maxSingleTransfer": 2500,
+            "maxAaveAllocationPct": 35
+          },
+          "status": "allow",
+          "metrics": {
+            "usedDailyOutflow": 0,
+            "projectedDailyOutflow": 0.001
+          },
+          "reasons": []
+        },
+        "execution_status": "allow",
+        "metadata": {}
+      },
+      {
+        "id": "75081d68-f654-46f2-b472-253b122525cb",
+        "timestamp": "2026-03-20T18:13:03.483Z",
+        "agent_name": "LoanDecisionAgent",
+        "decision": {
+          "amount": 0.001,
+          "decision": "approve",
+          "duration": 12,
+          "interest": 0.06,
+          "rationale": "The requested amount is within the maximum limit of 2x the monthly salary, and the monthly EMI does not exceed 30% of the salary. The credit score qualifies for a lower interest rate, and the market context is stable."
+        },
+        "rationale": "The requested amount is within the maximum limit of 2x the monthly salary, and the monthly EMI does not exceed 30% of the salary. The credit score qualifies for a lower interest rate, and the market context is stable.",
+        "action_taken": "Approved loan of 0.001 ETH",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "workflow_id": null,
+        "workflow_name": null,
+        "stage": "decision",
+        "source": "backend",
+        "policy_result": {},
+        "execution_status": null,
+        "metadata": {}
+      },
+      {
+        "id": "28a48963-7945-4562-99eb-17e0786cd99c",
+        "timestamp": "2026-03-20T18:12:55.763Z",
+        "agent_name": "WDKExecutionLayer",
+        "decision": {
+          "action": "reserve_treasury_topup"
+        },
+        "rationale": "Reserve wallet transfer sent to the company treasury wallet.",
+        "action_taken": "Treasury top-up execution succeeded.",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+        "workflow_name": "reserve_treasury_topup",
+        "stage": "wdk_execution",
+        "source": "test_harness_manual",
+        "policy_result": {
+          "amount": 0.02,
+          "checks": [
+            {
+              "name": "reserve_topup_enabled",
+              "value": "true",
+              "passed": true
+            },
+            {
+              "name": "max_reserve_topup_amount",
+              "limit": 0.05,
+              "amount": 0.02,
+              "passed": true
+            },
+            {
+              "name": "reserve_wallet_balance",
+              "amount": 0.02,
+              "passed": true,
+              "available": 0.024999915999055
+            }
+          ],
+          "limits": {
+            "reserveTopupMaxAmount": 0.05
+          },
+          "status": "allow",
+          "metrics": {
+            "reserveAvailable": 0.024999915999055
+          },
+          "reasons": []
+        },
+        "execution_status": "success",
+        "metadata": {
+          "taskId": null,
+          "tokenSymbol": "ETH"
+        }
+      },
+      {
+        "id": "433dc04e-bda1-43ea-ae8a-7e5034da0eb9",
+        "timestamp": "2026-03-20T18:12:55.499Z",
+        "agent_name": "FlowPayPolicyEngine",
+        "decision": {
+          "action": "reserve_treasury_topup"
+        },
+        "rationale": "Reserve treasury top-up passed reserve wallet policy checks.",
+        "action_taken": "Reserve treasury top-up policy status: ALLOW",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+        "workflow_name": "reserve_treasury_topup",
+        "stage": "policy_validation",
+        "source": "test_harness_manual",
+        "policy_result": {
+          "amount": 0.02,
+          "checks": [
+            {
+              "name": "reserve_topup_enabled",
+              "value": "true",
+              "passed": true
+            },
+            {
+              "name": "max_reserve_topup_amount",
+              "limit": 0.05,
+              "amount": 0.02,
+              "passed": true
+            },
+            {
+              "name": "reserve_wallet_balance",
+              "amount": 0.02,
+              "passed": true,
+              "available": 0.024999915999055
+            }
+          ],
+          "limits": {
+            "reserveTopupMaxAmount": 0.05
+          },
+          "status": "allow",
+          "metrics": {
+            "reserveAvailable": 0.024999915999055
+          },
+          "reasons": []
+        },
+        "execution_status": "allow",
+        "metadata": {}
+      },
+      {
+        "id": "47b08e08-b2fa-468e-b907-ceeb07fc9d8d",
+        "timestamp": "2026-03-20T18:12:55.496Z",
+        "agent_name": "ReserveFundingAgent",
+        "decision": {
+          "action": "reserve_treasury_topup"
+        },
+        "rationale": "Live EC2 backend manual flow test",
+        "action_taken": "Reserve top-up request prepared.",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+        "workflow_name": "reserve_treasury_topup",
+        "stage": "decision",
+        "source": "test_harness_manual",
+        "policy_result": {},
+        "execution_status": "started",
+        "metadata": {
+          "taskId": null,
+          "tokenSymbol": "ETH"
+        }
+      }
+    ]
+  },
+  "automationFlow": {
+    "addAutomationEmployee": {
+      "employee": {
+        "id": "77579630-6268-4b90-8caa-099944f8718c",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "full_name": "Automation Employee a00e0064",
+        "email": "auto-employee-a00e0064@example.com",
+        "salary": "0.001800",
+        "credit_score": 780,
+        "status": "invited"
+      },
+      "wallet": {
+        "id": "d61c47b2-ea2b-4763-a6e9-63abc89b91e9",
+        "wallet_id": "39ca93e9-eeac-4f23-b90e-3ed99c7d1359",
+        "wallet_address": "0x7a11c61385b3761BaC4564617D6B3DD03eBC0294"
+      },
+      "activationToken": "e925c174-4bdb-418b-bf58-39e38657ad8a",
+      "activationUrl": "https://flowpay-openclaw-three.vercel.app/employees/activate?token=e925c174-4bdb-418b-bf58-39e38657ad8a"
+    },
+    "activateAutomationEmployee": {
+      "employeeId": "77579630-6268-4b90-8caa-099944f8718c",
+      "status": "active",
+      "employee": {
+        "id": "77579630-6268-4b90-8caa-099944f8718c",
+        "full_name": "Automation Employee a00e0064",
+        "email": "auto-employee-a00e0064@example.com",
+        "salary": "0.001800",
+        "credit_score": 780,
+        "status": "active",
+        "created_at": "2026-03-20T18:17:35.269Z",
+        "wallet_address": "0x7a11c61385b3761BaC4564617D6B3DD03eBC0294",
+        "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "company_name": "LiveFlow-a00e0064"
+      }
+    }
+  },
+  "errors": [
+    {
+      "flow": "automation",
+      "error": "HTTP 400 /ops/treasury/topup payload={'error': 'Reserve wallet balance 0.004000 is below required top-up 0.010000.'}"
+    }
+  ],
+  "finishedAt": "2026-03-20T18:17:35.799984+00:00"
+}

@@ -13,7 +13,11 @@ function toFixedNum(value: number): number {
 
 export async function runInvestment(companyId: string, auditContext: AgentLogContext = {}) {
   const allocationResult = await db.query(
-    "SELECT investment_pool, payroll_reserve, lending_pool FROM treasury_allocations WHERE company_id = $1 ORDER BY created_at DESC LIMIT 1",
+    `SELECT investment_pool, payroll_reserve, lending_pool, main_reserve
+     FROM treasury_allocations
+     WHERE company_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
     [companyId]
   );
 
@@ -104,7 +108,8 @@ export async function runInvestment(companyId: string, auditContext: AgentLogCon
     }
     const payrollReserve = parseFloat(allocationResult.rows[0]?.payroll_reserve ?? "0");
     const lendingPool = parseFloat(allocationResult.rows[0]?.lending_pool ?? "0");
-    const totalTreasury = investmentPool + payrollReserve + lendingPool;
+    const mainReserve = parseFloat(allocationResult.rows[0]?.main_reserve ?? "0");
+    const totalTreasury = investmentPool + payrollReserve + lendingPool + mainReserve;
     const maxExposure = totalTreasury * parseFloat(env.MAX_AAVE_EXPOSURE_PCT);
 
     if (investAmountRaw <= 0n || normalizedInvestAmount <= 0) {

@@ -11,6 +11,7 @@ import { useEffect, useState, useCallback } from "react";
 import {
   fetchCompany,
   fetchTreasuryBalance,
+  fetchTreasuryAllocation,
   fetchEmployees,
   fetchEmployee,
   fetchEmployeeWallet,
@@ -28,6 +29,7 @@ import {
   type Transaction,
   type PayrollHistoryEntry,
   type TreasuryBalance,
+  type TreasuryAllocationSnapshot,
 } from "./api";
 import { loadCompanyContext, loadEmployeeContext } from "./companyContext";
 
@@ -103,6 +105,13 @@ export function useTreasuryBalance() {
   return useApi<TreasuryBalance>(id ? fetcher : null);
 }
 
+export function useTreasuryAllocation() {
+  const ctx = useClientContext(loadCompanyContext);
+  const id = ctx?.id ?? null;
+  const fetcher = useCallback(() => fetchTreasuryAllocation(id as string), [id]);
+  return useApi<TreasuryAllocationSnapshot>(id ? fetcher : null);
+}
+
 // ── Employees ────────────────────────────────────────────────
 
 export function useEmployees() {
@@ -170,6 +179,7 @@ export type InvestmentData = {
     investment_pool: string;
     payroll_reserve: string;
     lending_pool: string;
+    main_reserve: string;
     created_at: string;
   } | null;
   positions: {

@@ -16,6 +16,24 @@ function clearStoredContexts() {
   window.localStorage.removeItem("flowpay_employee");
 }
 
+async function sessionFetch<T>(path: string): Promise<T | null> {
+  const res = await fetch(`${BASE}${path}`, {
+    cache: "no-store",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (res.status === 401 || res.status === 403) {
+    return null;
+  }
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error ?? `API error ${res.status}`);
+  }
+  return data as T;
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     cache: "no-store",
@@ -144,6 +162,21 @@ export type TreasuryBalance = {
   token_symbol?: string;
 };
 
+export type TreasuryAllocationSnapshot = {
+  company_id: string;
+  payroll_reserve: string;
+  lending_pool: string;
+  investment_pool: string;
+  main_reserve: string;
+  created_at: string | null;
+  allocation: {
+    payroll_reserve_pct: number;
+    lending_pool_pct: number;
+    investment_pool_pct: number;
+    main_reserve_pct: number;
+  };
+};
+
 export type PayrollHistoryEntry = {
   id: string;
   amount: string;
@@ -205,6 +238,9 @@ export const fetchCompany = (id: string) =>
 export const fetchCompanies = () =>
   apiFetch<{ companies: Company[] }>("/companies");
 
+export const fetchCurrentCompanySession = () =>
+  sessionFetch<{ company: Company }>("/companies/session");
+
 export const registerCompany = (body: { name: string; email: string; accessPin: string }) =>
   apiFetch<{ company: Company; treasury_wallet: { wallet_address: string } }>("/companies/register", {
     method: "POST",
@@ -233,6 +269,9 @@ export const updateCompanyAccessPin = (accessPin: string) =>
 export const fetchTreasuryBalance = (companyId: string) =>
   apiFetch<TreasuryBalance>(`/treasury/balance?companyId=${companyId}`);
 
+export const fetchTreasuryAllocation = (companyId: string) =>
+  apiFetch<TreasuryAllocationSnapshot>(`/treasury/allocation?companyId=${companyId}`);
+
 // ── Employees ────────────────────────────────────────────────
 
 export const fetchEmployees = (companyId: string) =>
@@ -256,6 +295,9 @@ export const loginEmployee = (body: { access: string; password: string; email?: 
     body: JSON.stringify(body),
   });
 
+export const fetchCurrentEmployeeSession = () =>
+  sessionFetch<{ employee: Employee }>("/employees/session");
+
 export const logoutEmployee = () =>
   apiFetch<{ status: string }>("/employees/logout", {
     method: "POST",
@@ -268,7 +310,7 @@ export const addEmployee = (body: {
   salary: number;
   creditScore?: number;
 }) =>
-  apiFetch<{ employee: Employee }>("/employees/add", {
+  apiFetch<{ employee: Employee; activationToken: string; activationUrl: string }>("/employees/add", {
     method: "POST",
     body: JSON.stringify(body),
   });

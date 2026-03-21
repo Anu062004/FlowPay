@@ -1,5 +1,5 @@
 "use client";
-import { useTreasuryBalance, useEmployees, useLendingHistory, useTransactions } from "../lib/hooks";
+import { useTreasuryAllocation, useTreasuryBalance, useEmployees, useLendingHistory, useTransactions } from "../lib/hooks";
 import Link from "next/link";
 import { formatEth } from "../lib/format";
 import { AgentActivityFeed } from "../components/AgentActivityFeed";
@@ -107,6 +107,7 @@ const TX_BADGE: Record<string, string> = {
 // ═══════════════════════════════════════════════════════════
 export default function OverviewPage() {
   const treasury = useTreasuryBalance();
+  const treasuryAllocation = useTreasuryAllocation();
   const employees = useEmployees();
   const lending = useLendingHistory();
   const transactions = useTransactions(5);
@@ -120,16 +121,25 @@ export default function OverviewPage() {
   const totalPayroll = empList.reduce((s, e) => s + parseFloat(e.salary), 0);
   const txAmounts = txList.map(t => parseFloat(t.amount));
 
-  // derive capital allocation from lending summary
-  const totalIssued = parseFloat(lendingSummary?.total_issued ?? "0");
-  const remaining = parseFloat(lendingSummary?.remaining_balance ?? "0");
+  const allocationData = treasuryAllocation.data;
   const allocationSegments = [
-    { label: "Treasury Balance", value: balance, color: "#2563eb" },
-    { label: "Loan Principal Outstanding", value: remaining, color: "#f59e0b" },
-    { label: "Recovered (Repaid Loans)", value: totalIssued - remaining, color: "#10b981" },
-  ].filter(s => s.value > 0);
+    { label: "Salary Treasury", value: parseFloat(allocationData?.payroll_reserve ?? "0"), color: "#2563eb" },
+    { label: "Lending Treasury", value: parseFloat(allocationData?.lending_pool ?? "0"), color: "#f59e0b" },
+    { label: "Investment Treasury", value: parseFloat(allocationData?.investment_pool ?? "0"), color: "#10b981" },
+    { label: "Main Treasury Reserve", value: parseFloat(allocationData?.main_reserve ?? "0"), color: "#64748b" },
+  ].filter((segment) => segment.value > 0);
 
-  const loading = treasury.loading || employees.loading || lending.loading;
+  const projectedAllocationSegments = balance > 0
+    ? [
+        { label: "Salary Treasury", value: balance * 0.5, color: "#2563eb" },
+        { label: "Lending Treasury", value: balance * 0.2, color: "#f59e0b" },
+        { label: "Investment Treasury", value: balance * 0.2, color: "#10b981" },
+        { label: "Main Treasury Reserve", value: balance * 0.1, color: "#64748b" },
+      ]
+    : [];
+
+  const visibleAllocationSegments = allocationSegments.length > 0 ? allocationSegments : projectedAllocationSegments;
+  const loading = treasury.loading || employees.loading || lending.loading || treasuryAllocation.loading;
   const [aaveYieldEarned, setAaveYieldEarned] = useState<number>(0);
 
   useEffect(() => {
@@ -294,14 +304,24 @@ export default function OverviewPage() {
           <div className="card-header">
             <div>
               <div className="card-title">Capital Allocation</div>
-              <div className="card-subtitle">Deployed vs. treasury</div>
+              <div className="card-subtitle">Automatic 50% salary, 20% lending, 20% investment, 10% main reserve split</div>
             </div>
           </div>
           <div className="card-body">
-            {lending.loading ? (
+            {treasuryAllocation.loading ? (
               <div className="stack"><Skeleton h={100} /></div>
-            ) : allocationSegments.length > 0 ? (
-              <DonutChart segments={allocationSegments} />
+            ) : visibleAllocationSegments.length > 0 ? (
+              <div className="stack">
+                <DonutChart segments={visibleAllocationSegments} />
+                <div className="stack" style={{ gap: 10 }}>
+                  {visibleAllocationSegments.map((segment) => (
+                    <div key={segment.label} className="row-between">
+                      <span className="text-sm text-secondary">{segment.label}</span>
+                      <span className="fw-semi font-num text-sm">{fmt(segment.value, balanceSymbol)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
               <div className="empty-state" style={{ padding: "24px 0" }}>
                 <div className="empty-state-desc">No allocation data yet.</div>
@@ -312,12 +332,13 @@ export default function OverviewPage() {
       </div>
 
       {/* Errors */}
-      {(treasury.error || employees.error || lending.error) && (
+      {(treasury.error || treasuryAllocation.error || employees.error || lending.error) && (
         <div className="alert alert-warning">
           <span className="alert-icon"><Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} /></span>
           <div>
             Some data could not be loaded — ensure the backend is running and a company is selected.
             {treasury.error && <div className="text-xs" style={{ marginTop: 4 }}>Treasury: {treasury.error}</div>}
+            {treasuryAllocation.error && <div className="text-xs">Allocation: {treasuryAllocation.error}</div>}
             {employees.error && <div className="text-xs">Employees: {employees.error}</div>}
             {lending.error && <div className="text-xs">Lending: {lending.error}</div>}
           </div>

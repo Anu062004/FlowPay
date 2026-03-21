@@ -106,4 +106,9 @@ export async function ensureRuntimeSchema() {
   await db.query(`
     CREATE INDEX IF NOT EXISTS idx_agent_logs_workflow_id ON agent_logs(workflow_id)
   `);
+
+  await db.query(`
+    ALTER TABLE treasury_allocations
+    ADD COLUMN IF NOT EXISTS main_reserve NUMERIC(18,6) NOT NULL DEFAULT 0
+  `);
 }

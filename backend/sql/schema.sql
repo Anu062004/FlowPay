@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS treasury_allocations (
   payroll_reserve NUMERIC(18,6) NOT NULL,
   lending_pool NUMERIC(18,6) NOT NULL,
   investment_pool NUMERIC(18,6) NOT NULL,
+  main_reserve NUMERIC(18,6) NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

@@ -3,12 +3,19 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { logoutCompany, logoutEmployee } from "./lib/api";
+import {
+  fetchCurrentCompanySession,
+  fetchCurrentEmployeeSession,
+  logoutCompany,
+  logoutEmployee
+} from "./lib/api";
 import {
   clearCompanyContext,
   clearEmployeeContext,
   loadCompanyContext,
   loadEmployeeContext,
+  saveCompanyContext,
+  saveEmployeeContext,
   type CompanyContext,
   type EmployeeContext
 } from "./lib/companyContext";
@@ -147,10 +154,52 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [employeeCtx, setEmployeeCtx] = useState<EmployeeContext | null>(null);
 
   useEffect(() => {
-    setCompanyCtx(loadCompanyContext());
-    setEmployeeCtx(loadEmployeeContext());
-    setReady(true);
-  }, [pathname]);
+    let cancelled = false;
+
+    async function restoreWorkspace() {
+      setReady(false);
+      let nextCompany = loadCompanyContext();
+      let nextEmployee = loadEmployeeContext();
+
+      if (!employeeView && !nextCompany) {
+        const currentCompany = await fetchCurrentCompanySession().catch(() => null);
+        if (currentCompany?.company) {
+          nextCompany = {
+            id: currentCompany.company.id,
+            name: currentCompany.company.name,
+            email: currentCompany.company.email,
+            treasuryAddress: currentCompany.company.treasury_address ?? null
+          };
+          saveCompanyContext(nextCompany);
+        }
+      }
+
+      if (employeeView && !nextEmployee) {
+        const currentEmployee = await fetchCurrentEmployeeSession().catch(() => null);
+        if (currentEmployee?.employee) {
+          nextEmployee = {
+            id: currentEmployee.employee.id,
+            fullName: currentEmployee.employee.full_name ?? undefined,
+            companyId: currentEmployee.employee.company_id ?? undefined,
+            companyName: currentEmployee.employee.company_name ?? undefined,
+            walletAddress: currentEmployee.employee.wallet_address ?? null
+          };
+          saveEmployeeContext(nextEmployee);
+        }
+      }
+
+      if (!cancelled) {
+        setCompanyCtx(nextCompany);
+        setEmployeeCtx(nextEmployee);
+        setReady(true);
+      }
+    }
+
+    void restoreWorkspace();
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeView, pathname]);
 
   const activeSession = employeeView ? employeeCtx : companyCtx;
   const activeName = employeeView

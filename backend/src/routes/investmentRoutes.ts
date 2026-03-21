@@ -20,7 +20,7 @@ router.get(
 
     // Latest treasury allocation (investment pool config)
     const allocResult = await db.query(
-      `SELECT investment_pool, payroll_reserve, lending_pool, created_at
+      `SELECT investment_pool, payroll_reserve, lending_pool, main_reserve, created_at
        FROM treasury_allocations
        WHERE company_id = $1
        ORDER BY created_at DESC

@@ -425,6 +425,6 @@ export async function listenForDeposits(walletId: string) {
     throw new ApiError(404, "Treasury wallet not found for deposit listener");
   }
   const row = result.rows[0];
-  await startDepositWatcher(row.wallet_id, row.company_id, row.wallet_address);
+  await startDepositWatcher(row.wallet_id, row.company_id, row.wallet_address, { force: true });
   return { status: "listening" };
 }

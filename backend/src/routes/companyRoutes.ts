@@ -50,6 +50,16 @@ router.get(
   })
 );
 
+router.get(
+  "/session",
+  requireCompanySession,
+  asyncHandler(async (_req, res) => {
+    const session = getCompanySession(res);
+    const company = await getCompanyProfile(session!.companyId);
+    res.status(200).json({ company });
+  })
+);
+
 router.post(
   "/login",
   asyncHandler(async (_req, res) => {

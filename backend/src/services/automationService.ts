@@ -410,6 +410,7 @@ async function runBlockchainAutomation(companyId?: string): Promise<Record<strin
 
 async function runMonitoringAutomation(companyId?: string): Promise<Record<string, unknown>> {
   const checks: Array<{ name: string; ok: boolean; details?: string }> = [];
+  const depositWatchersEnabled = (env.DEPOSIT_WATCHERS_ENABLED ?? "true").toLowerCase() === "true";
 
   try {
     await db.query("SELECT 1");
@@ -474,15 +475,19 @@ async function runMonitoringAutomation(companyId?: string): Promise<Record<strin
     }
   }
 
-  try {
-    await startAllTreasuryWatchers();
-    checks.push({ name: "watcher_recovery", ok: true });
-  } catch (error) {
-    checks.push({
-      name: "watcher_recovery",
-      ok: false,
-      details: error instanceof Error ? error.message : "Watcher recovery failed"
-    });
+  if (depositWatchersEnabled) {
+    try {
+      await startAllTreasuryWatchers();
+      checks.push({ name: "watcher_recovery", ok: true });
+    } catch (error) {
+      checks.push({
+        name: "watcher_recovery",
+        ok: false,
+        details: error instanceof Error ? error.message : "Watcher recovery failed"
+      });
+    }
+  } else {
+    checks.push({ name: "watcher_recovery", ok: true, details: "Deposit watchers disabled by config" });
   }
 
   const failedChecks = checks.filter((check) => !check.ok);

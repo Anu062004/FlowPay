@@ -53,6 +53,11 @@ export default function EmployeesPage() {
   const [resendingInviteId, setResendingInviteId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [invitePreview, setInvitePreview] = useState<{
+    email: string;
+    activationUrl: string;
+    employeeName: string;
+  } | null>(null);
 
   const employees = data?.employees ?? [];
   const filtered = employees.filter(e =>
@@ -73,7 +78,7 @@ export default function EmployeesPage() {
     setActionMessage(null);
     setActionError(null);
     try {
-      await addEmployee({
+      const result = await addEmployee({
         companyId: companyCtx.id,
         fullName: form.fullName,
         email: form.email,
@@ -83,6 +88,11 @@ export default function EmployeesPage() {
       setShowAdd(false);
       setForm({ fullName: "", email: "", salary: "", creditScore: "" });
       setActionMessage(`Invite sent to ${form.email}`);
+      setInvitePreview({
+        email: result.employee.email || form.email,
+        activationUrl: result.activationUrl,
+        employeeName: result.employee.full_name || form.fullName
+      });
       refetch();
     } catch (err: any) {
       setSaveError(err.message ?? "Failed to add employee");
@@ -111,11 +121,24 @@ export default function EmployeesPage() {
     try {
       const result = await resendEmployeeInvite(emp.id);
       setActionMessage(`Invite resent to ${result.email}`);
+      setInvitePreview({
+        email: result.email,
+        activationUrl: result.activationUrl,
+        employeeName: emp.full_name
+      });
     } catch (err: any) {
       setActionError(err.message ?? "Failed to resend invite");
     } finally {
       setResendingInviteId(null);
     }
+  }
+
+  async function handleCopyInviteLink() {
+    if (!invitePreview?.activationUrl || typeof navigator === "undefined" || !navigator.clipboard) {
+      return;
+    }
+    await navigator.clipboard.writeText(invitePreview.activationUrl);
+    setActionMessage(`Activation link copied for ${invitePreview.email}`);
   }
 
   return (
@@ -150,6 +173,51 @@ export default function EmployeesPage() {
             )}
           </div>
         ))}
+      </div>
+
+      <div className="grid-2">
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <div className="card-title">Invitation Workflow</div>
+              <div className="card-subtitle">Invite employees by email and let them activate access with their own password.</div>
+            </div>
+          </div>
+          <div className="card-body stack">
+            <div className="text-sm text-secondary">1. Add the employee from the employer workspace.</div>
+            <div className="text-sm text-secondary">2. FlowPay sends or queues the invite email with an activation link.</div>
+            <div className="text-sm text-secondary">3. The employee opens the link, accepts the invite, and sets a password.</div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <div className="card-title">Latest Invite Link</div>
+              <div className="card-subtitle">Fallback activation URL for demos and queued email delivery.</div>
+            </div>
+          </div>
+          <div className="card-body stack">
+            {invitePreview ? (
+              <>
+                <div className="text-sm">
+                  <strong>{invitePreview.employeeName}</strong> will activate via <strong>{invitePreview.email}</strong>.
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Activation Link</label>
+                  <input className="form-input font-mono" value={invitePreview.activationUrl} readOnly />
+                </div>
+                <div className="row" style={{ gap: 12 }}>
+                  <button className="btn btn-secondary" onClick={() => void handleCopyInviteLink()}>
+                    Copy Invite Link
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-secondary">Send or resend an invite to surface the latest activation URL here.</div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Table */}

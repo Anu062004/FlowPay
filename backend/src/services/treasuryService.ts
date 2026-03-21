@@ -2,13 +2,64 @@ import { randomUUID } from "crypto";
 import { formatEther } from "ethers";
 import { db } from "../db/pool.js";
 import { env } from "../config/env.js";
-import { runTreasuryAllocationAgent } from "../agents/treasuryAgent.js";
 import { ApiError } from "../utils/errors.js";
 import { getWalletBalance, sendTransaction } from "./walletService.js";
 import { allocateVault } from "./contractService.js";
 import { formatTokenAmount } from "../utils/amounts.js";
 import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
 import { evaluateAgentPolicy } from "./agentPolicyService.js";
+
+const FIXED_TREASURY_SPLIT = {
+  payroll_reserve_pct: 0.5,
+  lending_pool_pct: 0.2,
+  investment_pool_pct: 0.2,
+  main_reserve_pct: 0.1
+} as const;
+
+const ACTIVE_TREASURY_PCT =
+  FIXED_TREASURY_SPLIT.payroll_reserve_pct +
+  FIXED_TREASURY_SPLIT.lending_pool_pct +
+  FIXED_TREASURY_SPLIT.investment_pool_pct;
+
+function toFixedAmount(value: number) {
+  return value.toFixed(6);
+}
+
+export async function getLatestTreasuryAllocation(companyId: string) {
+  const result = await db.query(
+    `SELECT payroll_reserve, lending_pool, investment_pool, main_reserve, created_at
+     FROM treasury_allocations
+     WHERE company_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [companyId]
+  );
+
+  const latest = result.rows[0] as
+    | {
+        payroll_reserve: string;
+        lending_pool: string;
+        investment_pool: string;
+        main_reserve: string;
+        created_at: string;
+      }
+    | undefined;
+
+  return {
+    company_id: companyId,
+    payroll_reserve: latest?.payroll_reserve ?? "0.000000",
+    lending_pool: latest?.lending_pool ?? "0.000000",
+    investment_pool: latest?.investment_pool ?? "0.000000",
+    main_reserve: latest?.main_reserve ?? "0.000000",
+    created_at: latest?.created_at ?? null,
+    allocation: {
+      payroll_reserve_pct: FIXED_TREASURY_SPLIT.payroll_reserve_pct,
+      lending_pool_pct: FIXED_TREASURY_SPLIT.lending_pool_pct,
+      investment_pool_pct: FIXED_TREASURY_SPLIT.investment_pool_pct,
+      main_reserve_pct: FIXED_TREASURY_SPLIT.main_reserve_pct
+    }
+  };
+}
 
 export async function getTreasuryBalance(companyId: string) {
   const result = await db.query(
@@ -52,24 +103,27 @@ export async function allocateTreasury(
     outstanding_loans: parseFloat(loanResult.rows[0].outstanding_loans)
   };
 
-  const allocation = await runTreasuryAllocationAgent(context).catch(() => null);
-  const payrollPct = allocation?.payroll_reserve_pct ?? parseFloat(env.TREASURY_PAYROLL_RESERVE_PCT);
-  const lendingPct = allocation?.lending_pool_pct ?? parseFloat(env.TREASURY_LENDING_PCT);
-  const investmentPct = allocation?.investment_pool_pct ?? parseFloat(env.TREASURY_INVESTMENT_PCT);
+  const payrollPct = FIXED_TREASURY_SPLIT.payroll_reserve_pct;
+  const lendingPct = FIXED_TREASURY_SPLIT.lending_pool_pct;
+  const investmentPct = FIXED_TREASURY_SPLIT.investment_pool_pct;
+  const mainReservePct = FIXED_TREASURY_SPLIT.main_reserve_pct;
 
-  if (Math.abs(payrollPct + lendingPct + investmentPct - 1) > 0.01) {
+  if (Math.abs(payrollPct + lendingPct + investmentPct + mainReservePct - 1) > 0.01) {
     throw new ApiError(400, "Invalid treasury allocation percentages");
   }
 
   const payrollReserve = balanceEth * payrollPct;
   const lendingPool = balanceEth * lendingPct;
   const investmentPool = balanceEth * investmentPct;
+  const mainReserve = balanceEth * mainReservePct;
 
-  const decisionPayload = allocation ?? {
+  const decisionPayload = {
     payroll_reserve_pct: payrollPct,
     lending_pool_pct: lendingPct,
     investment_pool_pct: investmentPct,
-    rationale: "Fallback treasury allocation policy applied."
+    main_reserve_pct: mainReservePct,
+    rationale:
+      "Fixed treasury policy applied: 50% salary reserve, 20% lending pool, 20% investment pool, 10% retained in the main treasury."
   };
 
   await logAgentAction(
@@ -77,7 +131,7 @@ export async function allocateTreasury(
     context,
     decisionPayload,
     String(decisionPayload.rationale ?? "Treasury allocation calculated."),
-    `Proposed allocation: ${(payrollPct * 100).toFixed(1)}% payroll, ${(lendingPct * 100).toFixed(1)}% lending, ${(investmentPct * 100).toFixed(1)}% investment.`,
+    `Applied fixed treasury split: ${(payrollPct * 100).toFixed(0)}% payroll, ${(lendingPct * 100).toFixed(0)}% lending, ${(investmentPct * 100).toFixed(0)}% investment, ${(mainReservePct * 100).toFixed(0)}% retained in the main treasury.`,
     companyId,
     {
       ...auditContext,
@@ -123,25 +177,38 @@ export async function allocateTreasury(
 
   // 1. DB Commit
   await db.query(
-    "INSERT INTO treasury_allocations (company_id, payroll_reserve, lending_pool, investment_pool) VALUES ($1, $2, $3, $4)",
-    [companyId, payrollReserve.toFixed(6), lendingPool.toFixed(6), investmentPool.toFixed(6)]
+    `INSERT INTO treasury_allocations
+       (company_id, payroll_reserve, lending_pool, investment_pool, main_reserve)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [
+      companyId,
+      toFixedAmount(payrollReserve),
+      toFixedAmount(lendingPool),
+      toFixedAmount(investmentPool),
+      toFixedAmount(mainReserve)
+    ]
   );
 
   // 2. Sync to contract - AWAIT THIS to ensure chain success
   try {
-    await allocateVault(payrollPct, lendingPct, investmentPct);
+    await allocateVault(
+      payrollPct / ACTIVE_TREASURY_PCT,
+      lendingPct / ACTIVE_TREASURY_PCT,
+      investmentPct / ACTIVE_TREASURY_PCT
+    );
     await logAgentAction(
       "WDKExecutionLayer",
       {
         companyId,
         payrollReserve,
         lendingPool,
-        investmentPool
+        investmentPool,
+        mainReserve
       },
       {
         action: "treasury_allocation"
       },
-      "Treasury allocation synced to the vault contract.",
+      "Treasury allocation synced to the vault contract using the active-capital ratios, while 10% remained in the main treasury reserve.",
       "Treasury allocation execution succeeded.",
       companyId,
       {
@@ -159,7 +226,8 @@ export async function allocateTreasury(
         companyId,
         payrollReserve,
         lendingPool,
-        investmentPool
+        investmentPool,
+        mainReserve
       },
       {
         action: "treasury_allocation"
@@ -180,11 +248,13 @@ export async function allocateTreasury(
     payroll_reserve: payrollReserve,
     lending_pool: lendingPool,
     investment_pool: investmentPool,
+    main_reserve: mainReserve,
     policy: policyResult,
     allocation: {
       payroll_reserve_pct: payrollPct,
       lending_pool_pct: lendingPct,
-      investment_pool_pct: investmentPct
+      investment_pool_pct: investmentPct,
+      main_reserve_pct: mainReservePct
     }
   };
 }

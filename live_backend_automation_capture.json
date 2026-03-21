@@ -1,0 +1,2427 @@
+{
+  "login": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "company": {
+        "id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "name": "LiveFlow-a00e0064",
+        "email": "liveflow-a00e0064@example.com",
+        "created_at": "2026-03-20T18:12:53.488Z",
+        "treasury_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+      }
+    }
+  },
+  "balanceBefore": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "balanceWei": "17583318418687081",
+      "balanceEth": "0.017583318418687081",
+      "walletAddress": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+      "tokenSymbol": "ETH",
+      "balance": "0.017583318418687081",
+      "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+      "token_symbol": "ETH"
+    }
+  },
+  "strategy": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "mode": "strategy",
+      "result": {
+        "processed": 1,
+        "results": [
+          {
+            "companyId": "afedbc53-d0da-4a87-8061-bc4012876b12",
+            "workflowId": "2bac69ad-0c88-4b86-9b7e-80ff37c33866",
+            "status": "failed"
+          }
+        ]
+      }
+    }
+  },
+  "demo": {
+    "ok": false,
+    "status": 400,
+    "payload": {
+      "error": "Allocation 70.4% exceeds Aave exposure cap 35%."
+    }
+  },
+  "automationRunAll": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "job": "all",
+      "result": {
+        "finance": {
+          "job": "finance",
+          "startedAt": "2026-03-20T18:21:40.468Z",
+          "finishedAt": "2026-03-20T18:21:40.505Z",
+          "success": true,
+          "summary": {
+            "processedCompanies": 1,
+            "createdTasks": {
+              "finance_snapshot": 1,
+              "reconciliation_report": 1,
+              "eod_summary": 1
+            }
+          },
+          "errors": []
+        },
+        "backend": {
+          "job": "backend",
+          "startedAt": "2026-03-20T18:21:40.505Z",
+          "finishedAt": "2026-03-20T18:21:40.508Z",
+          "success": true,
+          "summary": {
+            "companies": 1,
+            "hoursToPayroll": 278.64,
+            "payrollRequests": 0,
+            "unsyncedLoans": 0,
+            "staleOpsItems": 0
+          },
+          "errors": []
+        },
+        "blockchain": {
+          "job": "blockchain",
+          "startedAt": "2026-03-20T18:21:40.508Z",
+          "finishedAt": "2026-03-20T18:21:40.509Z",
+          "success": true,
+          "summary": {
+            "stalledCount": 0,
+            "failedPositions": 0,
+            "settlementAlertsCreated": 0
+          },
+          "errors": []
+        },
+        "monitoring": {
+          "job": "monitoring",
+          "startedAt": "2026-03-20T18:21:40.509Z",
+          "finishedAt": "2026-03-20T18:21:40.660Z",
+          "success": true,
+          "summary": {
+            "checks": [
+              {
+                "name": "database",
+                "ok": true
+              },
+              {
+                "name": "rpc",
+                "ok": true
+              },
+              {
+                "name": "price_feed",
+                "ok": true
+              },
+              {
+                "name": "watcher_recovery",
+                "ok": true,
+                "details": "Deposit watchers disabled by config"
+              }
+            ],
+            "failedChecks": 0
+          },
+          "errors": []
+        },
+        "support": {
+          "job": "support",
+          "startedAt": "2026-03-20T18:21:40.660Z",
+          "finishedAt": "2026-03-20T18:21:40.667Z",
+          "success": true,
+          "summary": {
+            "companies": 1,
+            "reportsCreated": 1
+          },
+          "errors": []
+        },
+        "browser": {
+          "job": "browser",
+          "startedAt": "2026-03-20T18:21:40.667Z",
+          "finishedAt": "2026-03-20T18:21:40.667Z",
+          "success": true,
+          "summary": {
+            "configuredTasks": 0,
+            "queued": 0
+          },
+          "errors": []
+        }
+      }
+    }
+  },
+  "automationStatus": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "status": {
+        "monitoring": {
+          "job": "monitoring",
+          "startedAt": "2026-03-20T18:21:40.509Z",
+          "finishedAt": "2026-03-20T18:21:40.660Z",
+          "success": true,
+          "summary": {
+            "checks": [
+              {
+                "name": "database",
+                "ok": true
+              },
+              {
+                "name": "rpc",
+                "ok": true
+              },
+              {
+                "name": "price_feed",
+                "ok": true
+              },
+              {
+                "name": "watcher_recovery",
+                "ok": true,
+                "details": "Deposit watchers disabled by config"
+              }
+            ],
+            "failedChecks": 0
+          },
+          "errors": []
+        },
+        "blockchain": {
+          "job": "blockchain",
+          "startedAt": "2026-03-20T18:21:40.508Z",
+          "finishedAt": "2026-03-20T18:21:40.509Z",
+          "success": true,
+          "summary": {
+            "stalledCount": 0,
+            "failedPositions": 0,
+            "settlementAlertsCreated": 0
+          },
+          "errors": []
+        },
+        "backend": {
+          "job": "backend",
+          "startedAt": "2026-03-20T18:21:40.505Z",
+          "finishedAt": "2026-03-20T18:21:40.508Z",
+          "success": true,
+          "summary": {
+            "companies": 1,
+            "hoursToPayroll": 278.64,
+            "payrollRequests": 0,
+            "unsyncedLoans": 0,
+            "staleOpsItems": 0
+          },
+          "errors": []
+        },
+        "finance": {
+          "job": "finance",
+          "startedAt": "2026-03-20T18:21:40.468Z",
+          "finishedAt": "2026-03-20T18:21:40.505Z",
+          "success": true,
+          "summary": {
+            "processedCompanies": 1,
+            "createdTasks": {
+              "finance_snapshot": 1,
+              "reconciliation_report": 1,
+              "eod_summary": 1
+            }
+          },
+          "errors": []
+        },
+        "support": {
+          "job": "support",
+          "startedAt": "2026-03-20T18:21:40.660Z",
+          "finishedAt": "2026-03-20T18:21:40.667Z",
+          "success": true,
+          "summary": {
+            "companies": 1,
+            "reportsCreated": 1
+          },
+          "errors": []
+        },
+        "browser": {
+          "job": "browser",
+          "startedAt": "2026-03-20T18:21:40.667Z",
+          "finishedAt": "2026-03-20T18:21:40.667Z",
+          "success": true,
+          "summary": {
+            "configuredTasks": 0,
+            "queued": 0
+          },
+          "errors": []
+        },
+        "all": {
+          "job": "all",
+          "startedAt": "2026-03-20T18:21:40.468Z",
+          "finishedAt": "2026-03-20T18:21:40.667Z",
+          "success": true,
+          "summary": {
+            "finance": {
+              "job": "finance",
+              "startedAt": "2026-03-20T18:21:40.468Z",
+              "finishedAt": "2026-03-20T18:21:40.505Z",
+              "success": true,
+              "summary": {
+                "processedCompanies": 1,
+                "createdTasks": {
+                  "finance_snapshot": 1,
+                  "reconciliation_report": 1,
+                  "eod_summary": 1
+                }
+              },
+              "errors": []
+            },
+            "backend": {
+              "job": "backend",
+              "startedAt": "2026-03-20T18:21:40.505Z",
+              "finishedAt": "2026-03-20T18:21:40.508Z",
+              "success": true,
+              "summary": {
+                "companies": 1,
+                "hoursToPayroll": 278.64,
+                "payrollRequests": 0,
+                "unsyncedLoans": 0,
+                "staleOpsItems": 0
+              },
+              "errors": []
+            },
+            "blockchain": {
+              "job": "blockchain",
+              "startedAt": "2026-03-20T18:21:40.508Z",
+              "finishedAt": "2026-03-20T18:21:40.509Z",
+              "success": true,
+              "summary": {
+                "stalledCount": 0,
+                "failedPositions": 0,
+                "settlementAlertsCreated": 0
+              },
+              "errors": []
+            },
+            "monitoring": {
+              "job": "monitoring",
+              "startedAt": "2026-03-20T18:21:40.509Z",
+              "finishedAt": "2026-03-20T18:21:40.660Z",
+              "success": true,
+              "summary": {
+                "checks": [
+                  {
+                    "name": "database",
+                    "ok": true
+                  },
+                  {
+                    "name": "rpc",
+                    "ok": true
+                  },
+                  {
+                    "name": "price_feed",
+                    "ok": true
+                  },
+                  {
+                    "name": "watcher_recovery",
+                    "ok": true,
+                    "details": "Deposit watchers disabled by config"
+                  }
+                ],
+                "failedChecks": 0
+              },
+              "errors": []
+            },
+            "support": {
+              "job": "support",
+              "startedAt": "2026-03-20T18:21:40.660Z",
+              "finishedAt": "2026-03-20T18:21:40.667Z",
+              "success": true,
+              "summary": {
+                "companies": 1,
+                "reportsCreated": 1
+              },
+              "errors": []
+            },
+            "browser": {
+              "job": "browser",
+              "startedAt": "2026-03-20T18:21:40.667Z",
+              "finishedAt": "2026-03-20T18:21:40.667Z",
+              "success": true,
+              "summary": {
+                "configuredTasks": 0,
+                "queued": 0
+              },
+              "errors": []
+            }
+          },
+          "errors": []
+        }
+      }
+    }
+  },
+  "supportInsights": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "insights": {
+        "companyId": "afedbc53-d0da-4a87-8061-bc4012876b12",
+        "generatedAt": "2026-03-20T18:21:40.673Z",
+        "failuresToday": {
+          "count": 6,
+          "items": [
+            {
+              "timestamp": "2026-03-20T18:21:40.464Z",
+              "agent_name": "OpenClawOrchestrator",
+              "action_taken": "Autonomous demo failed.",
+              "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%."
+            },
+            {
+              "timestamp": "2026-03-20T18:21:38.238Z",
+              "agent_name": "OpenClawOrchestrator",
+              "action_taken": "Strategy loop failed.",
+              "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%."
+            },
+            {
+              "timestamp": "2026-03-20T18:19:57.433Z",
+              "agent_name": "OpenClawOrchestrator",
+              "action_taken": "Strategy loop failed.",
+              "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%."
+            },
+            {
+              "timestamp": "2026-03-20T18:19:21.828Z",
+              "agent_name": "OpenClawOrchestrator",
+              "action_taken": "Autonomous demo failed.",
+              "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%."
+            },
+            {
+              "timestamp": "2026-03-20T18:19:19.316Z",
+              "agent_name": "OpenClawOrchestrator",
+              "action_taken": "Strategy loop failed.",
+              "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%."
+            },
+            {
+              "timestamp": "2026-03-20T18:19:10.223Z",
+              "agent_name": "OpenClawOrchestrator",
+              "action_taken": "Strategy loop failed.",
+              "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%."
+            }
+          ]
+        },
+        "pendingApprovals": {
+          "count": 0,
+          "items": []
+        },
+        "topRiskAccounts": [
+          {
+            "employee_id": "f95979c1-3a11-41f7-a041-1ab7110a62ee",
+            "full_name": "Employee a00e0064",
+            "email": "employee-a00e0064@example.com",
+            "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+            "credit_score": 760,
+            "salary": 0.0025,
+            "active_loan_balance": 0.000917,
+            "active_loan_count": 1,
+            "overdue_loan_count": 0,
+            "risk_score": 0.3668
+          },
+          {
+            "employee_id": "77579630-6268-4b90-8caa-099944f8718c",
+            "full_name": "Automation Employee a00e0064",
+            "email": "auto-employee-a00e0064@example.com",
+            "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+            "credit_score": 780,
+            "salary": 0.0018,
+            "active_loan_balance": 0,
+            "active_loan_count": 0,
+            "overdue_loan_count": 0,
+            "risk_score": 0
+          }
+        ]
+      }
+    }
+  },
+  "agentLogs": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "logs": [
+        {
+          "id": "2d8eebc9-5eb4-4dba-9e56-c24f92a7e786",
+          "timestamp": "2026-03-20T18:21:40.464Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "autonomous_demo"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Autonomous demo failed.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "425b2427-5132-49e8-8e6c-308658e436e6",
+          "workflow_name": "autonomous_demo",
+          "stage": "workflow",
+          "source": "test_suite_capture",
+          "policy_result": {},
+          "execution_status": "failed",
+          "metadata": {}
+        },
+        {
+          "id": "11e57a48-ed5f-467a-8431-4aafb4d9648e",
+          "timestamp": "2026-03-20T18:21:40.463Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "treasury_allocation"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Treasury allocation policy status: BLOCK",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "425b2427-5132-49e8-8e6c-308658e436e6",
+          "workflow_name": "autonomous_demo",
+          "stage": "policy_validation",
+          "source": "test_suite_capture",
+          "policy_result": {
+            "amount": 0.012379,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "treasury_allocation",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.012379,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.015796,
+                "usedToday": 0.003417
+              },
+              {
+                "name": "max_aave_allocation_pct",
+                "limit": 35,
+                "passed": false,
+                "allocationPct": 70.4
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.012379,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "block",
+            "metrics": {
+              "usedDailyOutflow": 0.003417,
+              "projectedDailyOutflow": 0.015796
+            },
+            "reasons": [
+              "Allocation 70.4% exceeds Aave exposure cap 35%."
+            ]
+          },
+          "execution_status": "block",
+          "metadata": {}
+        },
+        {
+          "id": "2c7603da-99e0-4130-b179-c56c5531f5eb",
+          "timestamp": "2026-03-20T18:21:40.459Z",
+          "agent_name": "TreasuryAllocationAgent",
+          "decision": {
+            "rationale": "The payroll reserve is set to cover the upcoming payroll of 0.0043, which requires approximately 24.4% of the total balance. The lending pool is allocated 5.2% to accommodate outstanding loans of 0.000917. The remaining 70.4% is allocated to the investment pool to maximize yield while ensuring liquidity.",
+            "lending_pool_pct": 0.052,
+            "investment_pool_pct": 0.704,
+            "payroll_reserve_pct": 0.244
+          },
+          "rationale": "The payroll reserve is set to cover the upcoming payroll of 0.0043, which requires approximately 24.4% of the total balance. The lending pool is allocated 5.2% to accommodate outstanding loans of 0.000917. The remaining 70.4% is allocated to the investment pool to maximize yield while ensuring liquidity.",
+          "action_taken": "Proposed allocation: 24.4% payroll, 5.2% lending, 70.4% investment.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "425b2427-5132-49e8-8e6c-308658e436e6",
+          "workflow_name": "autonomous_demo",
+          "stage": "decision",
+          "source": "test_suite_capture",
+          "policy_result": {},
+          "execution_status": null,
+          "metadata": {}
+        },
+        {
+          "id": "37b26206-9129-48a0-89d3-9a04ecdf86f7",
+          "timestamp": "2026-03-20T18:21:38.263Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "autonomous_demo"
+          },
+          "rationale": "Starting autonomous demo across treasury allocation, lending, payroll, and Aave rebalance.",
+          "action_taken": "Autonomous demo started.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "425b2427-5132-49e8-8e6c-308658e436e6",
+          "workflow_name": "autonomous_demo",
+          "stage": "workflow",
+          "source": "test_suite_capture",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "e8c19b60-74cc-49a3-940f-13358252a57a",
+          "timestamp": "2026-03-20T18:21:38.238Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "strategy"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Strategy loop failed.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "2bac69ad-0c88-4b86-9b7e-80ff37c33866",
+          "workflow_name": "strategy_orchestration",
+          "stage": "workflow",
+          "source": "test_suite_capture",
+          "policy_result": {},
+          "execution_status": "failed",
+          "metadata": {}
+        },
+        {
+          "id": "cc267633-4e20-477e-b5ed-518f9a78642a",
+          "timestamp": "2026-03-20T18:21:38.237Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "treasury_allocation"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Treasury allocation policy status: BLOCK",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "2bac69ad-0c88-4b86-9b7e-80ff37c33866",
+          "workflow_name": "strategy_orchestration",
+          "stage": "policy_validation",
+          "source": "test_suite_capture",
+          "policy_result": {
+            "amount": 0.012379,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "treasury_allocation",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.012379,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.015796,
+                "usedToday": 0.003417
+              },
+              {
+                "name": "max_aave_allocation_pct",
+                "limit": 35,
+                "passed": false,
+                "allocationPct": 70.4
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.012379,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "block",
+            "metrics": {
+              "usedDailyOutflow": 0.003417,
+              "projectedDailyOutflow": 0.015796
+            },
+            "reasons": [
+              "Allocation 70.4% exceeds Aave exposure cap 35%."
+            ]
+          },
+          "execution_status": "block",
+          "metadata": {}
+        },
+        {
+          "id": "0e8490df-cfab-4f94-b165-277652b4b620",
+          "timestamp": "2026-03-20T18:21:38.232Z",
+          "agent_name": "TreasuryAllocationAgent",
+          "decision": {
+            "rationale": "The payroll reserve is set to cover the upcoming payroll of 0.0043, which requires approximately 24.4% of the total balance. The lending pool is allocated based on the outstanding loans, ensuring liquidity for employee loans. The remaining balance is directed towards the investment pool to generate yield.",
+            "lending_pool_pct": 0.052,
+            "investment_pool_pct": 0.704,
+            "payroll_reserve_pct": 0.244
+          },
+          "rationale": "The payroll reserve is set to cover the upcoming payroll of 0.0043, which requires approximately 24.4% of the total balance. The lending pool is allocated based on the outstanding loans, ensuring liquidity for employee loans. The remaining balance is directed towards the investment pool to generate yield.",
+          "action_taken": "Proposed allocation: 24.4% payroll, 5.2% lending, 70.4% investment.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "2bac69ad-0c88-4b86-9b7e-80ff37c33866",
+          "workflow_name": "strategy_orchestration",
+          "stage": "decision",
+          "source": "test_suite_capture",
+          "policy_result": {},
+          "execution_status": null,
+          "metadata": {}
+        },
+        {
+          "id": "6c801fb4-2282-49ae-ae3b-a6f4ec821b21",
+          "timestamp": "2026-03-20T18:21:35.705Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "strategy"
+          },
+          "rationale": "Evaluating treasury, payroll coverage, lending guardrails, and Aave posture.",
+          "action_taken": "Strategy loop started.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "2bac69ad-0c88-4b86-9b7e-80ff37c33866",
+          "workflow_name": "strategy_orchestration",
+          "stage": "workflow",
+          "source": "test_suite_capture",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {}
+        },
+        {
+          "id": "0b41c032-4b5d-43d3-ac03-704d84bbefae",
+          "timestamp": "2026-03-20T18:19:57.433Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "strategy"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Strategy loop failed.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "c48f571f-a887-462c-b05a-ca88eaff30f3",
+          "workflow_name": "strategy_orchestration",
+          "stage": "workflow",
+          "source": "openclaw_clawbot",
+          "policy_result": {},
+          "execution_status": "failed",
+          "metadata": {}
+        },
+        {
+          "id": "edbfc614-6829-4014-91d0-b62a533e626d",
+          "timestamp": "2026-03-20T18:19:57.431Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "treasury_allocation"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Treasury allocation policy status: BLOCK",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "c48f571f-a887-462c-b05a-ca88eaff30f3",
+          "workflow_name": "strategy_orchestration",
+          "stage": "policy_validation",
+          "source": "openclaw_clawbot",
+          "policy_result": {
+            "amount": 0.012379,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "treasury_allocation",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.012379,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.015796,
+                "usedToday": 0.003417
+              },
+              {
+                "name": "max_aave_allocation_pct",
+                "limit": 35,
+                "passed": false,
+                "allocationPct": 70.4
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.012379,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "block",
+            "metrics": {
+              "usedDailyOutflow": 0.003417,
+              "projectedDailyOutflow": 0.015796
+            },
+            "reasons": [
+              "Allocation 70.4% exceeds Aave exposure cap 35%."
+            ]
+          },
+          "execution_status": "block",
+          "metadata": {}
+        },
+        {
+          "id": "137c6123-6fa9-4297-9203-9a3549ba49a1",
+          "timestamp": "2026-03-20T18:19:57.428Z",
+          "agent_name": "TreasuryAllocationAgent",
+          "decision": {
+            "rationale": "The payroll reserve is set to cover the upcoming payroll of 0.0043, which requires approximately 24.4% of the total balance. The lending pool is allocated 5.2% to accommodate the outstanding loans of 0.000917. The remaining 70.4% is allocated to the investment pool to generate yield, as it exceeds the immediate needs for payroll and loans.",
+            "lending_pool_pct": 0.052,
+            "investment_pool_pct": 0.704,
+            "payroll_reserve_pct": 0.244
+          },
+          "rationale": "The payroll reserve is set to cover the upcoming payroll of 0.0043, which requires approximately 24.4% of the total balance. The lending pool is allocated 5.2% to accommodate the outstanding loans of 0.000917. The remaining 70.4% is allocated to the investment pool to generate yield, as it exceeds the immediate needs for payroll and loans.",
+          "action_taken": "Proposed allocation: 24.4% payroll, 5.2% lending, 70.4% investment.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "c48f571f-a887-462c-b05a-ca88eaff30f3",
+          "workflow_name": "strategy_orchestration",
+          "stage": "decision",
+          "source": "openclaw_clawbot",
+          "policy_result": {},
+          "execution_status": null,
+          "metadata": {}
+        },
+        {
+          "id": "797cb186-40a8-4dc8-abb7-691a2b4283d9",
+          "timestamp": "2026-03-20T18:19:55.069Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "strategy"
+          },
+          "rationale": "Evaluating treasury, payroll coverage, lending guardrails, and Aave posture.",
+          "action_taken": "Strategy loop started.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "c48f571f-a887-462c-b05a-ca88eaff30f3",
+          "workflow_name": "strategy_orchestration",
+          "stage": "workflow",
+          "source": "openclaw_clawbot",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {}
+        },
+        {
+          "id": "f8a45e4e-243a-4748-a3ee-7b40076d18e3",
+          "timestamp": "2026-03-20T18:19:21.828Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "autonomous_demo"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Autonomous demo failed.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "900b6c7a-ad24-40c5-a620-6c6599755334",
+          "workflow_name": "autonomous_demo",
+          "stage": "workflow",
+          "source": "test_suite_recheck",
+          "policy_result": {},
+          "execution_status": "failed",
+          "metadata": {}
+        },
+        {
+          "id": "cbc3d0d8-6556-4b6f-a991-64cc3a129b47",
+          "timestamp": "2026-03-20T18:19:21.827Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "treasury_allocation"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Treasury allocation policy status: BLOCK",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "900b6c7a-ad24-40c5-a620-6c6599755334",
+          "workflow_name": "autonomous_demo",
+          "stage": "policy_validation",
+          "source": "test_suite_recheck",
+          "policy_result": {
+            "amount": 0.012379,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "treasury_allocation",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.012379,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.015796,
+                "usedToday": 0.003417
+              },
+              {
+                "name": "max_aave_allocation_pct",
+                "limit": 35,
+                "passed": false,
+                "allocationPct": 70.4
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.012379,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "block",
+            "metrics": {
+              "usedDailyOutflow": 0.003417,
+              "projectedDailyOutflow": 0.015796
+            },
+            "reasons": [
+              "Allocation 70.4% exceeds Aave exposure cap 35%."
+            ]
+          },
+          "execution_status": "block",
+          "metadata": {}
+        },
+        {
+          "id": "a99fed37-a931-49c2-aa6c-fee7450c74fd",
+          "timestamp": "2026-03-20T18:19:21.823Z",
+          "agent_name": "TreasuryAllocationAgent",
+          "decision": {
+            "rationale": "The payroll reserve is set to cover the upcoming payroll of 0.0043, which requires approximately 24.4% of the total balance. The lending pool is allocated based on the outstanding loans, ensuring liquidity for employee loans. The remaining balance is allocated to the investment pool to generate yield.",
+            "lending_pool_pct": 0.052,
+            "investment_pool_pct": 0.704,
+            "payroll_reserve_pct": 0.244
+          },
+          "rationale": "The payroll reserve is set to cover the upcoming payroll of 0.0043, which requires approximately 24.4% of the total balance. The lending pool is allocated based on the outstanding loans, ensuring liquidity for employee loans. The remaining balance is allocated to the investment pool to generate yield.",
+          "action_taken": "Proposed allocation: 24.4% payroll, 5.2% lending, 70.4% investment.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "900b6c7a-ad24-40c5-a620-6c6599755334",
+          "workflow_name": "autonomous_demo",
+          "stage": "decision",
+          "source": "test_suite_recheck",
+          "policy_result": {},
+          "execution_status": null,
+          "metadata": {}
+        },
+        {
+          "id": "4e16bb09-41f0-4cad-a759-eca08fbb2413",
+          "timestamp": "2026-03-20T18:19:19.348Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "autonomous_demo"
+          },
+          "rationale": "Starting autonomous demo across treasury allocation, lending, payroll, and Aave rebalance.",
+          "action_taken": "Autonomous demo started.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "900b6c7a-ad24-40c5-a620-6c6599755334",
+          "workflow_name": "autonomous_demo",
+          "stage": "workflow",
+          "source": "test_suite_recheck",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "0ad6bec9-e00f-49c1-bca3-ef7ab39a620e",
+          "timestamp": "2026-03-20T18:19:19.316Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "strategy"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Strategy loop failed.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "81c63c3a-1775-4c62-af7c-65d51ebe6b5c",
+          "workflow_name": "strategy_orchestration",
+          "stage": "workflow",
+          "source": "test_suite_recheck",
+          "policy_result": {},
+          "execution_status": "failed",
+          "metadata": {}
+        },
+        {
+          "id": "4180eb1d-3de3-4e46-8f2a-2c916386a791",
+          "timestamp": "2026-03-20T18:19:19.314Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "treasury_allocation"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Treasury allocation policy status: BLOCK",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "81c63c3a-1775-4c62-af7c-65d51ebe6b5c",
+          "workflow_name": "strategy_orchestration",
+          "stage": "policy_validation",
+          "source": "test_suite_recheck",
+          "policy_result": {
+            "amount": 0.012379,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "treasury_allocation",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.012379,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.015796,
+                "usedToday": 0.003417
+              },
+              {
+                "name": "max_aave_allocation_pct",
+                "limit": 35,
+                "passed": false,
+                "allocationPct": 70.4
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.012379,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "block",
+            "metrics": {
+              "usedDailyOutflow": 0.003417,
+              "projectedDailyOutflow": 0.015796
+            },
+            "reasons": [
+              "Allocation 70.4% exceeds Aave exposure cap 35%."
+            ]
+          },
+          "execution_status": "block",
+          "metadata": {}
+        },
+        {
+          "id": "44d77cd6-4dce-4f9b-8ee7-196aa296b288",
+          "timestamp": "2026-03-20T18:19:19.311Z",
+          "agent_name": "TreasuryAllocationAgent",
+          "decision": {
+            "rationale": "The payroll reserve is allocated to ensure sufficient coverage for the upcoming payroll of 0.0043, which requires 24.4% of the total balance. The lending pool is allocated 5.2% to cover outstanding loans of 0.000917. The remaining 70.4% is allocated to the investment pool to generate yield, as it exceeds the immediate needs for payroll and loans.",
+            "lending_pool_pct": 0.052,
+            "investment_pool_pct": 0.704,
+            "payroll_reserve_pct": 0.244
+          },
+          "rationale": "The payroll reserve is allocated to ensure sufficient coverage for the upcoming payroll of 0.0043, which requires 24.4% of the total balance. The lending pool is allocated 5.2% to cover outstanding loans of 0.000917. The remaining 70.4% is allocated to the investment pool to generate yield, as it exceeds the immediate needs for payroll and loans.",
+          "action_taken": "Proposed allocation: 24.4% payroll, 5.2% lending, 70.4% investment.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "81c63c3a-1775-4c62-af7c-65d51ebe6b5c",
+          "workflow_name": "strategy_orchestration",
+          "stage": "decision",
+          "source": "test_suite_recheck",
+          "policy_result": {},
+          "execution_status": null,
+          "metadata": {}
+        },
+        {
+          "id": "43829306-efeb-4a38-994b-cad0cf3cb645",
+          "timestamp": "2026-03-20T18:19:16.827Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "strategy"
+          },
+          "rationale": "Evaluating treasury, payroll coverage, lending guardrails, and Aave posture.",
+          "action_taken": "Strategy loop started.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "81c63c3a-1775-4c62-af7c-65d51ebe6b5c",
+          "workflow_name": "strategy_orchestration",
+          "stage": "workflow",
+          "source": "test_suite_recheck",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {}
+        },
+        {
+          "id": "6a158bf2-c2d9-479c-8ab2-11cf01e3e1f8",
+          "timestamp": "2026-03-20T18:19:10.223Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "strategy"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Strategy loop failed.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "e1d0fd75-0aeb-485f-8f6c-e61919d6b965",
+          "workflow_name": "strategy_orchestration",
+          "stage": "workflow",
+          "source": "openclaw_clawbot",
+          "policy_result": {},
+          "execution_status": "failed",
+          "metadata": {}
+        },
+        {
+          "id": "09d71358-4a05-4c00-a28a-d093828a12b7",
+          "timestamp": "2026-03-20T18:19:10.221Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "treasury_allocation"
+          },
+          "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+          "action_taken": "Treasury allocation policy status: BLOCK",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "e1d0fd75-0aeb-485f-8f6c-e61919d6b965",
+          "workflow_name": "strategy_orchestration",
+          "stage": "policy_validation",
+          "source": "openclaw_clawbot",
+          "policy_result": {
+            "amount": 0.012379,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "treasury_allocation",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.012379,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.015796,
+                "usedToday": 0.003417
+              },
+              {
+                "name": "max_aave_allocation_pct",
+                "limit": 35,
+                "passed": false,
+                "allocationPct": 70.4
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.012379,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "block",
+            "metrics": {
+              "usedDailyOutflow": 0.003417,
+              "projectedDailyOutflow": 0.015796
+            },
+            "reasons": [
+              "Allocation 70.4% exceeds Aave exposure cap 35%."
+            ]
+          },
+          "execution_status": "block",
+          "metadata": {}
+        },
+        {
+          "id": "cf17ed5b-1254-4007-98af-87d2d46f8bc8",
+          "timestamp": "2026-03-20T18:19:10.218Z",
+          "agent_name": "TreasuryAllocationAgent",
+          "decision": {
+            "rationale": "The payroll reserve is set to ensure sufficient funds for the upcoming payroll, covering 100% of the monthly payroll requirement. The lending pool is allocated based on the current outstanding loans, while the remaining balance is directed towards the investment pool to generate yield.",
+            "lending_pool_pct": 0.052,
+            "investment_pool_pct": 0.704,
+            "payroll_reserve_pct": 0.244
+          },
+          "rationale": "The payroll reserve is set to ensure sufficient funds for the upcoming payroll, covering 100% of the monthly payroll requirement. The lending pool is allocated based on the current outstanding loans, while the remaining balance is directed towards the investment pool to generate yield.",
+          "action_taken": "Proposed allocation: 24.4% payroll, 5.2% lending, 70.4% investment.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "e1d0fd75-0aeb-485f-8f6c-e61919d6b965",
+          "workflow_name": "strategy_orchestration",
+          "stage": "decision",
+          "source": "openclaw_clawbot",
+          "policy_result": {},
+          "execution_status": null,
+          "metadata": {}
+        },
+        {
+          "id": "4bd99a4e-dbe6-4e56-bcd5-da0a3e8db25c",
+          "timestamp": "2026-03-20T18:19:08.496Z",
+          "agent_name": "OpenClawOrchestrator",
+          "decision": {
+            "mode": "strategy"
+          },
+          "rationale": "Evaluating treasury, payroll coverage, lending guardrails, and Aave posture.",
+          "action_taken": "Strategy loop started.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "e1d0fd75-0aeb-485f-8f6c-e61919d6b965",
+          "workflow_name": "strategy_orchestration",
+          "stage": "workflow",
+          "source": "openclaw_clawbot",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {}
+        },
+        {
+          "id": "0c02eeb9-5c59-4bcd-b5ae-de7551c6931f",
+          "timestamp": "2026-03-20T18:17:35.797Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve wallet balance 0.004000 is below required top-up 0.010000.",
+          "action_taken": "Reserve treasury top-up policy status: BLOCK",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "8b468d3b-0736-4d96-a161-89b2eb682a6f",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "policy_validation",
+          "source": "test_harness_automation",
+          "policy_result": {
+            "amount": 0.01,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.01,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.01,
+                "passed": false,
+                "available": 0.003999873998593
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "block",
+            "metrics": {
+              "reserveAvailable": 0.003999873998593
+            },
+            "reasons": [
+              "Reserve wallet balance 0.004000 is below required top-up 0.010000."
+            ]
+          },
+          "execution_status": "block",
+          "metadata": {}
+        },
+        {
+          "id": "27eb800f-fe5f-461c-844e-c86027ebd4f5",
+          "timestamp": "2026-03-20T18:17:35.795Z",
+          "agent_name": "ReserveFundingAgent",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Live EC2 automation flow test buffer",
+          "action_taken": "Reserve top-up request prepared.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "8b468d3b-0736-4d96-a161-89b2eb682a6f",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "decision",
+          "source": "test_harness_automation",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {
+            "taskId": null,
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "b8a27ec8-855c-4054-99cc-471a01aaf6fa",
+          "timestamp": "2026-03-20T18:13:57.949Z",
+          "agent_name": "WDKExecutionLayer",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve wallet transfer sent to the company treasury wallet.",
+          "action_taken": "Treasury top-up execution succeeded.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "wdk_execution",
+          "source": "openclaw_clawbot",
+          "policy_result": {
+            "amount": 0.001,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.001,
+                "passed": true,
+                "available": 0.004999894998824
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.004999894998824
+            },
+            "reasons": []
+          },
+          "execution_status": "success",
+          "metadata": {
+            "taskId": "bec75ec4-36f7-403d-a406-3b8cd796071d",
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "219e112f-c81e-4704-9914-0e06a354134f",
+          "timestamp": "2026-03-20T18:13:57.707Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve treasury top-up passed reserve wallet policy checks.",
+          "action_taken": "Reserve treasury top-up policy status: ALLOW",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "policy_validation",
+          "source": "openclaw_clawbot",
+          "policy_result": {
+            "amount": 0.001,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.001,
+                "passed": true,
+                "available": 0.004999894998824
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.004999894998824
+            },
+            "reasons": []
+          },
+          "execution_status": "allow",
+          "metadata": {}
+        },
+        {
+          "id": "1aba4d40-ec42-4228-863d-7606136970bd",
+          "timestamp": "2026-03-20T18:13:57.705Z",
+          "agent_name": "ReserveFundingAgent",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Clawbot treasury top-up live test (auto)",
+          "action_taken": "Reserve top-up request prepared.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "cc743bb4-186f-4505-a6d6-873ccf64e504",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "decision",
+          "source": "openclaw_clawbot",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {
+            "taskId": "bec75ec4-36f7-403d-a406-3b8cd796071d",
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "eed07d2a-e10d-43f1-b598-20b323618626",
+          "timestamp": "2026-03-20T18:13:04.035Z",
+          "agent_name": "WDKExecutionLayer",
+          "decision": {
+            "action": "payroll"
+          },
+          "rationale": "Payroll transfers executed and EMI deductions recorded.",
+          "action_taken": "Payroll execution completed for 1 employees.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": null,
+          "workflow_name": null,
+          "stage": "wdk_execution",
+          "source": "backend",
+          "policy_result": {
+            "amount": 0.002417,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "payroll",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.002417,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.003417,
+                "usedToday": 0.001
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.002417,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "allow",
+            "metrics": {
+              "usedDailyOutflow": 0.001,
+              "projectedDailyOutflow": 0.003417
+            },
+            "reasons": []
+          },
+          "execution_status": "success",
+          "metadata": {
+            "txHashes": [
+              {
+                "txHash": "0xd125762cf2427e6227a256dfb8f4210dcdc37fd10af920e61e17da13c3041333",
+                "employeeId": "f95979c1-3a11-41f7-a041-1ab7110a62ee"
+              }
+            ]
+          }
+        },
+        {
+          "id": "99cc7182-a0c9-4b9f-b259-a1755bdf950b",
+          "timestamp": "2026-03-20T18:13:03.786Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "payroll"
+          },
+          "rationale": "Payroll run passed wallet policy checks.",
+          "action_taken": "Payroll policy status: ALLOW",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": null,
+          "workflow_name": null,
+          "stage": "policy_validation",
+          "source": "backend",
+          "policy_result": {
+            "amount": 0.002417,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "payroll",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.002417,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.003417,
+                "usedToday": 0.001
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.002417,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "allow",
+            "metrics": {
+              "usedDailyOutflow": 0.001,
+              "projectedDailyOutflow": 0.003417
+            },
+            "reasons": []
+          },
+          "execution_status": "allow",
+          "metadata": {}
+        },
+        {
+          "id": "49f43a36-e844-4da1-a7e5-63eb92f3dc16",
+          "timestamp": "2026-03-20T18:13:03.769Z",
+          "agent_name": "WDKExecutionLayer",
+          "decision": {
+            "action": "loan_disbursement"
+          },
+          "rationale": "Loan disbursal executed via WDK wallet transfer.",
+          "action_taken": "Loan disbursal executed. Tx: 0xd98ddf2fe95fbacbfdb76f34a1148a4c71ef287c207c404f872966f5a71e1c94",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": null,
+          "workflow_name": null,
+          "stage": "wdk_execution",
+          "source": "backend",
+          "policy_result": {
+            "amount": 0.001,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "loan_disbursement",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.001,
+                "usedToday": 0
+              },
+              {
+                "name": "max_loan_amount",
+                "limit": 1500,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.001,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "allow",
+            "metrics": {
+              "usedDailyOutflow": 0,
+              "projectedDailyOutflow": 0.001
+            },
+            "reasons": []
+          },
+          "execution_status": "success",
+          "metadata": {
+            "loanId": "d04877c2-7ac8-450a-8e18-fbd77730f6d7",
+            "txHash": "0xd98ddf2fe95fbacbfdb76f34a1148a4c71ef287c207c404f872966f5a71e1c94"
+          }
+        },
+        {
+          "id": "31cc94e0-bed4-4b2c-ad3d-5aa1ac346057",
+          "timestamp": "2026-03-20T18:13:03.487Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "loan_disbursement"
+          },
+          "rationale": "Loan disbursal passed wallet policy checks.",
+          "action_taken": "Loan disbursal policy status: ALLOW",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": null,
+          "workflow_name": null,
+          "stage": "policy_validation",
+          "source": "backend",
+          "policy_result": {
+            "amount": 0.001,
+            "checks": [
+              {
+                "name": "agent_enabled",
+                "value": true,
+                "passed": true
+              },
+              {
+                "name": "permission",
+                "value": true,
+                "action": "loan_disbursement",
+                "passed": true
+              },
+              {
+                "name": "max_single_transfer",
+                "limit": 2500,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "max_daily_outflow",
+                "limit": 10000,
+                "passed": true,
+                "projected": 0.001,
+                "usedToday": 0
+              },
+              {
+                "name": "max_loan_amount",
+                "limit": 1500,
+                "amount": 0.001,
+                "passed": true
+              },
+              {
+                "name": "human_review_threshold",
+                "amount": 0.001,
+                "passed": true,
+                "threshold": 750
+              }
+            ],
+            "limits": {
+              "maxLoanAmount": 1500,
+              "maxDailyOutflow": 10000,
+              "humanReviewAbove": 750,
+              "maxSingleTransfer": 2500,
+              "maxAaveAllocationPct": 35
+            },
+            "status": "allow",
+            "metrics": {
+              "usedDailyOutflow": 0,
+              "projectedDailyOutflow": 0.001
+            },
+            "reasons": []
+          },
+          "execution_status": "allow",
+          "metadata": {}
+        },
+        {
+          "id": "75081d68-f654-46f2-b472-253b122525cb",
+          "timestamp": "2026-03-20T18:13:03.483Z",
+          "agent_name": "LoanDecisionAgent",
+          "decision": {
+            "amount": 0.001,
+            "decision": "approve",
+            "duration": 12,
+            "interest": 0.06,
+            "rationale": "The requested amount is within the maximum limit of 2x the monthly salary, and the monthly EMI does not exceed 30% of the salary. The credit score qualifies for a lower interest rate, and the market context is stable."
+          },
+          "rationale": "The requested amount is within the maximum limit of 2x the monthly salary, and the monthly EMI does not exceed 30% of the salary. The credit score qualifies for a lower interest rate, and the market context is stable.",
+          "action_taken": "Approved loan of 0.001 ETH",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": null,
+          "workflow_name": null,
+          "stage": "decision",
+          "source": "backend",
+          "policy_result": {},
+          "execution_status": null,
+          "metadata": {}
+        },
+        {
+          "id": "28a48963-7945-4562-99eb-17e0786cd99c",
+          "timestamp": "2026-03-20T18:12:55.763Z",
+          "agent_name": "WDKExecutionLayer",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve wallet transfer sent to the company treasury wallet.",
+          "action_taken": "Treasury top-up execution succeeded.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "wdk_execution",
+          "source": "test_harness_manual",
+          "policy_result": {
+            "amount": 0.02,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.02,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.02,
+                "passed": true,
+                "available": 0.024999915999055
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.024999915999055
+            },
+            "reasons": []
+          },
+          "execution_status": "success",
+          "metadata": {
+            "taskId": null,
+            "tokenSymbol": "ETH"
+          }
+        },
+        {
+          "id": "433dc04e-bda1-43ea-ae8a-7e5034da0eb9",
+          "timestamp": "2026-03-20T18:12:55.499Z",
+          "agent_name": "FlowPayPolicyEngine",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Reserve treasury top-up passed reserve wallet policy checks.",
+          "action_taken": "Reserve treasury top-up policy status: ALLOW",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "policy_validation",
+          "source": "test_harness_manual",
+          "policy_result": {
+            "amount": 0.02,
+            "checks": [
+              {
+                "name": "reserve_topup_enabled",
+                "value": "true",
+                "passed": true
+              },
+              {
+                "name": "max_reserve_topup_amount",
+                "limit": 0.05,
+                "amount": 0.02,
+                "passed": true
+              },
+              {
+                "name": "reserve_wallet_balance",
+                "amount": 0.02,
+                "passed": true,
+                "available": 0.024999915999055
+              }
+            ],
+            "limits": {
+              "reserveTopupMaxAmount": 0.05
+            },
+            "status": "allow",
+            "metrics": {
+              "reserveAvailable": 0.024999915999055
+            },
+            "reasons": []
+          },
+          "execution_status": "allow",
+          "metadata": {}
+        },
+        {
+          "id": "47b08e08-b2fa-468e-b907-ceeb07fc9d8d",
+          "timestamp": "2026-03-20T18:12:55.496Z",
+          "agent_name": "ReserveFundingAgent",
+          "decision": {
+            "action": "reserve_treasury_topup"
+          },
+          "rationale": "Live EC2 backend manual flow test",
+          "action_taken": "Reserve top-up request prepared.",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "workflow_id": "16cefff8-5f7e-4da7-8d49-f54c9fcca4ed",
+          "workflow_name": "reserve_treasury_topup",
+          "stage": "decision",
+          "source": "test_harness_manual",
+          "policy_result": {},
+          "execution_status": "started",
+          "metadata": {
+            "taskId": null,
+            "tokenSymbol": "ETH"
+          }
+        }
+      ]
+    }
+  },
+  "opsTasks": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "tasks": [
+        {
+          "id": "55b60faf-0517-4fab-a8d6-ead91d6238df",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "type": "employee_invite",
+          "status": "completed",
+          "recipient_email": "employee-a00e0064@example.com",
+          "subject": "Activate your FlowPay account",
+          "payload": {
+            "email": "employee-a00e0064@example.com",
+            "employeeId": "f95979c1-3a11-41f7-a041-1ab7110a62ee",
+            "activationUrl": "https://flowpay-openclaw-three.vercel.app/employees/activate?token=2a9df04c-c0c8-4928-b76c-a4b1e5ad5ea0",
+            "activationToken": "2a9df04c-c0c8-4928-b76c-a4b1e5ad5ea0",
+            "followupSuggestedDays": [
+              1,
+              3,
+              7
+            ]
+          },
+          "approval_id": null,
+          "created_at": "2026-03-20T18:12:54.504Z",
+          "updated_at": "2026-03-20T18:13:49.122Z",
+          "completed_at": "2026-03-20T18:13:49.122Z"
+        },
+        {
+          "id": "bec75ec4-36f7-403d-a406-3b8cd796071d",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "type": "treasury_topup",
+          "status": "completed",
+          "recipient_email": "amanraj4u92@gmail.com",
+          "subject": "Clawbot treasury top-up live test",
+          "payload": {
+            "amount": 0.001,
+            "companyId": "afedbc53-d0da-4a87-8061-bc4012876b12",
+            "shortfall": 0.001,
+            "balanceEth": 0.02,
+            "monthlyPayroll": 0.0025,
+            "treasuryAddress": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+          },
+          "approval_id": null,
+          "created_at": "2026-03-20T18:13:04.071Z",
+          "updated_at": "2026-03-20T18:13:59.848Z",
+          "completed_at": "2026-03-20T18:13:59.848Z"
+        },
+        {
+          "id": "6c3b2c3c-0e29-4342-ae7a-7f2d3f235e4c",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "type": "employee_invite",
+          "status": "completed",
+          "recipient_email": "auto-employee-a00e0064@example.com",
+          "subject": "Activate your FlowPay account",
+          "payload": {
+            "email": "auto-employee-a00e0064@example.com",
+            "employeeId": "77579630-6268-4b90-8caa-099944f8718c",
+            "activationUrl": "https://flowpay-openclaw-three.vercel.app/employees/activate?token=e925c174-4bdb-418b-bf58-39e38657ad8a",
+            "activationToken": "e925c174-4bdb-418b-bf58-39e38657ad8a",
+            "followupSuggestedDays": [
+              1,
+              3,
+              7
+            ]
+          },
+          "approval_id": null,
+          "created_at": "2026-03-20T18:17:35.329Z",
+          "updated_at": "2026-03-20T18:17:49.713Z",
+          "completed_at": "2026-03-20T18:17:49.713Z"
+        },
+        {
+          "id": "3d4a3658-ba82-4ac2-96a3-ddb7295854a0",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "type": "finance_snapshot",
+          "status": "pending",
+          "recipient_email": "amanraj4u92@gmail.com",
+          "subject": "FlowPay daily balance snapshot",
+          "payload": {
+            "loans": {
+              "active_loans": "1",
+              "outstanding_loans": "0.000917"
+            },
+            "treasury": {
+              "balance": "0.017583318418687081",
+              "balanceEth": "0.017583318418687081",
+              "balanceWei": "17583318418687081",
+              "tokenSymbol": "ETH",
+              "token_symbol": "ETH",
+              "walletAddress": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+              "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+            },
+            "companyId": "afedbc53-d0da-4a87-8061-bc4012876b12",
+            "employees": {
+              "total_salary": "0.004300",
+              "active_employees": "2"
+            },
+            "companyName": "LiveFlow-a00e0064",
+            "generatedAt": "2026-03-20T18:21:40.497Z",
+            "transactions": {
+              "tx_count_today": "3",
+              "tx_amount_today": "0.003500",
+              "pending_settlement_count": "1"
+            },
+            "hoursToNextPayroll": 278.64
+          },
+          "approval_id": null,
+          "created_at": "2026-03-20T18:21:40.499Z",
+          "updated_at": "2026-03-20T18:21:40.499Z",
+          "completed_at": null
+        },
+        {
+          "id": "516139c6-ad0d-44ac-9936-91f8a582d519",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "type": "reconciliation_report",
+          "status": "pending",
+          "recipient_email": "amanraj4u92@gmail.com",
+          "subject": "FlowPay reconciliation check",
+          "payload": {
+            "companyId": "afedbc53-d0da-4a87-8061-bc4012876b12",
+            "generatedAt": "2026-03-20T18:21:40.501Z",
+            "txCountToday": 3,
+            "txAmountToday": 0.0035,
+            "pendingSettlementCount": 1
+          },
+          "approval_id": null,
+          "created_at": "2026-03-20T18:21:40.501Z",
+          "updated_at": "2026-03-20T18:21:40.501Z",
+          "completed_at": null
+        },
+        {
+          "id": "d2ae6e19-95fe-4838-8d64-c9ec4b822bb8",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "type": "eod_summary",
+          "status": "pending",
+          "recipient_email": "amanraj4u92@gmail.com",
+          "subject": "FlowPay end-of-day summary",
+          "payload": {
+            "loans": {
+              "active_loans": "1",
+              "outstanding_loans": "0.000917"
+            },
+            "treasury": {
+              "balance": "0.017583318418687081",
+              "balanceEth": "0.017583318418687081",
+              "balanceWei": "17583318418687081",
+              "tokenSymbol": "ETH",
+              "token_symbol": "ETH",
+              "walletAddress": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+              "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+            },
+            "companyId": "afedbc53-d0da-4a87-8061-bc4012876b12",
+            "employees": {
+              "total_salary": "0.004300",
+              "active_employees": "2"
+            },
+            "companyName": "LiveFlow-a00e0064",
+            "generatedAt": "2026-03-20T18:21:40.503Z",
+            "transactions": {
+              "tx_count_today": "3",
+              "tx_amount_today": "0.003500",
+              "pending_settlement_count": "1"
+            }
+          },
+          "approval_id": null,
+          "created_at": "2026-03-20T18:21:40.503Z",
+          "updated_at": "2026-03-20T18:21:40.503Z",
+          "completed_at": null
+        },
+        {
+          "id": "bc5c91a7-aaa8-4615-a402-19d14c495a57",
+          "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+          "type": "admin_report",
+          "status": "pending",
+          "recipient_email": "amanraj4u92@gmail.com",
+          "subject": "FlowPay admin support digest",
+          "payload": {
+            "answers": {
+              "topRiskAccounts": "2 top risk accounts listed.",
+              "whatFailedToday": "6 failures detected today.",
+              "pendingApprovals": "No pending approvals."
+            },
+            "companyId": "afedbc53-d0da-4a87-8061-bc4012876b12",
+            "companyName": "LiveFlow-a00e0064",
+            "generatedAt": "2026-03-20T18:21:40.664Z",
+            "failuresToday": {
+              "count": 6,
+              "items": [
+                {
+                  "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+                  "timestamp": "2026-03-20T18:21:40.464Z",
+                  "agent_name": "OpenClawOrchestrator",
+                  "action_taken": "Autonomous demo failed."
+                },
+                {
+                  "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+                  "timestamp": "2026-03-20T18:21:38.238Z",
+                  "agent_name": "OpenClawOrchestrator",
+                  "action_taken": "Strategy loop failed."
+                },
+                {
+                  "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+                  "timestamp": "2026-03-20T18:19:57.433Z",
+                  "agent_name": "OpenClawOrchestrator",
+                  "action_taken": "Strategy loop failed."
+                },
+                {
+                  "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+                  "timestamp": "2026-03-20T18:19:21.828Z",
+                  "agent_name": "OpenClawOrchestrator",
+                  "action_taken": "Autonomous demo failed."
+                },
+                {
+                  "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+                  "timestamp": "2026-03-20T18:19:19.316Z",
+                  "agent_name": "OpenClawOrchestrator",
+                  "action_taken": "Strategy loop failed."
+                },
+                {
+                  "rationale": "Allocation 70.4% exceeds Aave exposure cap 35%.",
+                  "timestamp": "2026-03-20T18:19:10.223Z",
+                  "agent_name": "OpenClawOrchestrator",
+                  "action_taken": "Strategy loop failed."
+                }
+              ]
+            },
+            "topRiskAccounts": [
+              {
+                "email": "employee-a00e0064@example.com",
+                "salary": 0.0025,
+                "full_name": "Employee a00e0064",
+                "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+                "risk_score": 0.3668,
+                "employee_id": "f95979c1-3a11-41f7-a041-1ab7110a62ee",
+                "credit_score": 760,
+                "active_loan_count": 1,
+                "overdue_loan_count": 0,
+                "active_loan_balance": 0.000917
+              },
+              {
+                "email": "auto-employee-a00e0064@example.com",
+                "salary": 0.0018,
+                "full_name": "Automation Employee a00e0064",
+                "company_id": "afedbc53-d0da-4a87-8061-bc4012876b12",
+                "risk_score": 0,
+                "employee_id": "77579630-6268-4b90-8caa-099944f8718c",
+                "credit_score": 780,
+                "active_loan_count": 0,
+                "overdue_loan_count": 0,
+                "active_loan_balance": 0
+              }
+            ],
+            "pendingApprovals": {
+              "count": 0,
+              "items": []
+            }
+          },
+          "approval_id": null,
+          "created_at": "2026-03-20T18:21:40.665Z",
+          "updated_at": "2026-03-20T18:21:40.665Z",
+          "completed_at": null
+        }
+      ]
+    }
+  },
+  "approvals": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "approvals": []
+    }
+  },
+  "balanceAfter": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "balanceWei": "17583318418687081",
+      "balanceEth": "0.017583318418687081",
+      "walletAddress": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+      "tokenSymbol": "ETH",
+      "balance": "0.017583318418687081",
+      "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC",
+      "token_symbol": "ETH"
+    }
+  },
+  "transactions": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "transactions": [
+        {
+          "id": "95f21af6-cf9a-4f3a-ae21-b70c7382730b",
+          "type": "emi_repayment",
+          "amount": "0.000083",
+          "tx_hash": null,
+          "token_symbol": "",
+          "created_at": "2026-03-20T18:13:04.031Z",
+          "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+        },
+        {
+          "id": "ddda7358-8f06-40f1-8904-f585a2a16325",
+          "type": "payroll",
+          "amount": "0.002417",
+          "tx_hash": "0xd125762cf2427e6227a256dfb8f4210dcdc37fd10af920e61e17da13c3041333",
+          "token_symbol": "ETH",
+          "created_at": "2026-03-20T18:13:04.026Z",
+          "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+        },
+        {
+          "id": "576b7e31-aefc-4905-b709-20e0dbad7f84",
+          "type": "loan_disbursement",
+          "amount": "0.001000",
+          "tx_hash": "0xd98ddf2fe95fbacbfdb76f34a1148a4c71ef287c207c404f872966f5a71e1c94",
+          "token_symbol": "ETH",
+          "created_at": "2026-03-20T18:13:03.763Z",
+          "wallet_address": "0xaecA25D012fEB21cC8f2d58911dD5FD9F8Ff35AC"
+        }
+      ],
+      "total": 3
+    }
+  },
+  "investments": {
+    "ok": true,
+    "status": 200,
+    "payload": {
+      "allocation": null,
+      "positions": [],
+      "transactions": [],
+      "summary": {
+        "total_invested": "0.000000",
+        "investment_pool": "0",
+        "transaction_count": 0
+      },
+      "market": {
+        "asset": "ETH",
+        "price": 2133.05,
+        "change_pct": 0.48899755501220776,
+        "source": "bitfinex"
+      },
+      "marketBoard": {
+        "updatedAt": "2026-03-20T18:21:41.439Z",
+        "pricingSource": "wdk-bitfinex",
+        "rankingSource": "curated",
+        "crypto": [
+          {
+            "rank": 1,
+            "name": "Bitcoin",
+            "symbol": "BTC",
+            "category": "crypto",
+            "price": 69956,
+            "changePct24h": 0.20470096481433764,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 2,
+            "name": "Ethereum",
+            "symbol": "ETH",
+            "category": "crypto",
+            "price": 2133.05,
+            "changePct24h": 0.48899755501220776,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 3,
+            "name": "XRP",
+            "symbol": "XRP",
+            "category": "crypto",
+            "price": 1.43635,
+            "changePct24h": 0.11824441816790948,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 4,
+            "name": "BNB",
+            "symbol": "BNB",
+            "category": "crypto",
+            "price": 639.955979,
+            "changePct24h": 0,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 5,
+            "name": "Solana",
+            "symbol": "SOL",
+            "category": "crypto",
+            "price": 88.8335,
+            "changePct24h": 0.8243097681274493,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 6,
+            "name": "Dogecoin",
+            "symbol": "DOGE",
+            "category": "crypto",
+            "price": 0.094004,
+            "changePct24h": 0,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 7,
+            "name": "Cardano",
+            "symbol": "ADA",
+            "category": "crypto",
+            "price": 0.26564,
+            "changePct24h": 0.16178794491684323,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 8,
+            "name": "TRON",
+            "symbol": "TRX",
+            "category": "crypto",
+            "price": 0.308455,
+            "changePct24h": 2.613836394433554,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 9,
+            "name": "Avalanche",
+            "symbol": "AVAX",
+            "category": "crypto",
+            "price": 9.514,
+            "changePct24h": 0,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 10,
+            "name": "Chainlink",
+            "symbol": "LINK",
+            "category": "crypto",
+            "price": 9.0175,
+            "changePct24h": 0,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 11,
+            "name": "Toncoin",
+            "symbol": "TON",
+            "category": "crypto",
+            "price": 1.2558,
+            "changePct24h": 1.326646173758289,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 12,
+            "name": "Stellar",
+            "symbol": "XLM",
+            "category": "crypto",
+            "price": 0.165625,
+            "changePct24h": 0.9607199318983328,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 13,
+            "name": "Shiba Inu",
+            "symbol": "SHIB",
+            "category": "crypto",
+            "price": 6.07e-06,
+            "changePct24h": 0,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 14,
+            "name": "Hedera",
+            "symbol": "HBAR",
+            "category": "crypto",
+            "price": 0.09240586,
+            "changePct24h": 0,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 15,
+            "name": "Polkadot",
+            "symbol": "DOT",
+            "category": "crypto",
+            "price": 1.51515,
+            "changePct24h": 0.27034155347487754,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 16,
+            "name": "UNUS SED LEO",
+            "symbol": "LEO",
+            "category": "crypto",
+            "price": 9.1978,
+            "changePct24h": 0.28734381122383046,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 17,
+            "name": "Litecoin",
+            "symbol": "LTC",
+            "category": "crypto",
+            "price": 55.6275,
+            "changePct24h": 0.7121425731120962,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 18,
+            "name": "Sui",
+            "symbol": "SUI",
+            "category": "crypto",
+            "price": 0.9617,
+            "changePct24h": 1.4273392797038005,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 19,
+            "name": "Uniswap",
+            "symbol": "UNI",
+            "category": "crypto",
+            "price": 3.58145,
+            "changePct24h": 0.9720774280803577,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 20,
+            "name": "Aptos",
+            "symbol": "APT",
+            "category": "crypto",
+            "price": 0.997395,
+            "changePct24h": 6.789317885221377,
+            "source": "bitfinex",
+            "available": true
+          }
+        ],
+        "metals": [
+          {
+            "rank": 1,
+            "name": "Gold (XAUT)",
+            "symbol": "XAUT",
+            "category": "metal",
+            "price": 4570.6,
+            "changePct24h": 0,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 2,
+            "name": "Silver",
+            "symbol": "XAG",
+            "category": "metal",
+            "price": 69.01035,
+            "changePct24h": 0,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 3,
+            "name": "Platinum",
+            "symbol": "XPT",
+            "category": "metal",
+            "price": 1990.2985,
+            "changePct24h": 0,
+            "source": "bitfinex",
+            "available": true
+          },
+          {
+            "rank": 4,
+            "name": "Palladium",
+            "symbol": "XPD",
+            "category": "metal",
+            "price": 1413.912055,
+            "changePct24h": 0,
+            "source": "bitfinex",
+            "available": true
+          }
+        ]
+      }
+    }
+  }
+}

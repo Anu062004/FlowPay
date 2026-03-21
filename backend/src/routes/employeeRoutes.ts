@@ -15,6 +15,7 @@ import {
   assertCompanyScope,
   assertEmployeeScope,
   getCompanySession,
+  getEmployeeSession,
   requireCompanySession,
   requireEmployeeSession
 } from "../middleware/auth.js";
@@ -128,6 +129,16 @@ router.post(
   asyncHandler(async (_req, res) => {
     clearEmployeeSession(res);
     res.status(200).json({ status: "ok" });
+  })
+);
+
+router.get(
+  "/session",
+  requireEmployeeSession,
+  asyncHandler(async (_req, res) => {
+    const session = getEmployeeSession(res);
+    const employee = await getEmployeeProfile(session!.employeeId);
+    res.status(200).json({ employee });
   })
 );
 

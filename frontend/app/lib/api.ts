@@ -57,7 +57,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   if ((res.status === 401 || res.status === 403) && typeof window !== "undefined") {
     const authEntryPaths = new Set([
       "/companies/login",
+      "/companies/recover/request",
+      "/companies/recover/reset",
       "/employees/login",
+      "/employees/recover/request",
+      "/employees/recover/reset",
       "/companies/register",
       "/employees/register-self",
       "/employees/activate"
@@ -267,6 +271,18 @@ export const loginCompany = (body: { access: string; accessPin: string; email?: 
     body: JSON.stringify(body),
   });
 
+export const requestCompanyRecovery = (email: string) =>
+  apiFetch<{ status: string; message: string }>("/companies/recover/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+
+export const resetCompanyRecovery = (body: { token: string; accessPin: string }) =>
+  apiFetch<{ company: Company }>("/companies/recover/reset", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
 export const logoutCompany = () =>
   apiFetch<{ status: string }>("/companies/logout", {
     method: "POST",
@@ -305,6 +321,18 @@ export const registerEmployeeWallet = (body: { fullName: string; email?: string;
 
 export const loginEmployee = (body: { access: string; password: string; email?: string }) =>
   apiFetch<{ employee: Employee }>("/employees/login", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const requestEmployeeRecovery = (email: string) =>
+  apiFetch<{ status: string; message: string }>("/employees/recover/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+
+export const resetEmployeeRecovery = (body: { token: string; password: string }) =>
+  apiFetch<{ employee: Employee }>("/employees/recover/reset", {
     method: "POST",
     body: JSON.stringify(body),
   });

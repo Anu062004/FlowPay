@@ -75,6 +75,65 @@ function buildPlainTextMessage(params: {
   return toBase64Url(lines.join("\r\n"));
 }
 
+async function deliverEmail(input: {
+  companyId?: string;
+  type: "employee_invite" | "company_recovery" | "employee_recovery";
+  recipientEmail: string;
+  subject: string;
+  text: string;
+  payload: Record<string, unknown>;
+}) {
+  if (env.HUMAN_TASKS_PROVIDER === "openclaw" && input.companyId) {
+    await createOpsTask({
+      companyId: input.companyId,
+      type: input.type,
+      recipientEmail: input.recipientEmail,
+      subject: input.subject,
+      payload: input.payload
+    });
+    return;
+  }
+
+  if (env.EMAIL_PROVIDER_MODE && env.EMAIL_PROVIDER_MODE !== "live") {
+    console.warn("Email skipped: EMAIL_PROVIDER_MODE != live", { email: input.recipientEmail, type: input.type });
+    return;
+  }
+
+  const sender =
+    env.CLAWGENCY_PLATFORM_EMAIL ?? env.GMAIL_SENDER_EMAIL ?? env.EMAIL_FROM;
+  if (!sender) {
+    console.warn("Email skipped: GMAIL_SENDER_EMAIL or EMAIL_FROM not configured", { email: input.recipientEmail, type: input.type });
+    return;
+  }
+  const hasCreds =
+    (env.GOOGLE_OAUTH_CLIENT_ID ?? env.GMAIL_CLIENT_ID) &&
+    (env.GOOGLE_OAUTH_CLIENT_SECRET ?? env.GMAIL_CLIENT_SECRET) &&
+    (readRefreshToken() || env.GMAIL_ACCESS_TOKEN);
+  if (!hasCreds) {
+    console.warn("Email skipped: Gmail API credentials not configured", { email: input.recipientEmail, type: input.type });
+    return;
+  }
+
+  const raw = buildPlainTextMessage({
+    from: sender,
+    to: input.recipientEmail,
+    subject: input.subject,
+    text: input.text,
+    replyTo: env.CLAWGENCY_PLATFORM_EMAIL ?? undefined
+  });
+
+  const gmail = resolveGmailClient();
+  const label = env.GMAIL_REPLY_LABEL;
+  const labelId = label ? await resolveLabelId(label) : null;
+  await gmail.users.messages.send({
+    userId: "me",
+    requestBody: {
+      raw,
+      ...(labelId ? { labelIds: [labelId] } : {})
+    }
+  });
+}
+
 async function resolveLabelId(labelName: string) {
   if (!labelName) return null;
   if (labelCache && labelCache[labelName]) return labelCache[labelName];
@@ -98,64 +157,76 @@ export async function sendEmployeeInvite(input: {
   activationUrl?: string;
 }) {
   const inviteUrl = input.activationUrl ?? `${env.APP_BASE_URL}/employees/activate?token=${input.activationToken}`;
-
-  if (env.HUMAN_TASKS_PROVIDER === "openclaw") {
-    if (!input.companyId) {
-      console.warn("OpenClaw invite skipped: missing companyId", { email: input.email });
-      return;
-    }
-    await createOpsTask({
-      companyId: input.companyId,
-      type: "employee_invite",
-      recipientEmail: input.email,
-      subject: "Activate your FlowPay account",
-      payload: {
-        employeeId: input.employeeId ?? null,
-        email: input.email,
-        activationToken: input.activationToken,
-        activationUrl: inviteUrl,
-        followupSuggestedDays: [1, 3, 7]
-      }
-    });
-    return;
-  }
-
-  if (env.EMAIL_PROVIDER_MODE && env.EMAIL_PROVIDER_MODE !== "live") {
-    console.warn("Email invite skipped: EMAIL_PROVIDER_MODE != live", { email: input.email });
-    return;
-  }
-
-  const sender =
-    env.CLAWGENCY_PLATFORM_EMAIL ?? env.GMAIL_SENDER_EMAIL ?? env.EMAIL_FROM;
-  if (!sender) {
-    console.warn("Email invite skipped: GMAIL_SENDER_EMAIL or EMAIL_FROM not configured", { email: input.email });
-    return;
-  }
-  const hasCreds =
-    (env.GOOGLE_OAUTH_CLIENT_ID ?? env.GMAIL_CLIENT_ID) &&
-    (env.GOOGLE_OAUTH_CLIENT_SECRET ?? env.GMAIL_CLIENT_SECRET) &&
-    (readRefreshToken() || env.GMAIL_ACCESS_TOKEN);
-  if (!hasCreds) {
-    console.warn("Email invite skipped: Gmail API credentials not configured", { email: input.email });
-    return;
-  }
-
-  const raw = buildPlainTextMessage({
-    from: sender,
-    to: input.email,
+  await deliverEmail({
+    companyId: input.companyId,
+    type: "employee_invite",
+    recipientEmail: input.email,
     subject: "Activate your FlowPay account",
     text: `You have been invited to FlowPay. Activate your account here: ${inviteUrl}`,
-    replyTo: env.CLAWGENCY_PLATFORM_EMAIL ?? undefined
+    payload: {
+      employeeId: input.employeeId ?? null,
+      email: input.email,
+      activationToken: input.activationToken,
+      activationUrl: inviteUrl,
+      followupSuggestedDays: [1, 3, 7]
+    }
   });
+}
 
-  const gmail = resolveGmailClient();
-  const label = env.GMAIL_REPLY_LABEL;
-  const labelId = label ? await resolveLabelId(label) : null;
-  await gmail.users.messages.send({
-    userId: "me",
-    requestBody: {
-      raw,
-      ...(labelId ? { labelIds: [labelId] } : {})
+export async function sendCompanyRecoveryEmail(input: {
+  companyId: string;
+  companyName: string;
+  email: string;
+  resetToken: string;
+  resetUrl?: string;
+}) {
+  const resetUrl = input.resetUrl ?? `${env.APP_BASE_URL}/recover/company?token=${input.resetToken}`;
+  await deliverEmail({
+    companyId: input.companyId,
+    type: "company_recovery",
+    recipientEmail: input.email,
+    subject: "Reset your FlowPay company PIN",
+    text: [
+      `A PIN reset was requested for ${input.companyName}.`,
+      `Use this link to set a new company PIN: ${resetUrl}`,
+      "",
+      "This link expires in 60 minutes."
+    ].join("\n"),
+    payload: {
+      companyName: input.companyName,
+      email: input.email,
+      resetToken: input.resetToken,
+      resetUrl
+    }
+  });
+}
+
+export async function sendEmployeeRecoveryEmail(input: {
+  companyId?: string;
+  employeeId: string;
+  fullName: string;
+  email: string;
+  resetToken: string;
+  resetUrl?: string;
+}) {
+  const resetUrl = input.resetUrl ?? `${env.APP_BASE_URL}/recover/employee?token=${input.resetToken}`;
+  await deliverEmail({
+    companyId: input.companyId,
+    type: "employee_recovery",
+    recipientEmail: input.email,
+    subject: "Reset your FlowPay employee password",
+    text: [
+      `A password reset was requested for ${input.fullName}.`,
+      `Use this link to set a new employee password: ${resetUrl}`,
+      "",
+      "This link expires in 60 minutes."
+    ].join("\n"),
+    payload: {
+      employeeId: input.employeeId,
+      fullName: input.fullName,
+      email: input.email,
+      resetToken: input.resetToken,
+      resetUrl
     }
   });
 }

@@ -17,6 +17,16 @@ export async function ensureRuntimeSchema() {
   `);
 
   await db.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS recovery_token_hash TEXT
+  `);
+
+  await db.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS recovery_token_expires_at TIMESTAMPTZ
+  `);
+
+  await db.query(`
     UPDATE companies
     SET email = CONCAT('company+', id::text, '@flowpay.local')
     WHERE email IS NULL
@@ -40,6 +50,16 @@ export async function ensureRuntimeSchema() {
   await db.query(`
     ALTER TABLE employees
     ALTER COLUMN salary SET DEFAULT 0
+  `);
+
+  await db.query(`
+    ALTER TABLE employees
+    ADD COLUMN IF NOT EXISTS recovery_token_hash TEXT
+  `);
+
+  await db.query(`
+    ALTER TABLE employees
+    ADD COLUMN IF NOT EXISTS recovery_token_expires_at TIMESTAMPTZ
   `);
 
   await db.query(`

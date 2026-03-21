@@ -4,6 +4,8 @@ import { ApiError } from "../utils/errors.js";
 
 export type OpsTaskType =
   | "employee_invite"
+  | "company_recovery"
+  | "employee_recovery"
   | "payroll_approval"
   | "payroll_prep"
   | "loan_approval"

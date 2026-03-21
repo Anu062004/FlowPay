@@ -482,7 +482,7 @@ export default function LandingPage() {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Registered Email (only if setting the first PIN)</label>
+                    <label className="form-label">Registered Email (for first PIN setup or recovery)</label>
                     <input
                       className="form-input"
                       type="email"
@@ -494,6 +494,9 @@ export default function LandingPage() {
                   <button className="btn btn-secondary" type="submit" disabled={busyAction !== null}>
                     {busyAction === "existing-company" ? "Opening..." : copy.existingButton}
                   </button>
+                  <Link className="btn btn-ghost" href="/recover/company">
+                    Forgot company PIN?
+                  </Link>
                 </form>
               ) : (
                 <form className="stack" onSubmit={handleExistingEmployee}>
@@ -519,7 +522,7 @@ export default function LandingPage() {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Invite Email (only if setting the first password)</label>
+                    <label className="form-label">Registered Email (for first password setup or recovery)</label>
                     <input
                       className="form-input"
                       type="email"
@@ -531,6 +534,9 @@ export default function LandingPage() {
                   <button className="btn btn-secondary" type="submit" disabled={busyAction !== null}>
                     {busyAction === "existing-employee" ? "Opening..." : copy.existingButton}
                   </button>
+                  <Link className="btn btn-ghost" href="/recover/employee">
+                    Forgot employee password?
+                  </Link>
                 </form>
               )}
 

@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS companies (
   name TEXT NOT NULL,
   email TEXT NOT NULL,
   access_pin_hash TEXT,
+  recovery_token_hash TEXT,
+  recovery_token_expires_at TIMESTAMPTZ,
   treasury_wallet_id UUID REFERENCES wallets(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -50,6 +52,8 @@ CREATE TABLE IF NOT EXISTS employees (
   credit_score INTEGER NOT NULL DEFAULT 600,
   activation_token TEXT,
   password_hash TEXT,
+  recovery_token_hash TEXT,
+  recovery_token_expires_at TIMESTAMPTZ,
   activated_at TIMESTAMPTZ,
   status TEXT NOT NULL DEFAULT 'pending',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()

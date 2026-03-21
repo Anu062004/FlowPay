@@ -402,6 +402,14 @@ function formatTaskEmail(task: OpsTask) {
   } else if (task.type === "employee_invite") {
     lines.push(`Welcome to FlowPay.`);
     lines.push(`Activate here: ${payload.activationUrl ?? ""}`);
+  } else if (task.type === "company_recovery") {
+    lines.push(`A company PIN reset was requested.`);
+    lines.push(`Reset here: ${payload.resetUrl ?? ""}`);
+    lines.push(`Company: ${payload.companyName ?? ""}`);
+  } else if (task.type === "employee_recovery") {
+    lines.push(`An employee password reset was requested.`);
+    lines.push(`Reset here: ${payload.resetUrl ?? ""}`);
+    lines.push(`Employee: ${payload.fullName ?? ""}`);
   } else if (task.type === "payroll_prep") {
     lines.push(`Payroll prep window opened.`);
     lines.push(`Company: ${payload.companyId ?? ""}`);

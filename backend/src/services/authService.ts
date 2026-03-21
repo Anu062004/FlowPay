@@ -4,10 +4,12 @@ import type { Request, Response } from "express";
 import { db } from "../db/pool.js";
 import { env } from "../config/env.js";
 import { ApiError } from "../utils/errors.js";
+import { sendCompanyRecoveryEmail, sendEmployeeRecoveryEmail } from "./emailService.js";
 
 const COMPANY_SESSION_COOKIE = "flowpay_company_session";
 const EMPLOYEE_SESSION_COOKIE = "flowpay_employee_session";
 const DEFAULT_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+const RECOVERY_TOKEN_TTL_MS = 60 * 60 * 1000;
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type CompanyProfile = {
@@ -131,6 +133,25 @@ function parseTimeoutLabel(label?: string | null) {
     default:
       return DEFAULT_SESSION_TIMEOUT_MS;
   }
+}
+
+function buildRecoveryTokenRecord() {
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + RECOVERY_TOKEN_TTL_MS);
+  return { token, tokenHash, expiresAt };
+}
+
+function hashRecoveryToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function getCompanyRecoveryUrl(token: string) {
+  return `${env.APP_BASE_URL}/recover/company?token=${encodeURIComponent(token)}`;
+}
+
+function getEmployeeRecoveryUrl(token: string) {
+  return `${env.APP_BASE_URL}/recover/employee?token=${encodeURIComponent(token)}`;
 }
 
 async function getCompanySessionTimeout(companyId?: string | null) {
@@ -336,6 +357,68 @@ export async function updateCompanyAccessPin(companyId: string, accessPin: strin
   await db.query("UPDATE companies SET access_pin_hash = $1 WHERE id = $2", [accessPinHash, companyId]);
 }
 
+export async function requestCompanyRecovery(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    throw new ApiError(400, "Registered email is required");
+  }
+
+  const result = await db.query(
+    `SELECT id, name, email
+     FROM companies
+     WHERE LOWER(email) = $1`,
+    [normalizedEmail]
+  );
+
+  for (const company of result.rows as Array<{ id: string; name: string; email: string }>) {
+    const { token, tokenHash, expiresAt } = buildRecoveryTokenRecord();
+    await db.query(
+      `UPDATE companies
+       SET recovery_token_hash = $1, recovery_token_expires_at = $2
+       WHERE id = $3`,
+      [tokenHash, expiresAt, company.id]
+    );
+
+    await sendCompanyRecoveryEmail({
+      companyId: company.id,
+      companyName: company.name,
+      email: company.email,
+      resetToken: token,
+      resetUrl: getCompanyRecoveryUrl(token)
+    });
+  }
+}
+
+export async function resetCompanyRecovery(token: string, accessPin: string) {
+  const tokenHash = hashRecoveryToken(token);
+  const result = await db.query(
+    `SELECT id
+     FROM companies
+     WHERE recovery_token_hash = $1
+       AND recovery_token_expires_at IS NOT NULL
+       AND recovery_token_expires_at > now()
+     LIMIT 1`,
+    [tokenHash]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new ApiError(404, "Invalid or expired recovery link");
+  }
+
+  const companyId = result.rows[0].id as string;
+  const accessPinHash = await bcrypt.hash(accessPin, 12);
+  await db.query(
+    `UPDATE companies
+     SET access_pin_hash = $1,
+         recovery_token_hash = NULL,
+         recovery_token_expires_at = NULL
+     WHERE id = $2`,
+    [accessPinHash, companyId]
+  );
+
+  return getCompanyProfile(companyId);
+}
+
 export async function getCompanyProfile(companyId: string) {
   const result = await db.query(
     `SELECT c.id, c.name, c.email, c.created_at, w.wallet_address AS treasury_address
@@ -382,6 +465,76 @@ export async function getEmployeeProfile(employeeId: string) {
   }
 
   return result.rows[0] as EmployeeProfile;
+}
+
+export async function requestEmployeeRecovery(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    throw new ApiError(400, "Registered email is required");
+  }
+
+  const result = await db.query(
+    `SELECT id, company_id, full_name, email
+     FROM employees
+     WHERE LOWER(COALESCE(email, '')) = $1
+       AND status = 'active'
+     ORDER BY created_at DESC`,
+    [normalizedEmail]
+  );
+
+  for (const employee of result.rows as Array<{
+    id: string;
+    company_id: string | null;
+    full_name: string;
+    email: string;
+  }>) {
+    const { token, tokenHash, expiresAt } = buildRecoveryTokenRecord();
+    await db.query(
+      `UPDATE employees
+       SET recovery_token_hash = $1, recovery_token_expires_at = $2
+       WHERE id = $3`,
+      [tokenHash, expiresAt, employee.id]
+    );
+
+    await sendEmployeeRecoveryEmail({
+      companyId: employee.company_id ?? undefined,
+      employeeId: employee.id,
+      fullName: employee.full_name,
+      email: employee.email,
+      resetToken: token,
+      resetUrl: getEmployeeRecoveryUrl(token)
+    });
+  }
+}
+
+export async function resetEmployeeRecovery(token: string, password: string) {
+  const tokenHash = hashRecoveryToken(token);
+  const result = await db.query(
+    `SELECT id, company_id
+     FROM employees
+     WHERE recovery_token_hash = $1
+       AND recovery_token_expires_at IS NOT NULL
+       AND recovery_token_expires_at > now()
+     LIMIT 1`,
+    [tokenHash]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new ApiError(404, "Invalid or expired recovery link");
+  }
+
+  const employeeId = result.rows[0].id as string;
+  const passwordHash = await bcrypt.hash(password, 12);
+  await db.query(
+    `UPDATE employees
+     SET password_hash = $1,
+         recovery_token_hash = NULL,
+         recovery_token_expires_at = NULL
+     WHERE id = $2`,
+    [passwordHash, employeeId]
+  );
+
+  return getEmployeeProfile(employeeId);
 }
 
 export async function isEmployeeOwnedByCompany(employeeId: string, companyId: string) {

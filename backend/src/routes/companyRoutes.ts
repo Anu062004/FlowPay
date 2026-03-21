@@ -8,6 +8,8 @@ import {
   createCompanySession,
   getCompanyListForOwner,
   getCompanyProfile,
+  requestCompanyRecovery,
+  resetCompanyRecovery,
   updateCompanyAccessPin
 } from "../services/authService.js";
 import { assertCompanyScope, getCompanySession, requireCompanySession } from "../middleware/auth.js";
@@ -27,6 +29,15 @@ const loginSchema = z.object({
 });
 
 const accessPinSchema = z.object({
+  accessPin: z.string().trim().min(4).max(64)
+});
+
+const recoveryRequestSchema = z.object({
+  email: z.string().trim().email()
+});
+
+const recoveryResetSchema = z.object({
+  token: z.string().trim().min(10),
   accessPin: z.string().trim().min(4).max(64)
 });
 
@@ -65,6 +76,28 @@ router.post(
   asyncHandler(async (_req, res) => {
     const payload = loginSchema.parse(_req.body);
     const company = await authenticateCompany(payload);
+    await createCompanySession(res, company.id);
+    res.status(200).json({ company });
+  })
+);
+
+router.post(
+  "/recover/request",
+  asyncHandler(async (req, res) => {
+    const payload = recoveryRequestSchema.parse(req.body);
+    await requestCompanyRecovery(payload.email);
+    res.status(200).json({
+      status: "ok",
+      message: "If a company account exists for that email, a recovery link has been sent."
+    });
+  })
+);
+
+router.post(
+  "/recover/reset",
+  asyncHandler(async (req, res) => {
+    const payload = recoveryResetSchema.parse(req.body);
+    const company = await resetCompanyRecovery(payload.token, payload.accessPin);
     await createCompanySession(res, company.id);
     res.status(200).json({ company });
   })

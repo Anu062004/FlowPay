@@ -9,7 +9,9 @@ import {
   authenticateEmployee,
   clearEmployeeSession,
   createEmployeeSession,
-  getEmployeeProfile
+  getEmployeeProfile,
+  requestEmployeeRecovery,
+  resetEmployeeRecovery
 } from "../services/authService.js";
 import {
   assertCompanyScope,
@@ -45,6 +47,15 @@ const loginSchema = z.object({
   access: z.string().trim().min(3),
   password: z.string().min(8),
   email: z.string().trim().email().optional()
+});
+
+const recoveryRequestSchema = z.object({
+  email: z.string().trim().email()
+});
+
+const recoveryResetSchema = z.object({
+  token: z.string().trim().min(10),
+  password: z.string().min(8)
 });
 
 const withdrawSchema = z.object({
@@ -119,6 +130,28 @@ router.post(
   asyncHandler(async (req, res) => {
     const payload = loginSchema.parse(req.body);
     const employee = await authenticateEmployee(payload);
+    await createEmployeeSession(res, employee.id, employee.company_id ?? null);
+    res.status(200).json({ employee });
+  })
+);
+
+router.post(
+  "/recover/request",
+  asyncHandler(async (req, res) => {
+    const payload = recoveryRequestSchema.parse(req.body);
+    await requestEmployeeRecovery(payload.email);
+    res.status(200).json({
+      status: "ok",
+      message: "If an employee account exists for that email, a recovery link has been sent."
+    });
+  })
+);
+
+router.post(
+  "/recover/reset",
+  asyncHandler(async (req, res) => {
+    const payload = recoveryResetSchema.parse(req.body);
+    const employee = await resetEmployeeRecovery(payload.token, payload.password);
     await createEmployeeSession(res, employee.id, employee.company_id ?? null);
     res.status(200).json({ employee });
   })

@@ -25,7 +25,23 @@ router.get(
          t.id,
          t.type,
          t.amount,
-         t.tx_hash,
+         COALESCE(
+           t.tx_hash,
+           CASE
+             WHEN t.type = 'emi_repayment' THEN (
+               SELECT pd.tx_hash
+               FROM payroll_disbursements pd
+               JOIN companies c2 ON c2.id = pd.company_id
+               WHERE c2.treasury_wallet_id = t.wallet_id
+                 AND pd.tx_hash IS NOT NULL
+                 AND pd.emi_deducted = t.amount
+                 AND pd.payroll_month = date_trunc('month', t.created_at AT TIME ZONE 'UTC')::date
+               ORDER BY ABS(EXTRACT(EPOCH FROM (pd.created_at - t.created_at))) ASC, pd.created_at DESC
+               LIMIT 1
+             )
+             ELSE NULL
+           END
+         ) AS tx_hash,
          t.token_symbol,
          t.created_at,
          w.wallet_address
@@ -96,7 +112,23 @@ router.get(
          t.id,
          t.type,
          t.amount,
-         t.tx_hash,
+         COALESCE(
+           t.tx_hash,
+           CASE
+             WHEN t.type = 'emi_repayment' THEN (
+               SELECT pd.tx_hash
+               FROM payroll_disbursements pd
+               JOIN employees e2 ON e2.id = pd.employee_id
+               WHERE e2.wallet_id = t.wallet_id
+                 AND pd.tx_hash IS NOT NULL
+                 AND pd.emi_deducted = t.amount
+                 AND pd.payroll_month = date_trunc('month', t.created_at AT TIME ZONE 'UTC')::date
+               ORDER BY ABS(EXTRACT(EPOCH FROM (pd.created_at - t.created_at))) ASC, pd.created_at DESC
+               LIMIT 1
+             )
+             ELSE NULL
+           END
+         ) AS tx_hash,
          t.token_symbol,
          t.created_at
        FROM transactions t

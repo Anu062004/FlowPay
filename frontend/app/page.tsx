@@ -7,7 +7,6 @@ import {
   loginCompany,
   loginEmployee,
   registerCompany,
-  registerEmployeeWallet,
   type Company,
   type Employee
 } from "./lib/api";
@@ -101,14 +100,14 @@ function roleCopy(role: Role) {
   return {
     eyebrow: "Employee Environment",
     title: "Get in to your employee wallet workspace",
-    subtitle: "Create your own Tether WDK employee wallet with a password, or sign in with your existing employee ID or wallet address plus password.",
-    createTitle: "Create Employee Wallet",
-    createHelp: "Enter your details and FlowPay will create a managed employee wallet protected by your password.",
+    subtitle: "Employees are activated through employer invite links. Finish invite setup first, then sign in with your employee ID or wallet address plus password.",
+    createTitle: "Activate Employee Invite",
+    createHelp: "Employees are added from the employer workspace. Use the invite email to set your password and unlock your wallet.",
     existingTitle: "Use Existing Employee Wallet",
     existingHelp: "Enter your employee ID or wallet address, then confirm with your password.",
-    createButton: "Create Employee Wallet",
+    createButton: "Open Invite Activation",
     existingButton: "Open Employee Portal",
-    note: "Wallet addresses alone no longer unlock employee pages. Activated employees must sign in with a password."
+    note: "Employee onboarding is invite-only. Activated employees sign in with a password after completing the invite flow."
   };
 }
 
@@ -121,9 +120,6 @@ export default function LandingPage() {
   const [companyAccess, setCompanyAccess] = useState("");
   const [companyLoginPin, setCompanyLoginPin] = useState("");
   const [companyLoginEmail, setCompanyLoginEmail] = useState("");
-  const [employeeName, setEmployeeName] = useState("");
-  const [employeeEmail, setEmployeeEmail] = useState("");
-  const [employeePassword, setEmployeePassword] = useState("");
   const [employeeAccess, setEmployeeAccess] = useState("");
   const [employeeLoginPassword, setEmployeeLoginPassword] = useState("");
   const [employeeLoginEmail, setEmployeeLoginEmail] = useState("");
@@ -141,7 +137,7 @@ export default function LandingPage() {
         { label: "Wallet scope", value: "Treasury, lending, investments" },
       ]
     : [
-        { label: "Primary action", value: "Access salary wallet and loans" },
+        { label: "Primary action", value: "Activate invite, then access salary wallet and loans" },
         { label: "Access control", value: "Password required" },
         { label: "Wallet scope", value: "Salary, loan, withdrawal activity" },
       ];
@@ -216,28 +212,6 @@ export default function LandingPage() {
       openCompany(data.company);
     } catch (err: any) {
       setStatus({ type: "error", message: err?.message ?? "Company sign-in failed" });
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const handleCreateEmployee = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setBusyAction("create-employee");
-    setStatus(null);
-    try {
-      const data = await registerEmployeeWallet({
-        fullName: employeeName.trim(),
-        email: employeeEmail.trim() || undefined,
-        password: employeePassword
-      });
-      setStatus({
-        type: "success",
-        message: "Employee wallet created and secured. Opening employee workspace."
-      });
-      openEmployee(data.employee, data.wallet.wallet_address);
-    } catch (err: any) {
-      setStatus({ type: "error", message: err?.message ?? "Failed to create employee wallet" });
     } finally {
       setBusyAction(null);
     }
@@ -403,49 +377,38 @@ export default function LandingPage() {
                   </button>
                 </form>
               ) : (
-                <form className="stack" onSubmit={handleCreateEmployee}>
-                  <div className="form-group">
-                    <label className="form-label">Full Name</label>
-                    <input
-                      className="form-input"
-                      value={employeeName}
-                      onChange={(e) => setEmployeeName(e.target.value)}
-                      placeholder="Jane Doe"
-                      required
-                    />
+                <div className="stack">
+                  <div className="landing-role-note">
+                    <div className="landing-role-note-title">Invite-only onboarding</div>
+                    <div className="landing-role-note-copy">
+                      Employees are created by the employer workspace. FlowPay emails an activation link, and the employee
+                      completes setup by choosing a password from that invite.
+                    </div>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Email (optional)</label>
-                    <input
-                      className="form-input"
-                      type="email"
-                      value={employeeEmail}
-                      onChange={(e) => setEmployeeEmail(e.target.value)}
-                      placeholder="jane@company.com"
-                    />
+                  <div className="stack" style={{ gap: 12 }}>
+                    <div className="landing-flow-item">
+                      <div className="landing-flow-title">1. Receive employer invite</div>
+                      <div className="landing-flow-description">Your employer adds you from the employee roster and FlowPay sends the activation email.</div>
+                    </div>
+                    <div className="landing-flow-item">
+                      <div className="landing-flow-title">2. Set your password</div>
+                      <div className="landing-flow-description">Open the invite link and create the password that gates employee access.</div>
+                    </div>
+                    <div className="landing-flow-item">
+                      <div className="landing-flow-title">3. Return here to sign in</div>
+                      <div className="landing-flow-description">After activation, use your employee ID or wallet address in the existing employee panel.</div>
+                    </div>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Password</label>
-                    <input
-                      className="form-input"
-                      type="password"
-                      value={employeePassword}
-                      onChange={(e) => setEmployeePassword(e.target.value)}
-                      placeholder="Minimum 8 characters"
-                      minLength={8}
-                      required
-                    />
-                  </div>
-                  <button className="btn btn-primary" type="submit" disabled={busyAction !== null}>
-                    {busyAction === "create-employee" ? "Creating..." : copy.createButton}
-                  </button>
-                </form>
+                  <Link className="btn btn-primary" href="/employees/activate">
+                    {copy.createButton}
+                  </Link>
+                </div>
               )}
 
               <div className="landing-auth-footer">
                 {role === "employer"
                   ? "Creates a managed treasury wallet that OpenClaw and FlowPay can operate under policy controls."
-                  : "Creates a managed employee wallet for salary, loans, withdrawals, and repayment activity."}
+                  : "Employee wallets are activated from employer invites, not created directly from the public landing page."}
               </div>
             </div>
           </div>

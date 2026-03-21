@@ -215,12 +215,12 @@ export async function runPayroll(companyId?: string, auditContext: AgentLogConte
           const tokenSymbol = env.TREASURY_TOKEN_SYMBOL ?? "ETH";
           const createdAt = new Date();
           await db.query(
-            "INSERT INTO transactions (wallet_id, type, amount, token_symbol, created_at) VALUES ($1, 'emi_repayment', $2, $3, $4)",
-            [company.treasury_wallet_id, employee.totalEmi.toFixed(6), tokenSymbol, createdAt]
+            "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, created_at) VALUES ($1, 'emi_repayment', $2, $3, $4, $5)",
+            [company.treasury_wallet_id, employee.totalEmi.toFixed(6), payrollTxHash, tokenSymbol, createdAt]
           );
           await db.query(
-            "INSERT INTO transactions (wallet_id, type, amount, token_symbol, created_at) VALUES ($1, 'emi_repayment', $2, $3, $4)",
-            [employee.walletId, employee.totalEmi.toFixed(6), tokenSymbol, createdAt]
+            "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, created_at) VALUES ($1, 'emi_repayment', $2, $3, $4, $5)",
+            [employee.walletId, employee.totalEmi.toFixed(6), payrollTxHash, tokenSymbol, createdAt]
           );
         }
 

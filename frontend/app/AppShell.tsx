@@ -175,6 +175,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [companyCtx, setCompanyCtx] = useState<CompanyContext | null>(null);
   const [employeeCtx, setEmployeeCtx] = useState<EmployeeContext | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarReady, setSidebarReady] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mobileQuery = window.matchMedia("(max-width: 768px)");
+    setSidebarOpen(!mobileQuery.matches);
+    setSidebarReady(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -223,6 +235,33 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [employeeView, pathname]);
+
+  useEffect(() => {
+    if (!sidebarReady || typeof window === "undefined") {
+      return;
+    }
+
+    if (window.matchMedia("(max-width: 768px)").matches) {
+      setSidebarOpen(false);
+    }
+  }, [pathname, sidebarReady]);
+
+  useEffect(() => {
+    if (!sidebarOpen || typeof window === "undefined") {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [sidebarOpen]);
 
   const activeSession = employeeView ? employeeCtx : companyCtx;
   const activeName = employeeView
@@ -274,9 +313,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <SessionRequired employee={employeeView} />;
   }
 
+  const shellClassName = [
+    "app-shell",
+    sidebarReady ? "sidebar-ready" : "",
+    sidebarOpen ? "sidebar-open" : "sidebar-collapsed"
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={shellClassName}>
+      <button
+        type="button"
+        className="sidebar-scrim"
+        aria-label="Close navigation"
+        aria-hidden={!sidebarOpen}
+        tabIndex={sidebarOpen ? 0 : -1}
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      <aside id="workspace-sidebar" className="sidebar">
         <div className="sidebar-logo">
           <div className="sidebar-logo-mark">FP</div>
           <div className="sidebar-logo-text">Flow<span>Pay</span></div>
@@ -333,10 +389,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="main-content">
         <header className="top-header">
-          <div className="header-breadcrumb">
-            <span>{section}</span>
-            <span className="header-breadcrumb-sep">&gt;</span>
-            <span className="header-breadcrumb-current">{page}</span>
+          <div className="header-left">
+            <button
+              className="header-menu-btn"
+              type="button"
+              onClick={() => setSidebarOpen((current) => !current)}
+              aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={sidebarOpen}
+              aria-controls="workspace-sidebar"
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+
+            <div className="header-breadcrumb">
+              <span>{section}</span>
+              <span className="header-breadcrumb-sep">&gt;</span>
+              <span className="header-breadcrumb-current">{page}</span>
+            </div>
           </div>
           <div className="header-actions">
             <div className="search-input-wrap">

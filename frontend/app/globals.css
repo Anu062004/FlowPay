@@ -187,11 +187,29 @@ button, input, select, textarea {
    APP SHELL LAYOUT
    ──────────────────────────────────────────────────────────── */
 .app-shell {
+  position: relative;
   display: flex;
   min-height: 100vh;
 }
 
 /* ── Sidebar ── */
+.sidebar-scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  border: none;
+  background: rgba(15, 23, 42, 0.48);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
+  z-index: 95;
+}
+
+.app-shell.sidebar-ready.sidebar-open .sidebar-scrim {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .sidebar {
   position: fixed;
   top: 0;
@@ -204,6 +222,12 @@ button, input, select, textarea {
   flex-direction: column;
   z-index: 100;
   overflow: hidden;
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+  will-change: transform;
+}
+
+.app-shell.sidebar-collapsed .sidebar {
+  transform: translateX(calc(var(--sidebar-width) * -1));
 }
 
 .sidebar-logo {
@@ -375,9 +399,14 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  transition: margin-left var(--transition-base);
 }
 
 /* ── Top Header ── */
+.app-shell.sidebar-collapsed .main-content {
+  margin-left: 0;
+}
+
 .top-header {
   position: sticky;
   top: 0;
@@ -392,6 +421,14 @@ button, input, select, textarea {
   gap: var(--sp-4);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex: 1;
+  min-width: 0;
+}
+
 .header-breadcrumb {
   display: flex;
   align-items: center;
@@ -399,6 +436,50 @@ button, input, select, textarea {
   font-size: var(--text-sm);
   color: var(--text-tertiary);
   flex: 1;
+  min-width: 0;
+}
+
+.header-menu-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.header-menu-btn:hover {
+  background: var(--gray-100);
+  color: var(--text-primary);
+}
+
+.header-menu-btn span {
+  display: block;
+  width: 16px;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  transition: transform var(--transition-base), opacity var(--transition-fast);
+}
+
+.app-shell.sidebar-open .header-menu-btn span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.app-shell.sidebar-open .header-menu-btn span:nth-child(2) {
+  opacity: 0;
+}
+
+.app-shell.sidebar-open .header-menu-btn span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
 }
 
 .header-breadcrumb-sep { color: var(--gray-300); }
@@ -466,6 +547,8 @@ button, input, select, textarea {
   padding: var(--sp-8);
   max-width: var(--content-max-width);
   width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* ──────────────────────────────────────────────────────────── 
@@ -494,6 +577,11 @@ button, input, select, textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.page-header-row > * {
+  min-width: 0;
 }
 
 /* ──────────────────────────────────────────────────────────── 
@@ -504,6 +592,7 @@ button, input, select, textarea {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
+  min-width: 0;
 }
 
 .card-header {
@@ -548,6 +637,7 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+  min-width: 0;
 }
 
 .metric-card-header {
@@ -618,31 +708,31 @@ button, input, select, textarea {
    ──────────────────────────────────────────────────────────── */
 .grid-4 {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--sp-4);
 }
 
 .grid-3 {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-4);
 }
 
 .grid-2 {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-4);
 }
 
 .grid-2-1 {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: var(--sp-4);
 }
 
 .grid-1-2 {
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: var(--sp-4);
 }
 
@@ -2018,9 +2108,18 @@ button, input, select, textarea {
 }
 
 @media (max-width: 768px) {
-  :root { --sidebar-width: 0px; }
-  .sidebar { transform: translateX(-100%); }
+  .sidebar-scrim { display: block; }
+  .sidebar {
+    width: min(280px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-modal);
+  }
+  .app-shell.sidebar-ready.sidebar-open .sidebar { transform: translateX(0); }
   .main-content { margin-left: 0; }
+  .top-header { padding: 0 var(--sp-4); }
+  .search-input-wrap { display: none; }
+  .header-divider { display: none; }
   .landing-container { padding: 24px 16px 48px; }
   .landing-hero-copy { padding: 24px; }
   .landing-role-panel { padding: 18px; }

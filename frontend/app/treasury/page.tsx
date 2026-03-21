@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import { formatEth } from "../lib/format";
 import { useTreasuryBalance, useTransactions } from "../lib/hooks";
 import { loadCompanyContext, type CompanyContext } from "../lib/companyContext";
+import {
+  getTransactionExplorerUrl,
+  getTransactionHashFallbackLabel
+} from "../lib/transactions";
 
 const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -204,9 +208,19 @@ export default function TreasuryPage() {
                       <td><Badge variant={TX_BADGE[tx.type] ?? "neutral"}>{TX_TYPE_LABELS[tx.type] ?? tx.type}</Badge></td>
                       <td className="data-table-num">{fmt(tx.amount, tx.token_symbol ?? balanceSymbol)}</td>
                       <td>
-                        {tx.tx_hash
-                          ? <span className="font-mono text-xs text-secondary">{tx.tx_hash.slice(0, 12)}…{tx.tx_hash.slice(-6)}</span>
-                          : <span className="text-tertiary text-xs">—</span>}
+                        {tx.tx_hash ? (
+                          <a
+                            href={getTransactionExplorerUrl(tx.tx_hash)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-mono text-xs text-secondary"
+                            title="Open transaction in explorer"
+                          >
+                            {tx.tx_hash.slice(0, 12)}...{tx.tx_hash.slice(-6)}
+                          </a>
+                        ) : (
+                          <span className="text-tertiary text-xs">{getTransactionHashFallbackLabel(tx)}</span>
+                        )}
                       </td>
                     </tr>
                   ))}

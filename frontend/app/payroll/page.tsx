@@ -5,6 +5,7 @@ import { runPayroll, type PayrollRunResult } from "../lib/api";
 import { formatEth } from "../lib/format";
 import { useEmployees, usePayrollHistory } from "../lib/hooks";
 import { loadCompanyContext } from "../lib/companyContext";
+import { getTransactionExplorerUrl } from "../lib/transactions";
 
 const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   <svg
@@ -303,9 +304,15 @@ export default function PayrollPage() {
                     <td className="text-sm">{String(entry.employee_count)}</td>
                     <td>
                       {entry.tx_hash ? (
-                        <span className="font-mono text-xs text-secondary">
+                        <a
+                          href={getTransactionExplorerUrl(entry.tx_hash)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-xs text-secondary"
+                          title="Open transaction in explorer"
+                        >
                           {entry.tx_hash.slice(0, 12)}...
-                        </span>
+                        </a>
                       ) : (
                         <span className="text-tertiary text-xs">--</span>
                       )}

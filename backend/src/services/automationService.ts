@@ -105,7 +105,7 @@ async function runFinanceAutomation(companyId?: string): Promise<Record<string, 
       `SELECT
          COUNT(*) FILTER (WHERE t.created_at >= date_trunc('day', now())) AS tx_count_today,
          COALESCE(SUM(t.amount) FILTER (WHERE t.created_at >= date_trunc('day', now())), 0) AS tx_amount_today,
-         COUNT(*) FILTER (WHERE t.tx_hash IS NULL) AS pending_settlement_count
+         COUNT(*) FILTER (WHERE t.tx_hash IS NULL AND t.type <> 'emi_repayment') AS pending_settlement_count
        FROM transactions t
        JOIN wallets w ON w.id = t.wallet_id
        JOIN companies c ON c.treasury_wallet_id = w.id

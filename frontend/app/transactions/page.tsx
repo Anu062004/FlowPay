@@ -2,6 +2,13 @@
 import { useState } from "react";
 import { formatEth } from "../lib/format";
 import { useTransactions } from "../lib/hooks";
+import {
+  getTransactionExplorerUrl,
+  getTransactionHashFallbackLabel,
+  getTransactionSettlementKind,
+  getTransactionSettlementLabel,
+  getTransactionSettlementVariant
+} from "../lib/transactions";
 
 const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -53,7 +60,8 @@ export default function TransactionsPage() {
   // Summary KPIs
   const totalVolume = txList.reduce((s, t) => s + parseFloat(t.amount), 0);
   const volumeSymbol = txList.find(t => t.token_symbol)?.token_symbol ?? "ETH";
-  const confirmed = txList.filter(t => t.tx_hash).length;
+  const confirmed = txList.filter(t => getTransactionSettlementKind(t) === "confirmed").length;
+  const awaitingHash = txList.filter(t => getTransactionSettlementKind(t) === "pending").length;
 
   return (
     <div className="stack-xl">
@@ -75,7 +83,7 @@ export default function TransactionsPage() {
         {[
           { label: "Total Transactions", value: loading ? "—" : String(data?.total ?? txList.length) },
           { label: "On-chain Confirmed", value: loading ? "—" : String(confirmed) },
-          { label: "Pending / No Hash",  value: loading ? "—" : String(txList.length - confirmed) },
+          { label: "Awaiting Hash",  value: loading ? "—" : String(awaitingHash) },
           { label: `Total Volume (${volumeSymbol})`, value: loading ? "—" : fmt(totalVolume, volumeSymbol) },
         ].map((s, i) => (
           <div key={i} className="metric-card">
@@ -153,13 +161,25 @@ export default function TransactionsPage() {
                       </td>
                       <td className="data-table-num">{fmt(tx.amount, tx.token_symbol ?? "ETH")}</td>
                       <td>
-                        {tx.tx_hash
-                          ? <span className="font-mono text-xs text-secondary">{tx.tx_hash.slice(0, 14)}…{tx.tx_hash.slice(-6)}</span>
-                          : <span className="text-tertiary text-xs">—</span>}
+                        {tx.tx_hash ? (
+                          <a
+                            href={getTransactionExplorerUrl(tx.tx_hash)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-mono text-xs text-secondary"
+                            title="Open transaction in explorer"
+                          >
+                            {tx.tx_hash.slice(0, 14)}...{tx.tx_hash.slice(-6)}
+                          </a>
+                        ) : (
+                          <span className="text-tertiary text-xs">
+                            {getTransactionHashFallbackLabel(tx)}
+                          </span>
+                        )}
                       </td>
                       <td className="right">
-                        <Badge variant={tx.tx_hash ? "success" : "warning"}>
-                          {tx.tx_hash ? "Confirmed" : "Pending"}
+                        <Badge variant={getTransactionSettlementVariant(tx)}>
+                          {getTransactionSettlementLabel(tx)}
                         </Badge>
                       </td>
                     </tr>

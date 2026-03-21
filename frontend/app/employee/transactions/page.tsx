@@ -4,6 +4,11 @@ import type { Transaction } from "../../lib/api";
 import { useMyTransactions } from "../../lib/hooks";
 import { loadEmployeeContext, type EmployeeContext } from "../../lib/companyContext";
 import EmployeeSessionPrompt from "../../components/EmployeeSessionPrompt";
+import {
+  getTransactionExplorerUrl,
+  getTransactionHashFallbackLabel,
+  isLedgerRecordedTransaction
+} from "../../lib/transactions";
 
 const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -154,9 +159,19 @@ export default function EmployeeTransactionsPage() {
                           {isCredit ? "+" : "-"}{fmt(tx.amount)}
                         </td>
                         <td>
-                          {tx.tx_hash
-                            ? <span className="font-mono text-xs text-secondary">{tx.tx_hash.slice(0, 12)}...</span>
-                            : <span className="text-tertiary text-xs">--</span>}
+                          {tx.tx_hash ? (
+                            <a
+                              href={getTransactionExplorerUrl(tx.tx_hash)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-mono text-xs text-secondary"
+                              title="Open transaction in explorer"
+                            >
+                              {tx.tx_hash.slice(0, 12)}...
+                            </a>
+                          ) : (
+                            <span className="text-tertiary text-xs">{getTransactionHashFallbackLabel(tx)}</span>
+                          )}
                         </td>
                         <td>
                           <button className="btn btn-ghost btn-sm" onClick={() => setSelectedTx(tx)}>
@@ -220,11 +235,26 @@ export default function EmployeeTransactionsPage() {
                   <div className="text-sm text-secondary" style={{ marginBottom: 8 }}>Blockchain Tx Hash</div>
                   {selectedTx.tx_hash ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span className="font-mono text-xs text-secondary" style={{ wordBreak: "break-all" }}>{selectedTx.tx_hash}</span>
+                      <a
+                        href={getTransactionExplorerUrl(selectedTx.tx_hash)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-mono text-xs text-secondary"
+                        style={{ wordBreak: "break-all" }}
+                        title="Open transaction in explorer"
+                      >
+                        {selectedTx.tx_hash}
+                      </a>
                       <CopyButton text={selectedTx.tx_hash} />
                     </div>
+                  ) : isLedgerRecordedTransaction(selectedTx) ? (
+                    <span className="text-sm text-tertiary">
+                      This EMI deduction was recorded as part of payroll netting, so there is no separate blockchain hash.
+                    </span>
                   ) : (
-                    <span className="text-sm text-tertiary">No on-chain hash recorded for this entry.</span>
+                    <span className="text-sm text-tertiary">
+                      No on-chain hash has been recorded for this entry yet.
+                    </span>
                   )}
                 </div>
               </div>

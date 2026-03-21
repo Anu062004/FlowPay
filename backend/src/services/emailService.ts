@@ -77,13 +77,20 @@ function buildPlainTextMessage(params: {
 
 async function deliverEmail(input: {
   companyId?: string;
-  type: "employee_invite" | "company_access" | "employee_access" | "company_recovery" | "employee_recovery";
+  type:
+    | "employee_invite"
+    | "company_access"
+    | "employee_access"
+    | "company_recovery"
+    | "employee_recovery"
+    | "payroll_balance_alert";
   recipientEmail: string;
   subject: string;
   text: string;
   payload: Record<string, unknown>;
+  queueViaOpsTask?: boolean;
 }) {
-  if (env.HUMAN_TASKS_PROVIDER === "openclaw" && input.companyId) {
+  if (input.queueViaOpsTask !== false && env.HUMAN_TASKS_PROVIDER === "openclaw" && input.companyId) {
     await createOpsTask({
       companyId: input.companyId,
       type: input.type,
@@ -91,19 +98,19 @@ async function deliverEmail(input: {
       subject: input.subject,
       payload: input.payload
     });
-    return;
+    return true;
   }
 
   if (env.EMAIL_PROVIDER_MODE && env.EMAIL_PROVIDER_MODE !== "live") {
     console.warn("Email skipped: EMAIL_PROVIDER_MODE != live", { email: input.recipientEmail, type: input.type });
-    return;
+    return false;
   }
 
   const sender =
     env.CLAWGENCY_PLATFORM_EMAIL ?? env.GMAIL_SENDER_EMAIL ?? env.EMAIL_FROM;
   if (!sender) {
     console.warn("Email skipped: GMAIL_SENDER_EMAIL or EMAIL_FROM not configured", { email: input.recipientEmail, type: input.type });
-    return;
+    return false;
   }
   const hasCreds =
     (env.GOOGLE_OAUTH_CLIENT_ID ?? env.GMAIL_CLIENT_ID) &&
@@ -111,7 +118,7 @@ async function deliverEmail(input: {
     (readRefreshToken() || env.GMAIL_ACCESS_TOKEN);
   if (!hasCreds) {
     console.warn("Email skipped: Gmail API credentials not configured", { email: input.recipientEmail, type: input.type });
-    return;
+    return false;
   }
 
   const raw = buildPlainTextMessage({
@@ -132,6 +139,8 @@ async function deliverEmail(input: {
       ...(labelId ? { labelIds: [labelId] } : {})
     }
   });
+
+  return true;
 }
 
 async function resolveLabelId(labelName: string) {
@@ -157,7 +166,7 @@ export async function sendEmployeeInvite(input: {
   activationUrl?: string;
 }) {
   const inviteUrl = input.activationUrl ?? `${env.APP_BASE_URL}/employees/activate?token=${input.activationToken}`;
-  await deliverEmail({
+  return deliverEmail({
     companyId: input.companyId,
     type: "employee_invite",
     recipientEmail: input.email,
@@ -185,7 +194,7 @@ export async function sendCompanyRecoveryEmail(input: {
   resetUrl?: string;
 }) {
   const resetUrl = input.resetUrl ?? `${env.APP_BASE_URL}/recover/company?token=${input.resetToken}`;
-  await deliverEmail({
+  return deliverEmail({
     companyId: input.companyId,
     type: "company_recovery",
     recipientEmail: input.email,
@@ -216,7 +225,7 @@ export async function sendEmployeeRecoveryEmail(input: {
   resetUrl?: string;
 }) {
   const resetUrl = input.resetUrl ?? `${env.APP_BASE_URL}/recover/employee?token=${input.resetToken}`;
-  await deliverEmail({
+  return deliverEmail({
     companyId: input.companyId,
     type: "employee_recovery",
     recipientEmail: input.email,
@@ -244,7 +253,7 @@ export async function sendCompanyAccessEmail(input: {
   email: string;
   treasuryAddress?: string | null;
 }) {
-  await deliverEmail({
+  return deliverEmail({
     companyId: input.companyId,
     type: "company_access",
     recipientEmail: input.email,
@@ -271,7 +280,7 @@ export async function sendEmployeeAccessEmail(input: {
   email: string;
   walletAddress?: string | null;
 }) {
-  await deliverEmail({
+  return deliverEmail({
     companyId: input.companyId,
     type: "employee_access",
     recipientEmail: input.email,
@@ -289,5 +298,49 @@ export async function sendEmployeeAccessEmail(input: {
       walletAddress: input.walletAddress ?? null,
       email: input.email
     }
+  });
+}
+
+export async function sendCompanyPayrollBalanceAlert(input: {
+  companyId: string;
+  companyName: string;
+  email: string;
+  nextPayrollAt: string;
+  payrollMonthLabel: string;
+  hoursToPayroll: number;
+  requiredPayrollAmount: number;
+  treasuryBalance: number;
+  shortfall: number;
+  currency: string;
+}) {
+  return deliverEmail({
+    companyId: input.companyId,
+    type: "payroll_balance_alert",
+    recipientEmail: input.email,
+    subject: "FlowPay payroll funding alert",
+    text: [
+      `Payroll is approaching for ${input.companyName}.`,
+      `Payroll month: ${input.payrollMonthLabel}`,
+      `Scheduled payroll time: ${input.nextPayrollAt}`,
+      `Hours until payroll: ${input.hoursToPayroll.toFixed(2)}`,
+      `Required payroll funding: ${input.requiredPayrollAmount.toFixed(6)} ${input.currency}`,
+      `Current treasury balance: ${input.treasuryBalance.toFixed(6)} ${input.currency}`,
+      `Funding shortfall: ${input.shortfall.toFixed(6)} ${input.currency}`,
+      "",
+      "Please fund the treasury before the scheduled payroll run to avoid missed salary disbursements."
+    ].join("\n"),
+    payload: {
+      companyId: input.companyId,
+      companyName: input.companyName,
+      email: input.email,
+      nextPayrollAt: input.nextPayrollAt,
+      payrollMonthLabel: input.payrollMonthLabel,
+      hoursToPayroll: input.hoursToPayroll,
+      requiredPayrollAmount: input.requiredPayrollAmount,
+      treasuryBalance: input.treasuryBalance,
+      shortfall: input.shortfall,
+      currency: input.currency
+    },
+    queueViaOpsTask: false
   });
 }

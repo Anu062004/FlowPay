@@ -24,7 +24,8 @@ export async function runLoanDecisionAgent(input: {
       systemPrompt:
         "You are a senior lending risk agent for FlowPay. Your goal is to assess loan applications fairly while minimizing treasury risk.\n\n" +
         "Rules:\n" +
-        "- Max total loan cannot exceed 2x the monthly salary.\n" +
+        "- The request has already passed FlowPayCore eligibility checks. Do not impose any extra minimum credit-score cutoff.\n" +
+        "- Keep the approved amount at or below the requested amount.\n" +
         "- Monthly EMI must not exceed 30% of the monthly salary.\n" +
         "- Interest rates should range between 3% (low risk) and 12% (high risk).\n" +
         "- High credit scores (>700) qualify for lower interest rates.\n" +

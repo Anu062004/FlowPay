@@ -47,16 +47,6 @@ function buildFallbackLoanDecision(input: {
     };
   }
 
-  if (creditScore < 560) {
-    return {
-      decision: "reject" as const,
-      amount: requestedAmount,
-      interest: 0,
-      duration: 6,
-      rationale: "Fallback policy rejected the request due to insufficient credit quality."
-    };
-  }
-
   const stressedMarket = changePct < -10;
   const interest = interestRate ??
     creditScore >= 760 ? 4.5 :
@@ -91,7 +81,7 @@ function buildFallbackLoanDecision(input: {
     amount: approvedAmount,
     interest,
     duration,
-    rationale: "Fallback policy approved the request using salary, credit score, and repayment-cap rules."
+    rationale: "Fallback policy approved the request using FlowPayCore eligibility, salary, and repayment-cap rules."
   };
 }
 

@@ -1,8 +1,8 @@
 import { env } from "../config/env.js";
 import { db } from "../db/pool.js";
-import { requestPayrollApproval } from "./payrollService.js";
+import { getDuePayrollEmployees, requestPayrollApproval } from "./payrollService.js";
 import { getTreasuryBalance } from "./treasuryService.js";
-import { createOpsTaskIfNotRecent } from "./opsService.js";
+import { createOpsTask, createOpsTaskIfNotRecent, hasRecentOpsTask, updateOpsTaskStatus } from "./opsService.js";
 import { getAdminSupportInsights } from "./adminSupportService.js";
 import { sendAutomationNotification } from "./notificationService.js";
 import { getEthPrice } from "./priceService.js";
@@ -10,6 +10,7 @@ import { startAllTreasuryWatchers } from "./depositWatcher.js";
 import { getTokenTransfers } from "./indexerService.js";
 import { withRpcFailover } from "./rpcService.js";
 import { getCompanySettings } from "./settingsService.js";
+import { sendCompanyPayrollBalanceAlert } from "./emailService.js";
 import { getNextPayrollRun } from "../utils/payrollSchedule.js";
 
 export type AutomationJobName =
@@ -35,6 +36,7 @@ const runStatus = new Map<AutomationJobName, AutomationRunRecord>();
 type CompanyRow = {
   id: string;
   name: string;
+  email: string;
 };
 
 type AutomationRunOptions = {
@@ -63,11 +65,92 @@ function dedupeWindowMinutes(): number {
 
 async function listCompanies(companyId?: string): Promise<CompanyRow[]> {
   if (companyId) {
-    const result = await db.query("SELECT id, name FROM companies WHERE id = $1", [companyId]);
+    const result = await db.query("SELECT id, name, email FROM companies WHERE id = $1", [companyId]);
     return result.rows as CompanyRow[];
   }
-  const result = await db.query("SELECT id, name FROM companies ORDER BY created_at ASC");
+  const result = await db.query("SELECT id, name, email FROM companies ORDER BY created_at ASC");
   return result.rows as CompanyRow[];
+}
+
+async function sendPayrollBalanceAlertIfNeeded(input: {
+  company: CompanyRow;
+  nextPayrollAt: string;
+  payrollMonthLabel: string;
+  hoursToPayroll: number;
+  dueEmployees: number;
+  requiredPayrollAmount: number;
+  treasuryBalance: number;
+  shortfall: number;
+  currency: string;
+}) {
+  const recipientEmail = input.company.email?.trim().toLowerCase();
+  if (!recipientEmail) {
+    return false;
+  }
+
+  const subject = "FlowPay payroll funding alert";
+  const payload = {
+    companyId: input.company.id,
+    companyName: input.company.name,
+    nextPayrollAt: input.nextPayrollAt,
+    payrollMonthLabel: input.payrollMonthLabel,
+    hoursToPayroll: parseFloat(input.hoursToPayroll.toFixed(2)),
+    dueEmployees: input.dueEmployees,
+    requiredPayrollAmount: parseFloat(input.requiredPayrollAmount.toFixed(6)),
+    treasuryBalance: parseFloat(input.treasuryBalance.toFixed(6)),
+    shortfall: parseFloat(input.shortfall.toFixed(6)),
+    currency: input.currency
+  };
+
+  const dedupeWindowMinutes = 8 * 60;
+  const alreadySent = await hasRecentOpsTask({
+    companyId: input.company.id,
+    type: "payroll_balance_alert",
+    recipientEmail,
+    subject,
+    payload,
+    windowMinutes: dedupeWindowMinutes
+  });
+
+  if (alreadySent) {
+    return false;
+  }
+
+  const delivered = await sendCompanyPayrollBalanceAlert({
+    companyId: input.company.id,
+    companyName: input.company.name,
+    email: recipientEmail,
+    nextPayrollAt: input.nextPayrollAt,
+    payrollMonthLabel: input.payrollMonthLabel,
+    hoursToPayroll: input.hoursToPayroll,
+    requiredPayrollAmount: input.requiredPayrollAmount,
+    treasuryBalance: input.treasuryBalance,
+    shortfall: input.shortfall,
+    currency: input.currency
+  });
+
+  if (delivered) {
+    const { task } = await createOpsTask({
+      companyId: input.company.id,
+      type: "payroll_balance_alert",
+      recipientEmail,
+      subject,
+      payload
+    });
+    await updateOpsTaskStatus(task.id, "completed");
+    return true;
+  }
+
+  const queued = await createOpsTaskIfNotRecent({
+    companyId: input.company.id,
+    type: "payroll_balance_alert",
+    recipientEmail,
+    subject,
+    payload,
+    dedupeWindowMinutes
+  });
+
+  return queued.created;
 }
 
 async function runFinanceAutomation(companyId?: string): Promise<Record<string, unknown>> {
@@ -166,6 +249,16 @@ async function runFinanceAutomation(companyId?: string): Promise<Record<string, 
     }
 
     if (hoursToPayroll !== null && hoursToPayroll <= payrollLookahead) {
+      const dueEmployees = nextPayroll
+        ? await getDuePayrollEmployees(company.id, nextPayroll.payrollMonthKey)
+        : [];
+      const duePayrollAmount = dueEmployees.reduce(
+        (sum, employee) => sum + parseFloat(employee.salary),
+        0
+      );
+      const treasuryBalance = treasury ? toNumber((treasury as any).balance) : 0;
+      const shortfall = Math.max(duePayrollAmount - treasuryBalance, 0);
+
       const payrollPrepResult = await createOpsTaskIfNotRecent({
         companyId: company.id,
         type: "payroll_prep",
@@ -184,6 +277,23 @@ async function runFinanceAutomation(companyId?: string): Promise<Record<string, 
       });
       if (payrollPrepResult.created) {
         createdTasks.payroll_prep = (createdTasks.payroll_prep ?? 0) + 1;
+      }
+
+      if (duePayrollAmount > 0 && shortfall > 0 && nextPayroll) {
+        const alertCreated = await sendPayrollBalanceAlertIfNeeded({
+          company,
+          nextPayrollAt: nextPayroll.runAt.toISOString(),
+          payrollMonthLabel: nextPayroll.payrollMonthLabel,
+          hoursToPayroll,
+          dueEmployees: dueEmployees.length,
+          requiredPayrollAmount: duePayrollAmount,
+          treasuryBalance,
+          shortfall,
+          currency: env.TREASURY_TOKEN_SYMBOL ?? "ETH"
+        });
+        if (alertCreated) {
+          createdTasks.payroll_balance_alert = (createdTasks.payroll_balance_alert ?? 0) + 1;
+        }
       }
     }
 

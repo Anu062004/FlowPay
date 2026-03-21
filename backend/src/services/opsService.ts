@@ -10,6 +10,7 @@ export type OpsTaskType =
   | "employee_recovery"
   | "payroll_approval"
   | "payroll_prep"
+  | "payroll_balance_alert"
   | "loan_approval"
   | "treasury_topup"
   | "finance_snapshot"
@@ -135,6 +136,34 @@ export async function createOpsTaskIfNotRecent(input: {
   });
 
   return { ...created, created: true };
+}
+
+export async function hasRecentOpsTask(input: {
+  companyId: string;
+  type: OpsTaskType;
+  payload: Record<string, unknown>;
+  recipientEmail?: string | null;
+  subject?: string | null;
+  windowMinutes?: number;
+}) {
+  const recipient = input.recipientEmail ?? getDefaultAdminEmail();
+  const subject = input.subject ?? null;
+  const windowMinutes = Math.max(1, input.windowMinutes ?? 60);
+
+  const duplicate = await db.query(
+    `SELECT 1
+     FROM ops_tasks
+     WHERE company_id = $1
+       AND type = $2
+       AND COALESCE(recipient_email, '') = COALESCE($3, '')
+       AND COALESCE(subject, '') = COALESCE($4, '')
+       AND payload = $5::jsonb
+       AND created_at >= now() - ($6::text || ' minutes')::interval
+     LIMIT 1`,
+    [input.companyId, input.type, recipient, subject, input.payload, String(windowMinutes)]
+  );
+
+  return (duplicate.rowCount ?? 0) > 0;
 }
 
 export async function listOpsTasks(filters: { status?: string; companyId?: string; type?: string }) {

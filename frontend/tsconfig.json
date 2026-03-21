@@ -21,6 +21,9 @@
         "name": "next"
       }
     ],
+    "paths": {
+      "@/*": ["./*"]
+    },
     "incremental": true
   },
   "include": [

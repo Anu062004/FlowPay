@@ -1,13 +1,17 @@
-/* ============================================================
-   FlowPay Design System — globals.css
-   Enterprise-grade fintech design tokens & utilities
-   ============================================================ */
-
+@import '@fontsource/sora/400.css';
+@import '@fontsource/sora/500.css';
+@import '@fontsource/sora/600.css';
+@import '@fontsource/sora/700.css';
+@import '@fontsource/sora/800.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* ──────────────────────────────────────────────────────────── 
-   DESIGN TOKENS
-   ──────────────────────────────────────────────────────────── */
 :root {
   /* Primary Palette */
   --color-navy-950: #050d1f;
@@ -2029,4 +2033,209 @@ button, input, select, textarea {
   .admin-side-stats { grid-template-columns: 1fr; }
   .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; }
   .page-body { padding: var(--sp-4); }
+}
+
+/* Animated Landing Page Additions */
+
+
+@layer base {
+  :root {
+    /* FlowPay Color System */
+    --bg-primary: 222 48% 4%;
+    --bg-secondary: 222 38% 9%;
+    --accent: 227 100% 65%;
+    --accent-light: 227 100% 75%;
+    --accent-dark: 227 100% 55%;
+    --text-primary: 230 60% 97%;
+    --text-secondary: 222 20% 72%;
+    
+    /* shadcn overrides */
+    --background: 222 48% 4%;
+    --foreground: 230 60% 97%;
+    --card: 222 38% 9%;
+    --card-foreground: 230 60% 97%;
+    --popover: 222 38% 9%;
+    --popover-foreground: 230 60% 97%;
+    --primary: 227 100% 65%;
+    --primary-foreground: 222 48% 4%;
+    --secondary: 222 30% 15%;
+    --secondary-foreground: 230 60% 97%;
+    --muted: 222 25% 18%;
+    --muted-foreground: 222 20% 72%;
+    --accent: 227 100% 65%;
+    --accent-foreground: 222 48% 4%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 227 50% 25%;
+    --input: 222 30% 15%;
+    --ring: 227 100% 65%;
+    --radius: 0.875rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-[#070A12] text-[#F4F6FF] antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+  }
+  
+  .font-display {
+    font-family: 'Sora', sans-serif;
+  }
+  
+  .font-mono {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+}
+
+@layer components {
+  .accent-gradient-text {
+    @apply bg-gradient-to-r from-[#4B6CFF] via-[#6B8AFF] to-[#4B6CFF] bg-clip-text text-transparent;
+  }
+  
+  .accent-border {
+    @apply border border-[#4B6CFF]/50;
+  }
+  
+  .accent-glow {
+    box-shadow: 0 0 28px rgba(75, 108, 255, 0.55);
+  }
+  
+  .flow-line {
+    stroke: #4B6CFF;
+    stroke-width: 2;
+    fill: none;
+    filter: drop-shadow(0 0 8px rgba(75, 108, 255, 0.6));
+  }
+  
+  .dark-gradient {
+    background: linear-gradient(180deg, #070A12 0%, #0E1322 100%);
+  }
+  
+  .image-card {
+    @apply rounded-[28px] overflow-hidden;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+  }
+  
+  .grain-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.08;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+  
+  .vignette-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    background: radial-gradient(ellipse at center, transparent 0%, transparent 50%, rgba(7, 10, 18, 0.4) 100%);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+  
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+  
+  .animation-delay-600 {
+    animation-delay: 600ms;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #070A12;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1A2342;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2A3362;
+}
+
+/* Pulse Animation for Hotspots */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Floating Animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* FlowLine Pulse */
+@keyframes flow-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-flow-pulse {
+  animation: flow-pulse 2s ease-in-out infinite;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

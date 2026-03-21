@@ -7,6 +7,8 @@ node_modules
 .secrets/
 flowpay-deploy.tgz
 flowpay-backend-deploy-*
+backend-*-deploy-*.tgz
+backend-*.tgz
 tmp_openclaw_*.py
 openclaw-*.pem
 openclaw-ec2-connect

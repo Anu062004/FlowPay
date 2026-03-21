@@ -3,11 +3,13 @@ import { env } from "../../config/env.js";
 export async function anthropicGenerateText({
   system,
   user,
-  temperature
+  temperature,
+  maxOutputTokens
 }: {
   system: string;
   user: string;
   temperature?: number;
+  maxOutputTokens?: number;
 }): Promise<string> {
   if (!env.ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic");
@@ -22,7 +24,7 @@ export async function anthropicGenerateText({
     },
     body: JSON.stringify({
       model: env.ANTHROPIC_MODEL,
-      max_tokens: 512,
+      max_tokens: maxOutputTokens ?? 512,
       temperature,
       system,
       messages: [{ role: "user", content: user }]

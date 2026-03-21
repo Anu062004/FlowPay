@@ -54,32 +54,89 @@ export type InvestmentAgentInput = {
   strategy_candidates: InvestmentStrategyCandidate[];
 };
 
+type CompactInvestmentPrompt = {
+  investable_eth: number;
+  payroll_due_eth: number;
+  payroll_cover_ratio: number;
+  eth_24h_change_pct: number;
+  aave_position_eth: number;
+  aave_yield_eth: number;
+  aave_exposure_pct: number;
+  aave_exposure_cap_pct: number;
+  risk_tolerance: InvestmentAgentInput["risk_tolerance"];
+  open_positions: boolean;
+  strategies: Array<{
+    id: InvestmentStrategyId;
+    asset: string;
+    protocol: InvestmentStrategyProtocol;
+    available: boolean;
+    max_pct: number;
+    return_score: number;
+    risk_score: number;
+    liquidity_score: number;
+    payroll_safety_score: number;
+    note?: string;
+  }>;
+};
+
+function compactNumber(value: number) {
+  return Number.isFinite(value) ? parseFloat(value.toFixed(4)) : 0;
+}
+
+function buildInvestmentPrompt(input: InvestmentAgentInput): CompactInvestmentPrompt {
+  return {
+    investable_eth: compactNumber(input.investment_pool),
+    payroll_due_eth: compactNumber(input.monthly_payroll),
+    payroll_cover_ratio: compactNumber(input.payroll_coverage_ratio),
+    eth_24h_change_pct: compactNumber(input.price_change_pct),
+    aave_position_eth: compactNumber(input.atoken_balance),
+    aave_yield_eth: compactNumber(input.yield_earned),
+    aave_exposure_pct: compactNumber(input.current_aave_exposure_pct),
+    aave_exposure_cap_pct: compactNumber(input.max_aave_exposure_pct),
+    risk_tolerance: input.risk_tolerance,
+    open_positions: input.open_positions > 0,
+    strategies: input.strategy_candidates.map((candidate) => ({
+      id: candidate.id,
+      asset: candidate.asset_symbol,
+      protocol: candidate.protocol,
+      available: candidate.available,
+      max_pct: compactNumber(candidate.max_allocation_pct),
+      return_score: compactNumber(candidate.expected_return_score),
+      risk_score: compactNumber(candidate.risk_score),
+      liquidity_score: compactNumber(candidate.liquidity_score),
+      payroll_safety_score: compactNumber(candidate.payroll_safety_score),
+      note:
+        !candidate.available || candidate.notes.toLowerCase().includes("unavailable")
+          ? candidate.notes
+          : undefined
+    }))
+  };
+}
+
 export async function runInvestmentAgent(input: InvestmentAgentInput) {
+  const promptInput = buildInvestmentPrompt(input);
   return runOpenClawTask<InvestmentDecision>(
     {
       name: "investment_decision",
       systemPrompt:
-        "You are FlowPay's risk-adjusted treasury investment strategist. " +
-        "Choose exactly one approved strategy candidate for the investment pool.\n\n" +
-        "Rules:\n" +
-        "- Optimize for risk-adjusted return, not raw upside.\n" +
-        "- Preserve payroll safety before seeking yield.\n" +
-        "- Only choose from the supplied strategy_candidates list.\n" +
-        "- Never select a candidate where available=false.\n" +
-        "- Use 'invest' only for a yield strategy like aave_weth_supply.\n" +
-        "- Use 'withdraw' only when de-risking back to treasury is safer than staying invested.\n" +
-        "- When choosing 'invest', allocation_pct must be <= the selected candidate's max_allocation_pct.\n" +
-        "- When candidates are close, choose the safer and more liquid option.\n" +
-        "- Consider payroll_coverage_ratio, current_aave_exposure_pct, price_change_pct, yield_earned, and risk_tolerance.\n" +
-        "- Ensure rationale explains why the chosen strategy offers the best expected return for the least acceptable risk.\n\n" +
-        "Respond ONLY with a JSON object.",
-      userPrompt: (payload) => 
-        `Investment context: ${JSON.stringify(payload)}.\n\n` +
-        "Provide your decision in JSON format: " +
-        "{\"action\":\"invest\"|\"hold\"|\"withdraw\",\"strategy_id\":\"hold_treasury_eth\"|\"aave_weth_supply\"|\"de_risk_to_treasury\",\"target_asset\":\"string\",\"target_protocol\":\"treasury\"|\"aave\",\"allocation_pct\":number,\"confidence\":number,\"risk_level\":\"low\"|\"medium\"|\"high\",\"rationale\":\"string\"}",
+        "You are FlowPay's treasury strategy selector. Pick exactly one approved strategy.\n" +
+        "Optimize for risk-adjusted return while protecting payroll liquidity.\n" +
+        "Only use strategies where available=true.\n" +
+        "Prefer the safer, more liquid option when scores are close.\n" +
+        "Use invest only for aave_weth_supply.\n" +
+        "Use withdraw only for de_risk_to_treasury.\n" +
+        "allocation_pct must be 0 for hold, 1 for full de-risk, or <= selected max_pct for invest.\n" +
+        "Keep rationale to one short sentence.\n" +
+        "Return JSON only.",
+      userPrompt: (payload) =>
+        `State=${JSON.stringify(payload)}\n` +
+        "Return exactly this JSON shape: " +
+        "{\"action\":\"invest\"|\"hold\"|\"withdraw\",\"strategy_id\":\"hold_treasury_eth\"|\"aave_weth_supply\"|\"de_risk_to_treasury\",\"target_asset\":\"ETH\"|\"WETH\",\"target_protocol\":\"treasury\"|\"aave\",\"allocation_pct\":number,\"confidence\":number,\"risk_level\":\"low\"|\"medium\"|\"high\",\"rationale\":\"<=18 words\"}",
       schema: investmentSchema,
-      temperature: 0.3
+      temperature: 0.1,
+      maxRetries: 0,
+      maxOutputTokens: 140
     },
-    input
+    promptInput
   );
 }

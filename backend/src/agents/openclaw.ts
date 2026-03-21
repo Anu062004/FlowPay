@@ -8,6 +8,7 @@ export type OpenClawTask<T> = {
   schema: z.ZodSchema<T>;
   temperature?: number;
   maxRetries?: number;
+  maxOutputTokens?: number;
 };
 
 const llm = createLlmClient();
@@ -60,7 +61,8 @@ export async function runOpenClawTask<T>(task: OpenClawTask<T>, input: unknown):
       const responseText = await llm.generateText({
         system: task.systemPrompt,
         user: task.userPrompt(input),
-        temperature: task.temperature ?? 0.2
+        temperature: task.temperature ?? 0.2,
+        maxOutputTokens: task.maxOutputTokens
       });
 
       const parsed = extractJson(responseText);

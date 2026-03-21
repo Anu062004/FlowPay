@@ -7,6 +7,7 @@ export type LlmGenerateInput = {
   system: string;
   user: string;
   temperature?: number;
+  maxOutputTokens?: number;
 };
 
 export type LlmClient = {

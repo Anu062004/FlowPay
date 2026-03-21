@@ -42,11 +42,13 @@ function extractGeminiText(data: any): string {
 export async function geminiGenerateText({
   system,
   user,
-  temperature
+  temperature,
+  maxOutputTokens
 }: {
   system: string;
   user: string;
   temperature?: number;
+  maxOutputTokens?: number;
 }): Promise<string> {
   if (!env.GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY is required when LLM_PROVIDER=gemini");
@@ -61,7 +63,8 @@ export async function geminiGenerateText({
       }
     ],
     generationConfig: {
-      temperature
+      temperature,
+      maxOutputTokens
     }
   };
 

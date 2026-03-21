@@ -3,11 +3,13 @@ import { env } from "../../config/env.js";
 export async function openaiGenerateText({
   system,
   user,
-  temperature
+  temperature,
+  maxOutputTokens
 }: {
   system: string;
   user: string;
   temperature?: number;
+  maxOutputTokens?: number;
 }): Promise<string> {
   if (!env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is required when LLM_PROVIDER=openai");
@@ -23,7 +25,8 @@ export async function openaiGenerateText({
       model: env.OPENAI_MODEL,
       instructions: system,
       input: user,
-      temperature
+      temperature,
+      max_output_tokens: maxOutputTokens
     })
   });
 

@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import TransactionHashCell from "../components/TransactionHashCell";
 import { formatEth } from "../lib/format";
 import { useTreasuryBalance, useTransactions } from "../lib/hooks";
+import { withdrawTreasuryFunds } from "../lib/api";
 import { loadCompanyContext, type CompanyContext } from "../lib/companyContext";
 import {
   getTransactionHashFallbackLabel
@@ -40,23 +41,34 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function isEvmAddress(value: string) {
+  return /^0x[a-fA-F0-9]{40}$/.test(value.trim());
+}
+
 const TX_TYPE_LABELS: Record<string, string> = {
   deposit: "Deposit",
   payroll: "Payroll Disbursement",
   loan_disbursement: "Loan Disbursement",
   emi_repayment: "EMI Repayment",
+  withdrawal: "Treasury Withdrawal",
   investment: "Investment",
   treasury_allocation: "Treasury Allocation",
 };
 const TX_BADGE: Record<string, string> = {
   deposit: "success", payroll: "primary", loan_disbursement: "warning",
-  emi_repayment: "info", investment: "accent", treasury_allocation: "neutral",
+  emi_repayment: "info", withdrawal: "danger", investment: "accent", treasury_allocation: "neutral",
 };
 
 export default function TreasuryPage() {
   const treasury = useTreasuryBalance();
   const txData = useTransactions(20);
   const [showDeposit, setShowDeposit] = useState(false);
+  const [step, setStep] = useState<"idle" | "enter" | "confirm">("idle");
+  const [dest, setDest] = useState("");
+  const [amount, setAmount] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [ctx, setCtx] = useState<CompanyContext | null>(null);
@@ -67,6 +79,19 @@ export default function TreasuryPage() {
   const walletAddress = ctx?.treasuryAddress ?? treasury.data?.wallet_address ?? null;
   const balance = parseFloat(treasury.data?.balance ?? "0");
   const balanceSymbol = treasury.data?.token_symbol ?? "ETH";
+  const maxWithdrawable = parseFloat(treasury.data?.max_withdrawable ?? "0");
+  const trimmedDest = dest.trim();
+  const numericAmount = parseFloat(amount);
+  const canContinue = useMemo(() => {
+    return (
+      Boolean(ctx?.id) &&
+      Boolean(walletAddress) &&
+      isEvmAddress(trimmedDest) &&
+      Number.isFinite(numericAmount) &&
+      numericAmount > 0 &&
+      numericAmount <= maxWithdrawable
+    );
+  }, [ctx?.id, walletAddress, trimmedDest, numericAmount, maxWithdrawable]);
 
   const allTx = txData.data?.transactions ?? [];
   const filteredTx = allTx.filter(tx => {
@@ -77,8 +102,66 @@ export default function TreasuryPage() {
     return matchType && matchSearch;
   });
 
+  async function handleContinue() {
+    if (!isEvmAddress(trimmedDest)) {
+      setActionError("Enter a valid Sepolia/EVM wallet address.");
+      return;
+    }
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setActionError("Enter a valid withdrawal amount.");
+      return;
+    }
+    if (numericAmount > maxWithdrawable) {
+      setActionError(`Amount exceeds the max withdrawable treasury balance of ${fmt(maxWithdrawable, balanceSymbol)}.`);
+      return;
+    }
+    setActionError(null);
+    setStep("confirm");
+  }
+
+  async function handleConfirmWithdrawal() {
+    if (!ctx?.id) {
+      return;
+    }
+
+    setSubmitting(true);
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const result = await withdrawTreasuryFunds({
+        companyId: ctx.id,
+        destinationAddress: trimmedDest,
+        amount: numericAmount
+      });
+      setActionMessage(
+        `Treasury withdrawal submitted. Sent ${fmt(result.amount, result.token_symbol ?? balanceSymbol)} to ${result.to.slice(0, 10)}...${result.to.slice(-6)}${result.txHash ? ` (tx ${result.txHash.slice(0, 12)}...).` : "."}`
+      );
+      setDest("");
+      setAmount("");
+      setStep("idle");
+      await Promise.all([treasury.refetch(), txData.refetch()]);
+    } catch (err: any) {
+      setActionError(err?.message ?? "Failed to withdraw treasury funds.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="stack-xl">
+      {actionMessage ? (
+        <div className="alert alert-success">
+          <span className="alert-icon"><Icon d="M5 13l4 4L19 7" size={16} /></span>
+          <span>{actionMessage}</span>
+        </div>
+      ) : null}
+      {actionError ? (
+        <div className="alert alert-danger">
+          <span className="alert-icon"><Icon d="M6 18L18 6M6 6l12 12" size={16} /></span>
+          <span>{actionError}</span>
+        </div>
+      ) : null}
+
       <div className="page-header-row">
         <div className="page-header">
           <h1 className="page-title">Treasury</h1>
@@ -104,6 +187,17 @@ export default function TreasuryPage() {
           <button className="btn btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }}
             onClick={() => setShowDeposit(true)}>
             Deposit
+          </button>
+          <button
+            className="btn btn-accent"
+            style={{ fontSize: 12, padding: "6px 14px" }}
+            onClick={() => {
+              setActionError(null);
+              setStep("enter");
+            }}
+            disabled={treasury.loading || !ctx?.id || !walletAddress || maxWithdrawable <= 0}
+          >
+            Withdraw
           </button>
           <button className="btn btn-ghost" style={{ color: "rgba(255,255,255,0.55)", fontSize: 12,
             padding: "6px 14px", borderColor: "rgba(255,255,255,0.12)" }}
@@ -144,6 +238,13 @@ export default function TreasuryPage() {
     : `Only send ${balanceSymbol} or native ETH to this address. Sending other assets may result in permanent loss of funds.`}
 </span>
             </div>
+            <div className="alert alert-warning mt-4" style={{ marginTop: 16 }}>
+              <span className="alert-icon"><Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} /></span>
+              <span>
+                Max withdrawable right now: {fmt(maxWithdrawable, balanceSymbol)}.
+                {balanceSymbol === "ETH" ? " A small amount stays reserved for network gas." : ""}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -169,6 +270,7 @@ export default function TreasuryPage() {
               <option value="investment">Investment</option>
               <option value="loan_disbursement">Loan Disbursement</option>
               <option value="emi_repayment">EMI Repayment</option>
+              <option value="withdrawal">Withdrawal</option>
             </select>
           </div>
         </div>
@@ -229,6 +331,98 @@ export default function TreasuryPage() {
           </>
         )}
       </div>
+
+      {step === "enter" && (
+        <div className="modal-backdrop" onClick={() => setStep("idle")}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">Withdraw Treasury Funds</div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setStep("idle")} disabled={submitting}>
+                <Icon d="M6 18L18 6M6 6l12 12" size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="stack">
+                <div className="form-group">
+                  <label className="form-label">Destination Wallet Address</label>
+                  <input
+                    className="form-input font-mono"
+                    placeholder="0x..."
+                    value={dest}
+                    onChange={e => setDest(e.target.value)}
+                  />
+                  <span className="form-hint">Must be a valid Ethereum-compatible recipient address.</span>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Amount ({balanceSymbol})</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    step="0.000001"
+                    placeholder="0.005000"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                  />
+                  <span className="form-hint">
+                    Available to send: {fmt(maxWithdrawable, balanceSymbol)}.
+                    {balanceSymbol === "ETH" ? " A small amount stays reserved for network gas." : ""}
+                  </span>
+                </div>
+                <div className="alert alert-warning">
+                  <span className="alert-icon"><Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} /></span>
+                  <span>Treasury withdrawals are irreversible. Always double-check the destination address.</span>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setStep("idle")} disabled={submitting}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleContinue} disabled={!ctx?.id || !walletAddress || submitting}>
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step === "confirm" && (
+        <div className="modal-backdrop" onClick={() => !submitting && setStep("idle")}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">Confirm Treasury Withdrawal</div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setStep("idle")} disabled={submitting}>
+                <Icon d="M6 18L18 6M6 6l12 12" size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="stack">
+                {[
+                  ["Amount", fmt(numericAmount, balanceSymbol)],
+                  ["Treasury Balance", fmt(balance, balanceSymbol)],
+                  ["Max Withdrawable", fmt(maxWithdrawable, balanceSymbol)],
+                  ["To", `${trimmedDest.slice(0, 12)}...${trimmedDest.slice(-8)}`],
+                ].map(([k, v], i) => (
+                  <div key={i} className="row-between" style={{
+                    padding: "10px 0", borderBottom: i < 3 ? "1px solid var(--border-subtle)" : "none"
+                  }}>
+                    <span className="text-sm text-secondary">{k}</span>
+                    <span className="fw-semi font-mono text-sm">{v}</span>
+                  </div>
+                ))}
+                <div className="alert alert-warning">
+                  <span className="alert-icon"><Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} /></span>
+                  <span>Network gas is paid separately from the treasury balance. If the balance changes, the transfer may fail.</span>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setStep("enter")} disabled={submitting}>Back</button>
+              <button className="btn btn-danger" onClick={handleConfirmWithdrawal} disabled={!canContinue || submitting}>
+                {submitting ? "Submitting..." : "Confirm Withdrawal"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Deposit modal */}
       {showDeposit && walletAddress && (

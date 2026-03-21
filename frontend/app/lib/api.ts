@@ -179,6 +179,8 @@ export type Transaction = {
 
 export type TreasuryBalance = {
   balance: string;          // from walletService
+  max_withdrawable?: string;
+  chain?: string;
   wallet_address?: string;
   token_symbol?: string;
 };
@@ -320,6 +322,16 @@ export const fetchTreasuryBalance = (companyId: string) =>
 
 export const fetchTreasuryAllocation = (companyId: string) =>
   apiFetch<TreasuryAllocationSnapshot>(`/treasury/allocation?companyId=${companyId}`);
+
+export const withdrawTreasuryFunds = (body: {
+  companyId: string;
+  destinationAddress: string;
+  amount: number;
+}) =>
+  apiFetch<WithdrawalResult>("/treasury/withdraw", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 
 // ── Employees ────────────────────────────────────────────────
 

@@ -1,11 +1,12 @@
 import { randomUUID } from "crypto";
+import { ethers } from "ethers";
 import { formatEther } from "ethers";
 import { db } from "../db/pool.js";
 import { env } from "../config/env.js";
 import { ApiError } from "../utils/errors.js";
-import { getWalletBalance, sendTransaction } from "./walletService.js";
+import { getWalletBalance, nativeTransferMaxFee, sendTransaction } from "./walletService.js";
 import { allocateCore } from "./contractService.js";
-import { formatTokenAmount } from "../utils/amounts.js";
+import { formatAmount, formatTokenAmount, parseAmount } from "../utils/amounts.js";
 import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
 import { evaluateAgentPolicy } from "./agentPolicyService.js";
 
@@ -23,6 +24,33 @@ const ACTIVE_TREASURY_PCT =
 
 function toFixedAmount(value: number) {
   return value.toFixed(6);
+}
+
+async function getTreasuryWalletRow(companyId: string) {
+  const result = await db.query(
+    `SELECT
+       c.id,
+       c.name,
+       c.treasury_wallet_id,
+       w.wallet_address,
+       w.chain
+     FROM companies c
+     JOIN wallets w ON c.treasury_wallet_id = w.id
+     WHERE c.id = $1`,
+    [companyId]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new ApiError(404, "Company treasury wallet not found");
+  }
+
+  return result.rows[0] as {
+    id: string;
+    name: string;
+    treasury_wallet_id: string;
+    wallet_address: string;
+    chain: string;
+  };
 }
 
 export async function getLatestTreasuryAllocation(companyId: string) {
@@ -62,19 +90,66 @@ export async function getLatestTreasuryAllocation(companyId: string) {
 }
 
 export async function getTreasuryBalance(companyId: string) {
-  const result = await db.query(
-    "SELECT w.id as wallet_id FROM companies c JOIN wallets w ON c.treasury_wallet_id = w.id WHERE c.id = $1",
-    [companyId]
-  );
-  if (result.rowCount === 0) {
-    throw new ApiError(404, "Company treasury wallet not found");
-  }
-  const balance = await getWalletBalance(result.rows[0].wallet_id);
+  const wallet = await getTreasuryWalletRow(companyId);
+  const balance = await getWalletBalance(wallet.treasury_wallet_id);
   return {
     ...balance,
     balance: balance.balanceEth,
     wallet_address: balance.walletAddress,
     token_symbol: balance.tokenSymbol
+  };
+}
+
+export async function getTreasuryWalletDetails(companyId: string) {
+  const wallet = await getTreasuryWalletRow(companyId);
+  const balance = await getWalletBalance(wallet.treasury_wallet_id);
+  const balanceWei = BigInt(balance.balanceWei);
+  const maxWithdrawableWei =
+    balance.tokenSymbol === "ETH" && balanceWei > nativeTransferMaxFee
+      ? balanceWei - nativeTransferMaxFee
+      : 0n;
+
+  return {
+    wallet_address: balance.walletAddress,
+    balance: balance.balanceEth,
+    token_symbol: balance.tokenSymbol,
+    chain: wallet.chain,
+    max_withdrawable: balance.tokenSymbol === "ETH" ? formatAmount(maxWithdrawableWei) : balance.balanceEth
+  };
+}
+
+export async function withdrawTreasuryFunds(
+  companyId: string,
+  destinationAddress: string,
+  amountEth: number
+) {
+  const wallet = await getTreasuryWalletRow(companyId);
+
+  if (!ethers.isAddress(destinationAddress)) {
+    throw new ApiError(400, "Destination wallet address is invalid");
+  }
+  if (destinationAddress.toLowerCase() === wallet.wallet_address.toLowerCase()) {
+    throw new ApiError(400, "Destination address must be different from the treasury wallet");
+  }
+
+  const amountWei = parseAmount(amountEth);
+  if (amountWei <= 0n) {
+    throw new ApiError(400, "Withdrawal amount must be greater than zero");
+  }
+
+  const transfer = await sendTransaction(
+    wallet.treasury_wallet_id,
+    destinationAddress,
+    amountEth,
+    "withdrawal"
+  );
+
+  return {
+    txHash: transfer.txHash ?? null,
+    amount: amountEth.toString(),
+    from: transfer.from,
+    to: transfer.to,
+    token_symbol: env.TREASURY_TOKEN_SYMBOL ?? "ETH"
   };
 }
 

@@ -5,6 +5,7 @@ import { db } from "../db/pool.js";
 import { env } from "../config/env.js";
 import { ApiError } from "../utils/errors.js";
 import { sendCompanyRecoveryEmail, sendEmployeeRecoveryEmail } from "./emailService.js";
+import { getEmployeeCreditScoreOnCore } from "./contractService.js";
 
 const COMPANY_SESSION_COOKIE = "flowpay_company_session";
 const EMPLOYEE_SESSION_COOKIE = "flowpay_employee_session";
@@ -62,6 +63,27 @@ function sanitizeCompany(company: ResolvedCompany): CompanyProfile {
 function sanitizeEmployee(employee: ResolvedEmployee): EmployeeProfile {
   const { password_hash: _passwordHash, ...publicEmployee } = employee;
   return publicEmployee;
+}
+
+async function hydrateEmployeeCreditScore<T extends { id: string; wallet_address: string | null; credit_score: number }>(
+  employee: T
+): Promise<T> {
+  if (!employee.wallet_address) {
+    return employee;
+  }
+
+  try {
+    const creditScore = await getEmployeeCreditScoreOnCore(employee.wallet_address);
+    if (creditScore !== employee.credit_score) {
+      await db.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [creditScore, employee.id]);
+    }
+    return {
+      ...employee,
+      credit_score: creditScore
+    } as T;
+  } catch {
+    return employee;
+  }
 }
 
 function cookieOptions(maxAge: number) {
@@ -248,7 +270,7 @@ async function findEmployeeByAccess(access: string) {
     throw new ApiError(404, "Employee access not found");
   }
 
-  return result.rows[0] as ResolvedEmployee;
+  return hydrateEmployeeCreditScore(result.rows[0] as ResolvedEmployee);
 }
 
 export async function authenticateCompany(input: {
@@ -464,7 +486,7 @@ export async function getEmployeeProfile(employeeId: string) {
     throw new ApiError(404, "Employee not found");
   }
 
-  return result.rows[0] as EmployeeProfile;
+  return hydrateEmployeeCreditScore(result.rows[0] as EmployeeProfile);
 }
 
 export async function requestEmployeeRecovery(email: string) {

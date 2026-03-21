@@ -23,6 +23,7 @@ import {
   requireCompanySession,
   requireEmployeeSession
 } from "../middleware/auth.js";
+import { getEmployeeCreditScoreOnCore } from "../services/contractService.js";
 
 const router = Router();
 
@@ -117,13 +118,28 @@ router.get(
       ORDER BY e.created_at DESC`,
       [companyId]
     );
-    const employees = result.rows.map((row) => ({
-      ...row,
-      payroll_status: row.paid_this_period
-        ? "paid"
-        : payrollSchedule.due
-          ? "due"
-          : "scheduled"
+    const employees = await Promise.all(result.rows.map(async (row) => {
+      let creditScore = row.credit_score;
+      if (row.wallet_address) {
+        try {
+          creditScore = await getEmployeeCreditScoreOnCore(row.wallet_address);
+          if (creditScore !== row.credit_score) {
+            await db.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [creditScore, row.id]);
+          }
+        } catch {
+          creditScore = row.credit_score;
+        }
+      }
+
+      return {
+        ...row,
+        credit_score: creditScore,
+        payroll_status: row.paid_this_period
+          ? "paid"
+          : payrollSchedule.due
+            ? "due"
+            : "scheduled"
+      };
     }));
     res.status(200).json({ employees });
   })

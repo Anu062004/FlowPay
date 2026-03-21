@@ -14,7 +14,6 @@ import { ApiError } from "../utils/errors.js";
 import type { PoolClient } from "pg";
 import { startDepositWatcher } from "./depositWatcher.js";
 import { generateSeedPhrase } from "../utils/seed.js";
-import { emitVaultPayroll, emitVaultLoanDisbursed } from "./contractService.js";
 import { getTokenBalance as getIndexedTokenBalance } from "./indexerService.js";
 import { getRoundRobinRpcUrl, withRpcFailover } from "./rpcService.js";
 
@@ -392,14 +391,6 @@ export async function sendTransaction(
       tokenSymbol: "ETH",
       createdAt
     });
-
-    if (type === "payroll") {
-      emitVaultPayroll(toAddress, amountEth.toString()).catch(console.error);
-    }
-
-    if (type === "loan_disbursement") {
-      emitVaultLoanDisbursed(toAddress, amountEth.toString()).catch(console.error);
-    }
 
     return {
       txHash: txResult?.hash ?? null,

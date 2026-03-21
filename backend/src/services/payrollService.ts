@@ -8,6 +8,11 @@ import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
 import { evaluateAgentPolicy } from "./agentPolicyService.js";
 import { getCompanySettings } from "./settingsService.js";
 import {
+  ensureEmployeeInitializedOnCore,
+  getEmployeeCreditScoreOnCore,
+  recordPayrollOnCore
+} from "./contractService.js";
+import {
   formatPayrollMonthKey,
   formatPayrollMonthLabel,
 } from "../utils/payrollSchedule.js";
@@ -81,6 +86,12 @@ async function releasePayrollLock(companyId: string) {
 export async function getDuePayrollEmployees(companyId: string, payrollMonthKey: string) {
   const activeEmployees = await getCompanyPayrollEmployees(companyId, payrollMonthKey);
   return activeEmployees.filter((employee) => !employee.paid_at_this_period);
+}
+
+async function syncEmployeeCreditScore(employeeId: string, walletAddress: string) {
+  const score = await getEmployeeCreditScoreOnCore(walletAddress);
+  await db.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [score, employeeId]);
+  return score;
 }
 
 export async function runPayroll(
@@ -157,6 +168,7 @@ export async function runPayroll(
 
       for (const employee of dueEmployees) {
         const salary = parseFloat(employee.salary);
+        await ensureEmployeeInitializedOnCore(employee.wallet_address, salary, 1);
         const loans = await db.query(
           "SELECT id, amount, interest_rate, duration_months, remaining_balance FROM loans WHERE employee_id = $1 AND status = 'active'",
           [employee.id]
@@ -251,6 +263,17 @@ export async function runPayroll(
           txHashes.push({
             employeeId: employee.employeeId,
             txHash: payrollTxHash
+          });
+        }
+
+        try {
+          await recordPayrollOnCore(employee.walletAddress);
+          await syncEmployeeCreditScore(employee.employeeId, employee.walletAddress);
+        } catch (error) {
+          console.error("[Blockchain] Failed to sync payroll to FlowPayCore", {
+            companyId: company.id,
+            employeeId: employee.employeeId,
+            error
           });
         }
 

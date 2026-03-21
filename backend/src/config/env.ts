@@ -88,11 +88,14 @@ const envSchema = z.object({
   ADMIN_EMAILS: z.string().optional(),
   HUMAN_TASKS_PROVIDER: z.enum(["local", "openclaw"]).default("local"),
   APP_BASE_URL: z.string().default("http://localhost:3000"),
-  VAULT_CONTRACT_ADDRESS: z.string().min(1, "VAULT_CONTRACT_ADDRESS is required"),
-  LOAN_CONTRACT_ADDRESS: z.string().min(1, "LOAN_CONTRACT_ADDRESS is required"),
+  FLOW_PAY_CORE_ADDRESS: z.string().optional(),
+  VAULT_CONTRACT_ADDRESS: z.string().optional(),
+  FLOW_PAY_LOAN_ADDRESS: z.string().optional(),
+  LOAN_CONTRACT_ADDRESS: z.string().optional(),
   DEPOSIT_WATCHERS_ENABLED: z.string().default(isProduction ? "true" : "false"),
   ORCHESTRATOR_ENABLED: z.string().default(isProduction ? "true" : "false"),
   ORCHESTRATOR_INTERVAL_MS: z.string().default("120000"),
+  FLOW_PAY_INVESTMENT_ADDRESS: z.string().optional(),
   INVESTMENT_CONTRACT_ADDRESS: z.string().optional(),
   AAVE_POOL_ADDRESS: z.string().default("0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951"),
   AAVE_WETH_GATEWAY: z.string().default("0xD322A49006FC828F9B5B37Ab215F99B4E5caB19C"),
@@ -107,4 +110,25 @@ const envSchema = z.object({
   LOAN_AUTO_APPROVAL_THRESHOLD: z.string().default("0.02")
 });
 
-export const env = envSchema.parse(process.env);
+const parsedEnv = envSchema.parse(process.env);
+const coreContractAddress =
+  parsedEnv.FLOW_PAY_CORE_ADDRESS?.trim() || parsedEnv.VAULT_CONTRACT_ADDRESS?.trim();
+const loanContractAddress =
+  parsedEnv.FLOW_PAY_LOAN_ADDRESS?.trim() || parsedEnv.LOAN_CONTRACT_ADDRESS?.trim();
+const investmentContractAddress =
+  parsedEnv.FLOW_PAY_INVESTMENT_ADDRESS?.trim() || parsedEnv.INVESTMENT_CONTRACT_ADDRESS?.trim();
+
+if (!coreContractAddress) {
+  throw new Error("FLOW_PAY_CORE_ADDRESS is required");
+}
+
+if (!loanContractAddress) {
+  throw new Error("FLOW_PAY_LOAN_ADDRESS is required");
+}
+
+export const env = {
+  ...parsedEnv,
+  CORE_CONTRACT_ADDRESS: coreContractAddress,
+  LOAN_CONTRACT_ADDRESS: loanContractAddress,
+  INVESTMENT_CONTRACT_ADDRESS: investmentContractAddress
+};

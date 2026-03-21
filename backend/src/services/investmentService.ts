@@ -39,7 +39,7 @@ function riskToleranceCap(riskTolerance: InvestmentAgentInput["risk_tolerance"])
 
 function buildStrategyCandidates(input: {
   investmentPool: number;
-  totalTreasury: number;
+  managedTreasury: number;
   atokenBalance: number;
   yieldEarned: number;
   priceChangePct: number;
@@ -60,13 +60,13 @@ function buildStrategyCandidates(input: {
           : 5;
 
   const currentAaveExposurePct =
-    input.totalTreasury > 0 ? (input.atokenBalance / input.totalTreasury) * 100 : 0;
+    input.managedTreasury > 0 ? (input.atokenBalance / input.managedTreasury) * 100 : 0;
   const exposureStress =
     input.maxAaveExposurePct > 0
       ? clamp((currentAaveExposurePct / input.maxAaveExposurePct) * 4, 0, 4)
       : 0;
 
-  const maxAaveExposureEth = input.totalTreasury * (input.maxAaveExposurePct / 100);
+  const maxAaveExposureEth = input.managedTreasury * (input.maxAaveExposurePct / 100);
   const remainingAaveCapacityEth = Math.max(maxAaveExposureEth - input.atokenBalance, 0);
   const maxInvestableEth = Math.min(input.investmentPool, remainingAaveCapacityEth);
   const maxByPolicyPct =
@@ -104,7 +104,7 @@ function buildStrategyCandidates(input: {
       max_allocation_pct: aaveMaxAllocationPct,
       notes: input.aaveUnavailableReason
         ? `Aave execution unavailable: ${input.aaveUnavailableReason}`
-        : `Yield strategy with current Aave exposure ${currentAaveExposurePct.toFixed(2)}% and max new allocation ${(aaveMaxAllocationPct * 100).toFixed(1)}% of the investment pool.`
+        : `Yield strategy with current Aave exposure ${currentAaveExposurePct.toFixed(2)}% of managed treasury and max new allocation ${(aaveMaxAllocationPct * 100).toFixed(1)}% of the investment pool.`
     },
     {
       id: "de_risk_to_treasury",
@@ -280,7 +280,7 @@ export async function runInvestment(companyId: string, auditContext: AgentLogCon
   const payrollReserve = parseFloat(allocationResult.rows[0]?.payroll_reserve ?? "0");
   const lendingPool = parseFloat(allocationResult.rows[0]?.lending_pool ?? "0");
   const mainReserve = parseFloat(allocationResult.rows[0]?.main_reserve ?? "0");
-  const totalTreasury = investmentPool + payrollReserve + lendingPool + mainReserve;
+  const liquidTreasury = investmentPool + payrollReserve + lendingPool + mainReserve;
   const monthlyPayroll = parseFloat(payrollResult.rows[0]?.total_salary ?? "0");
   const payrollCoverageRatio =
     monthlyPayroll > 0 ? payrollReserve / monthlyPayroll : payrollReserve > 0 ? 999 : 0;
@@ -302,10 +302,12 @@ export async function runInvestment(companyId: string, auditContext: AgentLogCon
   const openPositions = parseInt(activePositionsResult.rows[0].count, 10);
   const priceInfo = await getEthPrice();
   const riskTolerance = normalizeRiskTolerance(settings.agent.riskTolerance);
-  const currentAaveExposurePct = totalTreasury > 0 ? (atokenBalance / totalTreasury) * 100 : 0;
+  const managedTreasury = liquidTreasury + Math.max(atokenBalance, 0);
+  const currentAaveExposurePct =
+    managedTreasury > 0 ? (atokenBalance / managedTreasury) * 100 : 0;
   const strategyCandidates = buildStrategyCandidates({
     investmentPool,
-    totalTreasury,
+    managedTreasury,
     atokenBalance,
     yieldEarned,
     priceChangePct: priceInfo.changePct,
@@ -417,14 +419,14 @@ export async function runInvestment(companyId: string, auditContext: AgentLogCon
     }
 
     const projectedExposurePct =
-      totalTreasury > 0 ? ((atokenBalance + normalizedInvestAmount) / totalTreasury) * 100 : 0;
+      managedTreasury > 0 ? ((atokenBalance + normalizedInvestAmount) / managedTreasury) * 100 : 0;
     const policyResult = await evaluateAgentPolicy({
       companyId,
       action: "aave_rebalance",
       amount: normalizedInvestAmount,
       metadata: {
         allocationPct: projectedExposurePct,
-        currentTreasuryBalance: totalTreasury
+        currentTreasuryBalance: managedTreasury
       }
     });
 
@@ -434,7 +436,8 @@ export async function runInvestment(companyId: string, auditContext: AgentLogCon
         companyId,
         investAmount: normalizedInvestAmount,
         projectedExposurePct,
-        totalTreasury,
+        liquidTreasury,
+        managedTreasury,
         strategyId: decision.strategy_id
       },
       {

@@ -68,6 +68,11 @@ export async function ensureRuntimeSchema() {
   `);
 
   await db.query(`
+    ALTER TABLE loans
+    ADD COLUMN IF NOT EXISTS contract_loan_id BIGINT
+  `);
+
+  await db.query(`
     CREATE TABLE IF NOT EXISTS agent_logs (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),

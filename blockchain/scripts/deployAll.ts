@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 
 function updateBackendEnv(addresses: {
-  vault: string;
+  core: string;
   loan: string;
   investment: string;
 }) {
@@ -23,9 +23,9 @@ function updateBackendEnv(addresses: {
     }
   };
 
-  replaceOrAppend("VAULT_CONTRACT_ADDRESS", addresses.vault);
-  replaceOrAppend("LOAN_CONTRACT_ADDRESS", addresses.loan);
-  replaceOrAppend("INVESTMENT_CONTRACT_ADDRESS", addresses.investment);
+  replaceOrAppend("FLOW_PAY_CORE_ADDRESS", addresses.core);
+  replaceOrAppend("FLOW_PAY_LOAN_ADDRESS", addresses.loan);
+  replaceOrAppend("FLOW_PAY_INVESTMENT_ADDRESS", addresses.investment);
 
   fs.writeFileSync(envPath, content);
   console.log("Updated backend/.env with deployed contract addresses.");
@@ -36,17 +36,21 @@ async function main() {
   const admin = deployer.address;
   const treasury = deployer.address;
 
-  const Vault = await ethers.getContractFactory("FlowPayVault");
-  const vault = await Vault.deploy(admin);
-  await vault.waitForDeployment();
-  const vaultAddress = await vault.getAddress();
-  console.log(`FlowPayVault deployed to ${vaultAddress}`);
+  const Core = await ethers.getContractFactory("FlowPayCore");
+  const core = await Core.deploy(admin);
+  await core.waitForDeployment();
+  const coreAddress = await core.getAddress();
+  console.log(`FlowPayCore deployed to ${coreAddress}`);
 
   const Loan = await ethers.getContractFactory("FlowPayLoan");
-  const loan = await Loan.deploy(admin);
+  const loan = await Loan.deploy(admin, coreAddress);
   await loan.waitForDeployment();
   const loanAddress = await loan.getAddress();
   console.log(`FlowPayLoan deployed to ${loanAddress}`);
+
+  const setLoanTx = await core.setLoanContract(loanAddress);
+  await setLoanTx.wait();
+  console.log(`FlowPayCore wired to FlowPayLoan at ${loanAddress}`);
 
   const Investment = await ethers.getContractFactory("FlowPayInvestment");
   const investment = await Investment.deploy(admin, treasury);
@@ -55,7 +59,7 @@ async function main() {
   console.log(`FlowPayInvestment deployed to ${investmentAddress}`);
 
   updateBackendEnv({
-    vault: vaultAddress,
+    core: coreAddress,
     loan: loanAddress,
     investment: investmentAddress
   });

@@ -3,7 +3,14 @@ import { runLoanDecisionAgent } from "../agents/loanAgent.js";
 import { sendTransaction } from "./walletService.js";
 import { ApiError } from "../utils/errors.js";
 import { getEthPrice } from "./priceService.js";
-import { issueContractLoan } from "./contractService.js";
+import {
+  checkLoanEligibilityOnCore,
+  ensureEmployeeInitializedOnCore,
+  getEmployeeCreditScoreOnCore,
+  issueContractLoan,
+  recordLoanDisbursementOnCore,
+  repayContractEMI
+} from "./contractService.js";
 import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
 import { getCompanySettings } from "./settingsService.js";
 import { evaluateAgentPolicy } from "./agentPolicyService.js";
@@ -23,9 +30,10 @@ function buildFallbackLoanDecision(input: {
   creditScore: number;
   requestedAmount: number;
   changePct: number;
+  maxAmount: number;
+  interestRate?: number;
 }) {
-  const { salary, creditScore, requestedAmount, changePct } = input;
-  const maxAmount = salary * 2;
+  const { salary, creditScore, requestedAmount, changePct, maxAmount, interestRate } = input;
   const approvedAmount = Math.min(requestedAmount, maxAmount);
 
   if (approvedAmount <= 0) {
@@ -49,7 +57,7 @@ function buildFallbackLoanDecision(input: {
   }
 
   const stressedMarket = changePct < -10;
-  const interest =
+  const interest = interestRate ??
     creditScore >= 760 ? 4.5 :
     creditScore >= 720 ? 6 :
     creditScore >= 680 ? 7.5 :
@@ -84,6 +92,12 @@ function buildFallbackLoanDecision(input: {
     duration,
     rationale: "Fallback policy approved the request using salary, credit score, and repayment-cap rules."
   };
+}
+
+async function syncEmployeeCreditScore(employeeId: string, walletAddress: string) {
+  const score = await getEmployeeCreditScoreOnCore(walletAddress);
+  await db.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [score, employeeId]);
+  return score;
 }
 
 export async function requestLoan(
@@ -129,14 +143,23 @@ export async function requestLoan(
   }
 
   const salary = parseFloat(employee.salary);
-  if (requestedAmount > salary * 2) {
-    throw new ApiError(400, "Requested amount exceeds max loan (2x salary)");
+  await ensureEmployeeInitializedOnCore(employee.wallet_address, salary, 1);
+  const creditScore = await syncEmployeeCreditScore(employeeId, employee.wallet_address);
+  const eligibility = await checkLoanEligibilityOnCore(employee.wallet_address);
+  const maxEligibleAmount = parseFloat(eligibility.maxAmountEth);
+
+  if (!eligibility.allowed || maxEligibleAmount <= 0) {
+    throw new ApiError(400, "Employee is not eligible for a loan under FlowPayCore");
+  }
+
+  if (requestedAmount > maxEligibleAmount) {
+    throw new ApiError(400, `Requested amount exceeds FlowPayCore limit (${maxEligibleAmount} ETH)`);
   }
 
   // 2. Agent Decision
   const agentInput = {
     salary,
-    credit_score: employee.credit_score,
+    credit_score: creditScore,
     requested_amount: requestedAmount,
     eth_price_usd: ethPrice,
     price_change_24h: changePct
@@ -145,9 +168,11 @@ export async function requestLoan(
   const decision = await runLoanDecisionAgent(agentInput).catch(() =>
     buildFallbackLoanDecision({
       salary,
-      creditScore: employee.credit_score,
+      creditScore,
       requestedAmount,
-      changePct
+      changePct,
+      maxAmount: maxEligibleAmount,
+      interestRate: eligibility.interestRatePct
     })
   );
 
@@ -176,11 +201,14 @@ export async function requestLoan(
   }
 
   // 3. Validation & EMI
-  if (decision.amount > salary * 2) {
-    throw new ApiError(400, "Agent-approved amount exceeds policy limit");
+  const approvedAmount = Math.min(decision.amount, maxEligibleAmount);
+  const approvedInterest = eligibility.interestRatePct;
+
+  if (approvedAmount <= 0) {
+    throw new ApiError(400, "No loan amount is eligible under FlowPayCore");
   }
 
-  const emi = calculateEmi(decision.amount, decision.interest, decision.duration);
+  const emi = calculateEmi(approvedAmount, approvedInterest, decision.duration);
   if (emi > salary * 0.3) {
     throw new ApiError(400, "EMI exceeds 30% salary policy");
   }
@@ -189,7 +217,7 @@ export async function requestLoan(
   const policyResult = await evaluateAgentPolicy({
     companyId: employee.company_id,
     action: "loan_disbursement",
-    amount: decision.amount,
+    amount: approvedAmount,
     metadata: {
       employeeId
     }
@@ -201,7 +229,7 @@ export async function requestLoan(
       companyId: employee.company_id,
       employeeId,
       requestedAmount,
-      approvedAmount: decision.amount,
+      approvedAmount,
       emi
     },
     {
@@ -221,7 +249,7 @@ export async function requestLoan(
   if (policyResult.status === "block") {
     await db.query(
       "INSERT INTO loans (employee_id, amount, interest_rate, duration_months, remaining_balance, status) VALUES ($1, $2, $3, $4, $5, 'rejected')",
-      [employeeId, decision.amount, decision.interest, decision.duration, decision.amount]
+      [employeeId, approvedAmount, approvedInterest, decision.duration, approvedAmount]
     );
     return {
       decision: "reject" as const,
@@ -235,8 +263,8 @@ export async function requestLoan(
     "INSERT INTO loans (employee_id, amount, interest_rate, duration_months, remaining_balance, status, contract_synced) VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING id",
     [
       employeeId,
-      decision.amount,
-      decision.interest,
+      approvedAmount,
+      approvedInterest,
       decision.duration,
       totalRepayable,
       "active"
@@ -249,7 +277,7 @@ export async function requestLoan(
     const transfer = await sendTransaction(
       employee.treasury_wallet_id,
       employee.wallet_address,
-      decision.amount,
+      approvedAmount,
       "loan_disbursement",
       employee.wallet_id
     );
@@ -259,7 +287,7 @@ export async function requestLoan(
       {
         companyId: employee.company_id,
         employeeId,
-        amount: decision.amount
+        amount: approvedAmount
       },
       {
         action: "loan_disbursement"
@@ -281,12 +309,20 @@ export async function requestLoan(
 
     issueContractLoan(
       employee.wallet_address,
-      decision.amount.toString(),
-      decision.interest,
+      approvedAmount.toString(),
       decision.duration
     )
-      .then(async () => {
-        await db.query("UPDATE loans SET contract_synced = true WHERE id = $1", [loanId]);
+      .then(async (contractSync) => {
+        await db.query(
+          "UPDATE loans SET contract_synced = true, contract_loan_id = $1, interest_rate = $2 WHERE id = $3",
+          [contractSync.contractLoanId, contractSync.interestRatePct, loanId]
+        );
+        try {
+          await recordLoanDisbursementOnCore(employee.wallet_address);
+        } catch (error) {
+          console.error(`[Blockchain] Loan disbursal event sync failed for loan ${loanId}:`, error);
+        }
+        await syncEmployeeCreditScore(employeeId, employee.wallet_address);
         console.log(`[Blockchain] Successfully synced loan ${loanId} to contract`);
       })
       .catch(err => {
@@ -299,7 +335,7 @@ export async function requestLoan(
       {
         companyId: employee.company_id,
         employeeId,
-        amount: decision.amount
+        amount: approvedAmount
       },
       {
         action: "loan_disbursement"
@@ -323,8 +359,8 @@ export async function requestLoan(
   return {
     decision: "approve",
     loanId,
-    amount: decision.amount,
-    interest: decision.interest,
+    amount: approvedAmount,
+    interest: approvedInterest,
     duration: decision.duration,
     emi,
     rationale: decision.rationale,
@@ -336,6 +372,7 @@ export async function requestLoan(
 export async function executeApprovedLoan(loanId: string, auditContext: AgentLogContext = {}) {
   const result = await db.query(
     `SELECT l.id, l.amount, l.interest_rate, l.duration_months, l.status,
+            e.salary,
             e.id as employee_id, e.company_id, e.wallet_id, w.wallet_address, c.treasury_wallet_id
      FROM loans l
      JOIN employees e ON e.id = l.employee_id
@@ -387,6 +424,8 @@ export async function executeApprovedLoan(loanId: string, auditContext: AgentLog
   if (policyResult.status === "block") {
     throw new ApiError(400, policyResult.reasons[0] ?? "Approved loan blocked by policy");
   }
+
+  await ensureEmployeeInitializedOnCore(row.wallet_address, parseFloat(row.salary), 1);
 
   let transfer: Awaited<ReturnType<typeof sendTransaction>>;
   try {
@@ -450,11 +489,19 @@ export async function executeApprovedLoan(loanId: string, auditContext: AgentLog
   issueContractLoan(
     row.wallet_address,
     row.amount.toString(),
-    parseFloat(row.interest_rate),
     parseInt(row.duration_months, 10)
   )
-    .then(async () => {
-      await db.query("UPDATE loans SET contract_synced = true WHERE id = $1", [loanId]);
+    .then(async (contractSync) => {
+      await db.query(
+        "UPDATE loans SET contract_synced = true, contract_loan_id = $1, interest_rate = $2 WHERE id = $3",
+        [contractSync.contractLoanId, contractSync.interestRatePct, loanId]
+      );
+      try {
+        await recordLoanDisbursementOnCore(row.wallet_address);
+      } catch (error) {
+        console.error(`[Blockchain] Loan disbursal event sync failed for approved loan ${loanId}:`, error);
+      }
+      await syncEmployeeCreditScore(row.employee_id, row.wallet_address);
       console.log(`[Blockchain] Successfully synced loan ${loanId} to contract`);
     })
     .catch(err => {
@@ -476,13 +523,16 @@ export async function repayLoanInFull(loanId: string, employeeId: string) {
     `SELECT
        l.id,
        l.employee_id,
+       l.contract_loan_id,
        l.remaining_balance,
        l.status,
        e.wallet_id AS employee_wallet_id,
+       ew.wallet_address AS employee_wallet_address,
        tw.id AS treasury_wallet_id,
        tw.wallet_address AS treasury_wallet_address
      FROM loans l
      JOIN employees e ON e.id = l.employee_id
+     JOIN wallets ew ON ew.id = e.wallet_id
      JOIN companies c ON c.id = e.company_id
      JOIN wallets tw ON tw.id = c.treasury_wallet_id
      WHERE l.id = $1`,
@@ -500,7 +550,7 @@ export async function repayLoanInFull(loanId: string, employeeId: string) {
   if (loan.status !== "active") {
     throw new ApiError(400, "Only active loans can be repaid in full");
   }
-  if (!loan.employee_wallet_id || !loan.treasury_wallet_id || !loan.treasury_wallet_address) {
+  if (!loan.employee_wallet_id || !loan.employee_wallet_address || !loan.treasury_wallet_id || !loan.treasury_wallet_address) {
     throw new ApiError(400, "Loan wallets are not configured correctly");
   }
 
@@ -521,6 +571,15 @@ export async function repayLoanInFull(loanId: string, employeeId: string) {
     "UPDATE loans SET remaining_balance = 0, status = 'repaid', updated_at = now() WHERE id = $1",
     [loanId]
   );
+
+  if (loan.contract_loan_id) {
+    try {
+      await repayContractEMI(Number(loan.contract_loan_id), remainingBalance.toString());
+      await syncEmployeeCreditScore(employeeId, loan.employee_wallet_address);
+    } catch (error) {
+      console.error(`[Blockchain] Failed to sync EMI repayment for loan ${loanId}:`, error);
+    }
+  }
 
   return {
     loanId,

@@ -4,7 +4,7 @@ import { db } from "../db/pool.js";
 import { env } from "../config/env.js";
 import { ApiError } from "../utils/errors.js";
 import { getWalletBalance, sendTransaction } from "./walletService.js";
-import { allocateVault } from "./contractService.js";
+import { allocateCore } from "./contractService.js";
 import { formatTokenAmount } from "../utils/amounts.js";
 import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
 import { evaluateAgentPolicy } from "./agentPolicyService.js";
@@ -191,7 +191,7 @@ export async function allocateTreasury(
 
   // 2. Sync to contract - AWAIT THIS to ensure chain success
   try {
-    await allocateVault(
+    await allocateCore(
       payrollPct / ACTIVE_TREASURY_PCT,
       lendingPct / ACTIVE_TREASURY_PCT,
       investmentPct / ACTIVE_TREASURY_PCT

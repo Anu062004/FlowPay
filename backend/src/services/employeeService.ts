@@ -6,6 +6,7 @@ import { sendEmployeeAccessEmail, sendEmployeeInvite } from "./emailService.js";
 import { ApiError } from "../utils/errors.js";
 import { env } from "../config/env.js";
 import { getEmployeeProfile } from "./authService.js";
+import { ensureEmployeeInitializedOnCore } from "./contractService.js";
 
 function getActivationUrl(token: string) {
   return `${env.APP_BASE_URL}/employees/activate?token=${token}`;
@@ -37,6 +38,9 @@ export async function addEmployee(input: {
     );
     const employee = insertResult.rows[0];
     const wallet = await createEmployeeWallet(employee.id, client);
+    const coreState = await ensureEmployeeInitializedOnCore(wallet.wallet_address, input.salary, 1);
+    await client.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [coreState.score, employee.id]);
+    employee.credit_score = coreState.score;
     await client.query("COMMIT");
 
     await sendEmployeeInvite({

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import TransactionHashCell from "../../components/TransactionHashCell";
 import type { Transaction } from "../../lib/api";
 import { useMyTransactions } from "../../lib/hooks";
 import { loadEmployeeContext, type EmployeeContext } from "../../lib/companyContext";
@@ -159,19 +160,10 @@ export default function EmployeeTransactionsPage() {
                           {isCredit ? "+" : "-"}{fmt(tx.amount)}
                         </td>
                         <td>
-                          {tx.tx_hash ? (
-                            <a
-                              href={getTransactionExplorerUrl(tx.tx_hash)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="font-mono text-xs text-secondary"
-                              title="Open transaction in explorer"
-                            >
-                              {tx.tx_hash.slice(0, 12)}...
-                            </a>
-                          ) : (
-                            <span className="text-tertiary text-xs">{getTransactionHashFallbackLabel(tx)}</span>
-                          )}
+                          <TransactionHashCell
+                            txHash={tx.tx_hash}
+                            fallbackLabel={getTransactionHashFallbackLabel(tx)}
+                          />
                         </td>
                         <td>
                           <button className="btn btn-ghost btn-sm" onClick={() => setSelectedTx(tx)}>

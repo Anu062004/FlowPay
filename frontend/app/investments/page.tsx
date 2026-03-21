@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import TransactionHashCell from "../components/TransactionHashCell";
 import { useInvestments, useTreasuryBalance, type InvestmentData } from "../lib/hooks";
 import { loadCompanyContext, saveCompanyContext } from "../lib/companyContext";
-import { getTransactionExplorerUrl } from "../lib/transactions";
 
 type InvestmentPosition = InvestmentData["positions"][number];
 type TrackedMarketAsset = NonNullable<InvestmentData["marketBoard"]>["crypto"][number];
@@ -471,19 +471,10 @@ export default function InvestmentsPage() {
                         <td className="text-sm text-secondary">{fmtDate(tx.created_at)}</td>
                         <td className="data-table-num">{fmtEth(tx.amount)}</td>
                         <td>
-                          {tx.tx_hash ? (
-                            <a
-                              href={getTransactionExplorerUrl(tx.tx_hash)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="font-mono text-xs text-secondary"
-                              title="Open transaction in explorer"
-                            >
-                              {fmtShortHash(tx.tx_hash)}
-                            </a>
-                          ) : (
-                            <span className="font-mono text-xs text-secondary">{fmtShortHash(tx.tx_hash)}</span>
-                          )}
+                          <TransactionHashCell
+                            txHash={tx.tx_hash}
+                            fallbackLabel={fmtShortHash(tx.tx_hash)}
+                          />
                         </td>
                       </tr>
                     ))}

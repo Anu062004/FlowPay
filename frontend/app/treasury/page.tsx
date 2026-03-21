@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
+import TransactionHashCell from "../components/TransactionHashCell";
 import { formatEth } from "../lib/format";
 import { useTreasuryBalance, useTransactions } from "../lib/hooks";
 import { loadCompanyContext, type CompanyContext } from "../lib/companyContext";
 import {
-  getTransactionExplorerUrl,
   getTransactionHashFallbackLabel
 } from "../lib/transactions";
 
@@ -208,19 +208,10 @@ export default function TreasuryPage() {
                       <td><Badge variant={TX_BADGE[tx.type] ?? "neutral"}>{TX_TYPE_LABELS[tx.type] ?? tx.type}</Badge></td>
                       <td className="data-table-num">{fmt(tx.amount, tx.token_symbol ?? balanceSymbol)}</td>
                       <td>
-                        {tx.tx_hash ? (
-                          <a
-                            href={getTransactionExplorerUrl(tx.tx_hash)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-mono text-xs text-secondary"
-                            title="Open transaction in explorer"
-                          >
-                            {tx.tx_hash.slice(0, 12)}...{tx.tx_hash.slice(-6)}
-                          </a>
-                        ) : (
-                          <span className="text-tertiary text-xs">{getTransactionHashFallbackLabel(tx)}</span>
-                        )}
+                        <TransactionHashCell
+                          txHash={tx.tx_hash}
+                          fallbackLabel={getTransactionHashFallbackLabel(tx)}
+                        />
                       </td>
                     </tr>
                   ))}

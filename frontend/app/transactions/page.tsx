@@ -1,9 +1,9 @@
 "use client";
 import { useState } from "react";
+import TransactionHashCell from "../components/TransactionHashCell";
 import { formatEth } from "../lib/format";
 import { useTransactions } from "../lib/hooks";
 import {
-  getTransactionExplorerUrl,
   getTransactionHashFallbackLabel,
   getTransactionSettlementKind,
   getTransactionSettlementLabel,
@@ -161,21 +161,11 @@ export default function TransactionsPage() {
                       </td>
                       <td className="data-table-num">{fmt(tx.amount, tx.token_symbol ?? "ETH")}</td>
                       <td>
-                        {tx.tx_hash ? (
-                          <a
-                            href={getTransactionExplorerUrl(tx.tx_hash)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-mono text-xs text-secondary"
-                            title="Open transaction in explorer"
-                          >
-                            {tx.tx_hash.slice(0, 14)}...{tx.tx_hash.slice(-6)}
-                          </a>
-                        ) : (
-                          <span className="text-tertiary text-xs">
-                            {getTransactionHashFallbackLabel(tx)}
-                          </span>
-                        )}
+                        <TransactionHashCell
+                          txHash={tx.tx_hash}
+                          fallbackLabel={getTransactionHashFallbackLabel(tx)}
+                          leadingChars={14}
+                        />
                       </td>
                       <td className="right">
                         <Badge variant={getTransactionSettlementVariant(tx)}>

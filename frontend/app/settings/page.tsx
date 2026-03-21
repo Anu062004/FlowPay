@@ -4,9 +4,90 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import CompanyContextBar from "../components/CompanyContextBar";
 import { loadCompanyContext, saveCompanyContext, type CompanyContext } from "../lib/companyContext";
-import { fetchCompanySettings, updateCompanyAccessPin, updateCompanySettings, type CompanySettings } from "../lib/api";
+import {
+  fetchCompanySettings,
+  runPayroll,
+  updateCompanyAccessPin,
+  updateCompanySettings,
+  type CompanySettings
+} from "../lib/api";
 
 type Status = { type: "success" | "error"; message: string } | null;
+
+const PAYROLL_SCHEDULE_PRESETS = [
+  { value: "today", label: "Today only" },
+  { value: "manual", label: "Manual only" },
+  { value: "weekly", label: "Weekly" },
+  { value: "bi-weekly", label: "Bi-weekly" },
+  { value: "1st", label: "1st of each month" },
+  { value: "15th", label: "15th of each month" },
+  { value: "last-day", label: "Last day of month" },
+  { value: "custom", label: "Custom day of month" }
+];
+
+function toOrdinal(day: number) {
+  const mod10 = day % 10;
+  const mod100 = day % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${day}st`;
+  if (mod10 === 2 && mod100 !== 12) return `${day}nd`;
+  if (mod10 === 3 && mod100 !== 13) return `${day}rd`;
+  return `${day}th`;
+}
+
+function parsePayrollSchedule(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "today only") {
+    return { preset: "today", customDay: 15 };
+  }
+  if (normalized === "manual only") {
+    return { preset: "manual", customDay: 15 };
+  }
+  if (normalized === "weekly") {
+    return { preset: "weekly", customDay: 15 };
+  }
+  if (normalized === "bi-weekly") {
+    return { preset: "bi-weekly", customDay: 15 };
+  }
+  if (normalized === "1st of each month") {
+    return { preset: "1st", customDay: 1 };
+  }
+  if (normalized === "15th of each month") {
+    return { preset: "15th", customDay: 15 };
+  }
+  if (normalized === "last day of month") {
+    return { preset: "last-day", customDay: 28 };
+  }
+
+  const customMatch = value.match(/(\d+)(st|nd|rd|th) of each month/i);
+  if (customMatch) {
+    return { preset: "custom", customDay: Math.min(Math.max(parseInt(customMatch[1], 10), 1), 28) };
+  }
+
+  return { preset: "15th", customDay: 15 };
+}
+
+function payrollScheduleLabel(preset: string, customDay: number) {
+  switch (preset) {
+    case "today":
+      return "Today only";
+    case "manual":
+      return "Manual only";
+    case "weekly":
+      return "Weekly";
+    case "bi-weekly":
+      return "Bi-weekly";
+    case "1st":
+      return "1st of each month";
+    case "15th":
+      return "15th of each month";
+    case "last-day":
+      return "Last day of month";
+    case "custom":
+      return `${toOrdinal(customDay)} of each month`;
+    default:
+      return "15th of each month";
+  }
+}
 
 function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
@@ -79,6 +160,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pinSaving, setPinSaving] = useState(false);
+  const [payrollRunning, setPayrollRunning] = useState(false);
   const [newAccessPin, setNewAccessPin] = useState("");
   const [status, setStatus] = useState<Status>(null);
 
@@ -104,6 +186,13 @@ export default function SettingsPage() {
 
   const updatePayroll = (patch: Partial<CompanySettings["payroll"]>) => {
     setSettings((prev) => (prev ? { ...prev, payroll: { ...prev.payroll, ...patch } } : prev));
+  };
+
+  const applyPayrollSchedule = (preset: string, customDay?: number) => {
+    const existing = settings?.payroll.payrollDay ?? "15th of each month";
+    const parsed = parsePayrollSchedule(existing);
+    const nextCustomDay = customDay ?? parsed.customDay;
+    updatePayroll({ payrollDay: payrollScheduleLabel(preset, nextCustomDay) });
   };
 
   const updateSecurity = (patch: Partial<CompanySettings["security"]>) => {
@@ -155,6 +244,7 @@ export default function SettingsPage() {
   };
 
   const disabled = saving || loading;
+  const payrollSchedule = parsePayrollSchedule(settings?.payroll.payrollDay ?? "15th of each month");
 
   const saveAccessPin = async () => {
     if (!newAccessPin.trim()) {
@@ -183,6 +273,23 @@ export default function SettingsPage() {
       setStatus({ type: "error", message: err?.message ?? "Failed to update company PIN" });
     } finally {
       setPinSaving(false);
+    }
+  };
+
+  const runPayrollToday = async () => {
+    if (!context?.id) return;
+    setPayrollRunning(true);
+    setStatus(null);
+    try {
+      const result = await runPayroll(context.id);
+      setStatus({
+        type: "success",
+        message: `Payroll processed today for ${result.processed} employee${result.processed === 1 ? "" : "s"}.`
+      });
+    } catch (err: any) {
+      setStatus({ type: "error", message: err?.message ?? "Failed to run payroll today" });
+    } finally {
+      setPayrollRunning(false);
     }
   };
 
@@ -275,18 +382,38 @@ export default function SettingsPage() {
             <Section title="Payroll Configuration" subtitle="Automation and schedule settings">
               <div className="stack">
                 <div className="form-group">
-                  <label className="form-label">Payroll Day</label>
+                  <label className="form-label">Payroll Schedule</label>
                   <select
                     className="form-select"
-                    value={settings.payroll.payrollDay}
-                    onChange={(e) => updatePayroll({ payrollDay: e.target.value })}
+                    value={payrollSchedule.preset}
+                    onChange={(e) => applyPayrollSchedule(e.target.value)}
                   >
-                    <option>15th of each month</option>
-                    <option>1st of each month</option>
-                    <option>Last day of month</option>
-                    <option>Bi-weekly</option>
+                    {PAYROLL_SCHEDULE_PRESETS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
+                  <span className="form-hint">
+                    Choose when payroll should normally be processed. Use the action below if you want to run it today immediately.
+                  </span>
                 </div>
+                {payrollSchedule.preset === "custom" ? (
+                  <div className="form-group">
+                    <label className="form-label">Custom Day of Month</label>
+                    <select
+                      className="form-select"
+                      value={String(payrollSchedule.customDay)}
+                      onChange={(e) => applyPayrollSchedule("custom", Number(e.target.value))}
+                    >
+                      {Array.from({ length: 28 }, (_, index) => index + 1).map((day) => (
+                        <option key={day} value={day}>
+                          {toOrdinal(day)} of each month
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
                 <div className="form-group">
                   <label className="form-label">Default Currency</label>
                   <select
@@ -316,14 +443,36 @@ export default function SettingsPage() {
                   checked={settings.payroll.emailNotifications}
                   onChange={(next) => updatePayroll({ emailNotifications: next })}
                 />
-                <button
-                  className="btn btn-primary"
-                  style={{ alignSelf: "flex-start", marginTop: 8 }}
-                  onClick={() => saveAll("Payroll settings")}
-                  disabled={disabled}
+                <div
+                  style={{
+                    padding: 16,
+                    borderRadius: 16,
+                    background: "var(--bg-muted)",
+                    border: "1px solid var(--border-subtle)"
+                  }}
+                  className="stack"
                 >
-                  Save Payroll Settings
-                </button>
+                  <div className="fw-medium text-sm">Quick Payroll Actions</div>
+                  <div className="text-xs text-secondary">
+                    Current schedule: <strong>{settings.payroll.payrollDay}</strong>. You can also bypass the schedule and process payroll immediately for today.
+                  </div>
+                  <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => saveAll("Payroll settings")}
+                      disabled={disabled}
+                    >
+                      Save Payroll Settings
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={runPayrollToday}
+                      disabled={disabled || payrollRunning}
+                    >
+                      {payrollRunning ? "Running Payroll..." : "Run Payroll Today"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </Section>
 

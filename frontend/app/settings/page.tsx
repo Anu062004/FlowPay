@@ -14,6 +14,26 @@ import {
 
 type Status = { type: "success" | "error"; message: string } | null;
 
+const DEFAULT_COMPANY_TIME_ZONE = "Europe/London";
+
+const COMPANY_TIME_ZONE_OPTIONS = [
+  { value: "Europe/London", label: "London (UTC/BST)" },
+  { value: "America/New_York", label: "New York (ET)" },
+  { value: "America/Los_Angeles", label: "San Francisco (PT)" },
+  { value: "Asia/Kolkata", label: "Mumbai (IST)" }
+];
+
+const COMPANY_TIME_ZONE_ALIASES: Record<string, string> = {
+  "UTC+0 - London": "Europe/London",
+  "UTC-5 - New York": "America/New_York",
+  "UTC-8 - San Francisco": "America/Los_Angeles",
+  "UTC+5:30 - Mumbai": "Asia/Kolkata",
+  "Europe/London": "Europe/London",
+  "America/New_York": "America/New_York",
+  "America/Los_Angeles": "America/Los_Angeles",
+  "Asia/Kolkata": "Asia/Kolkata"
+};
+
 const PAYROLL_SCHEDULE_PRESETS = [
   { value: "today", label: "Today only (test)" },
   { value: "manual", label: "Manual only" },
@@ -32,9 +52,33 @@ function toOrdinal(day: number) {
   return `${day}th`;
 }
 
+function normalizeCompanyTimeZone(value?: string | null) {
+  const candidate = value?.trim();
+  if (!candidate) {
+    return DEFAULT_COMPANY_TIME_ZONE;
+  }
+
+  return COMPANY_TIME_ZONE_ALIASES[candidate] ?? DEFAULT_COMPANY_TIME_ZONE;
+}
+
+function companyTimeZoneLabel(value?: string | null) {
+  const normalized = normalizeCompanyTimeZone(value);
+  return COMPANY_TIME_ZONE_OPTIONS.find((option) => option.value === normalized)?.label ?? "London (UTC/BST)";
+}
+
+function normalizeCompanySettings(settings: CompanySettings) {
+  return {
+    ...settings,
+    profile: {
+      ...settings.profile,
+      timeZone: normalizeCompanyTimeZone(settings.profile.timeZone)
+    }
+  };
+}
+
 function getTodayPayrollLabel(timeZone: string) {
   const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone,
+    timeZone: normalizeCompanyTimeZone(timeZone),
     day: "2-digit"
   });
   const parts = formatter.formatToParts(new Date());
@@ -171,7 +215,7 @@ export default function SettingsPage() {
     }
 
     fetchCompanySettings(ctx.id)
-      .then(({ settings }) => setSettings(settings))
+      .then(({ settings }) => setSettings(normalizeCompanySettings(settings)))
       .catch((err: any) => {
         setStatus({ type: "error", message: err?.message ?? "Failed to load settings" });
       })
@@ -224,12 +268,13 @@ export default function SettingsPage() {
     setStatus(null);
     try {
       const { settings: next } = await updateCompanySettings(context.id, settings);
-      setSettings(next);
+      const normalizedSettings = normalizeCompanySettings(next);
+      setSettings(normalizedSettings);
       if (context.name !== next.profile.companyName || context.email !== next.profile.companyEmail) {
         saveCompanyContext({
           id: context.id,
-          name: next.profile.companyName,
-          email: next.profile.companyEmail || context.email,
+          name: normalizedSettings.profile.companyName,
+          email: normalizedSettings.profile.companyEmail || context.email,
           treasuryAddress: context.treasuryAddress ?? null
         });
       }
@@ -243,7 +288,9 @@ export default function SettingsPage() {
 
   const disabled = saving || loading;
   const payrollSchedule = parsePayrollSchedule(settings?.payroll.payrollDay ?? "15th of each month");
-  const todayPayrollLabel = settings ? getTodayPayrollLabel(settings.profile.timeZone) : "15th of each month";
+  const companyTimeZone = settings ? normalizeCompanyTimeZone(settings.profile.timeZone) : DEFAULT_COMPANY_TIME_ZONE;
+  const companyTimeZoneDisplay = companyTimeZoneLabel(settings?.profile.timeZone);
+  const todayPayrollLabel = settings ? getTodayPayrollLabel(companyTimeZone) : "15th of each month";
 
   const saveAccessPin = async () => {
     if (!newAccessPin.trim()) {
@@ -358,13 +405,14 @@ export default function SettingsPage() {
                   <label className="form-label">Time Zone</label>
                   <select
                     className="form-select"
-                    value={settings.profile.timeZone}
+                    value={companyTimeZone}
                     onChange={(e) => updateProfile({ timeZone: e.target.value })}
                   >
-                    <option value="Europe/London">London (UTC/BST)</option>
-                    <option value="America/New_York">New York (ET)</option>
-                    <option value="America/Los_Angeles">San Francisco (PT)</option>
-                    <option value="Asia/Kolkata">Mumbai (IST)</option>
+                    {COMPANY_TIME_ZONE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <button
@@ -395,7 +443,7 @@ export default function SettingsPage() {
                   </select>
                   <span className="form-hint">
                     {payrollSchedule.preset === "today"
-                      ? `Testing shortcut: saving Today only resolves to ${todayPayrollLabel} in ${settings.profile.timeZone}, so the automated scheduler treats payroll as due today. Switch it back after testing.`
+                      ? `Testing shortcut: saving Today only resolves to ${todayPayrollLabel} in ${companyTimeZoneDisplay}, so the automated scheduler treats payroll as due today. Switch it back after testing.`
                       : "Choose which day of the month payroll should run automatically. Use the action below for one-off runs."}
                   </span>
                 </div>
@@ -455,7 +503,7 @@ export default function SettingsPage() {
                 >
                   <div className="fw-medium text-sm">Quick Payroll Actions</div>
                   <div className="text-xs text-secondary">
-                    Current schedule: <strong>{settings.payroll.payrollDay}</strong>. When auto-process is enabled, payroll runs at 09:00 in <strong>{settings.profile.timeZone}</strong>. You can still bypass the schedule and process payroll immediately today.
+                    Current schedule: <strong>{settings.payroll.payrollDay}</strong>. When auto-process is enabled, payroll runs at 09:00 in <strong>{companyTimeZoneDisplay}</strong>. You can still bypass the schedule and process payroll immediately today.
                   </div>
                   <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
                     <button

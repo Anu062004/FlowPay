@@ -4,25 +4,30 @@ export async function openaiGenerateText({
   system,
   user,
   temperature,
-  maxOutputTokens
+  maxOutputTokens,
+  modelOverride,
+  apiKeyOverride
 }: {
   system: string;
   user: string;
   temperature?: number;
   maxOutputTokens?: number;
+  modelOverride?: string;
+  apiKeyOverride?: string;
 }): Promise<string> {
-  if (!env.OPENAI_API_KEY) {
+  const apiKey = apiKeyOverride ?? env.OPENAI_API_KEY;
+  if (!apiKey) {
     throw new Error("OPENAI_API_KEY is required when LLM_PROVIDER=openai");
   }
 
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: env.OPENAI_MODEL,
+      model: modelOverride ?? env.OPENAI_MODEL,
       instructions: system,
       input: user,
       temperature,

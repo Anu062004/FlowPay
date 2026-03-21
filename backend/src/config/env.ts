@@ -34,6 +34,8 @@ const envSchema = z.object({
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-20250514"),
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
+  INVESTMENT_GEMINI_API_KEY: z.string().optional(),
+  INVESTMENT_GEMINI_MODEL: z.string().optional(),
   PAYROLL_CRON: z.string().default("0 9 1 * *"),
   INVESTMENT_CRON: z.string().default("0 */6 * * *"),
   REPORT_CRON: z.string().default("0 9 * * 1"),

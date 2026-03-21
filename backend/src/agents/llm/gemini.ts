@@ -43,17 +43,21 @@ export async function geminiGenerateText({
   system,
   user,
   temperature,
-  maxOutputTokens
+  maxOutputTokens,
+  modelOverride,
+  apiKeyOverride
 }: {
   system: string;
   user: string;
   temperature?: number;
   maxOutputTokens?: number;
+  modelOverride?: string;
+  apiKeyOverride?: string;
 }): Promise<string> {
-  if (!env.GEMINI_API_KEY) {
+  const apiKey = apiKeyOverride ?? env.GEMINI_API_KEY;
+  if (!apiKey) {
     throw new Error("GEMINI_API_KEY is required when LLM_PROVIDER=gemini");
   }
-  const apiKey = env.GEMINI_API_KEY;
 
   const body = {
     contents: [
@@ -68,7 +72,7 @@ export async function geminiGenerateText({
     }
   };
 
-  const models = Array.from(new Set([env.GEMINI_MODEL, ...geminiFallbackModels].filter(Boolean)));
+  const models = Array.from(new Set([modelOverride ?? env.GEMINI_MODEL, ...geminiFallbackModels].filter(Boolean)));
   let lastError: Error | null = null;
 
   for (const [index, model] of models.entries()) {

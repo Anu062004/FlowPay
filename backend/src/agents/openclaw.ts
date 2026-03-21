@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createLlmClient } from "./llm/client.js";
+import type { LlmProvider } from "./llm/client.js";
 
 export type OpenClawTask<T> = {
   name: string;
@@ -9,6 +10,9 @@ export type OpenClawTask<T> = {
   temperature?: number;
   maxRetries?: number;
   maxOutputTokens?: number;
+  providerOverride?: LlmProvider;
+  modelOverride?: string;
+  apiKeyOverride?: string;
 };
 
 const llm = createLlmClient();
@@ -62,7 +66,10 @@ export async function runOpenClawTask<T>(task: OpenClawTask<T>, input: unknown):
         system: task.systemPrompt,
         user: task.userPrompt(input),
         temperature: task.temperature ?? 0.2,
-        maxOutputTokens: task.maxOutputTokens
+        maxOutputTokens: task.maxOutputTokens,
+        providerOverride: task.providerOverride,
+        modelOverride: task.modelOverride,
+        apiKeyOverride: task.apiKeyOverride
       });
 
       const parsed = extractJson(responseText);

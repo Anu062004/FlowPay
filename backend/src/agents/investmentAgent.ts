@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { runOpenClawTask } from "./openclaw.js";
+import { env } from "../config/env.js";
 
 const strategyIdSchema = z.enum([
   "hold_treasury_eth",
@@ -135,7 +136,10 @@ export async function runInvestmentAgent(input: InvestmentAgentInput) {
       schema: investmentSchema,
       temperature: 0.1,
       maxRetries: 0,
-      maxOutputTokens: 140
+      maxOutputTokens: 140,
+      providerOverride: "gemini",
+      modelOverride: env.INVESTMENT_GEMINI_MODEL ?? "gemini-2.5-flash-lite",
+      apiKeyOverride: env.INVESTMENT_GEMINI_API_KEY ?? env.GEMINI_API_KEY
     },
     promptInput
   );

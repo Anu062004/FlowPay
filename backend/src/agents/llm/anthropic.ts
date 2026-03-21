@@ -4,26 +4,31 @@ export async function anthropicGenerateText({
   system,
   user,
   temperature,
-  maxOutputTokens
+  maxOutputTokens,
+  modelOverride,
+  apiKeyOverride
 }: {
   system: string;
   user: string;
   temperature?: number;
   maxOutputTokens?: number;
+  modelOverride?: string;
+  apiKeyOverride?: string;
 }): Promise<string> {
-  if (!env.ANTHROPIC_API_KEY) {
+  const apiKey = apiKeyOverride ?? env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic");
   }
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
-      "x-api-key": env.ANTHROPIC_API_KEY,
+      "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: env.ANTHROPIC_MODEL,
+      model: modelOverride ?? env.ANTHROPIC_MODEL,
       max_tokens: maxOutputTokens ?? 512,
       temperature,
       system,

@@ -77,7 +77,7 @@ function buildPlainTextMessage(params: {
 
 async function deliverEmail(input: {
   companyId?: string;
-  type: "employee_invite" | "company_recovery" | "employee_recovery";
+  type: "employee_invite" | "company_access" | "employee_access" | "company_recovery" | "employee_recovery";
   recipientEmail: string;
   subject: string;
   text: string;
@@ -162,7 +162,11 @@ export async function sendEmployeeInvite(input: {
     type: "employee_invite",
     recipientEmail: input.email,
     subject: "Activate your FlowPay account",
-    text: `You have been invited to FlowPay. Activate your account here: ${inviteUrl}`,
+    text: [
+      "You have been invited to FlowPay.",
+      `Employee ID: ${input.employeeId ?? "Pending assignment"}`,
+      `Activate your account here: ${inviteUrl}`
+    ].join("\n"),
     payload: {
       employeeId: input.employeeId ?? null,
       email: input.email,
@@ -188,11 +192,13 @@ export async function sendCompanyRecoveryEmail(input: {
     subject: "Reset your FlowPay company PIN",
     text: [
       `A PIN reset was requested for ${input.companyName}.`,
+      `Company ID: ${input.companyId}`,
       `Use this link to set a new company PIN: ${resetUrl}`,
       "",
       "This link expires in 60 minutes."
     ].join("\n"),
     payload: {
+      companyId: input.companyId,
       companyName: input.companyName,
       email: input.email,
       resetToken: input.resetToken,
@@ -217,6 +223,7 @@ export async function sendEmployeeRecoveryEmail(input: {
     subject: "Reset your FlowPay employee password",
     text: [
       `A password reset was requested for ${input.fullName}.`,
+      `Employee ID: ${input.employeeId}`,
       `Use this link to set a new employee password: ${resetUrl}`,
       "",
       "This link expires in 60 minutes."
@@ -227,6 +234,60 @@ export async function sendEmployeeRecoveryEmail(input: {
       email: input.email,
       resetToken: input.resetToken,
       resetUrl
+    }
+  });
+}
+
+export async function sendCompanyAccessEmail(input: {
+  companyId: string;
+  companyName: string;
+  email: string;
+  treasuryAddress?: string | null;
+}) {
+  await deliverEmail({
+    companyId: input.companyId,
+    type: "company_access",
+    recipientEmail: input.email,
+    subject: "Your FlowPay company workspace is ready",
+    text: [
+      `Your FlowPay employer workspace for ${input.companyName} is ready.`,
+      `Company ID: ${input.companyId}`,
+      ...(input.treasuryAddress ? [`Treasury wallet: ${input.treasuryAddress}`] : []),
+      `Open FlowPay here: ${env.APP_BASE_URL}`
+    ].join("\n"),
+    payload: {
+      companyId: input.companyId,
+      companyName: input.companyName,
+      treasuryAddress: input.treasuryAddress ?? null,
+      email: input.email
+    }
+  });
+}
+
+export async function sendEmployeeAccessEmail(input: {
+  companyId?: string;
+  employeeId: string;
+  fullName: string;
+  email: string;
+  walletAddress?: string | null;
+}) {
+  await deliverEmail({
+    companyId: input.companyId,
+    type: "employee_access",
+    recipientEmail: input.email,
+    subject: "Your FlowPay employee workspace is ready",
+    text: [
+      `Your FlowPay employee workspace is ready for ${input.fullName}.`,
+      `Employee ID: ${input.employeeId}`,
+      ...(input.walletAddress ? [`Wallet address: ${input.walletAddress}`] : []),
+      `Open FlowPay here: ${env.APP_BASE_URL}`
+    ].join("\n"),
+    payload: {
+      companyId: input.companyId ?? null,
+      employeeId: input.employeeId,
+      fullName: input.fullName,
+      walletAddress: input.walletAddress ?? null,
+      email: input.email
     }
   });
 }

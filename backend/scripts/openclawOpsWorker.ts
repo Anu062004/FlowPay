@@ -401,13 +401,24 @@ function formatTaskEmail(task: OpsTask) {
     lines.push("Reply with APPROVE or DENY to decide.");
   } else if (task.type === "employee_invite") {
     lines.push(`Welcome to FlowPay.`);
+    lines.push(`Employee ID: ${payload.employeeId ?? ""}`);
     lines.push(`Activate here: ${payload.activationUrl ?? ""}`);
+  } else if (task.type === "company_access") {
+    lines.push(`Your FlowPay employer workspace is ready.`);
+    lines.push(`Company ID: ${payload.companyId ?? ""}`);
+    if (payload.treasuryAddress) lines.push(`Treasury wallet: ${payload.treasuryAddress}`);
+  } else if (task.type === "employee_access") {
+    lines.push(`Your FlowPay employee workspace is ready.`);
+    lines.push(`Employee ID: ${payload.employeeId ?? ""}`);
+    if (payload.walletAddress) lines.push(`Wallet address: ${payload.walletAddress}`);
   } else if (task.type === "company_recovery") {
     lines.push(`A company PIN reset was requested.`);
+    lines.push(`Company ID: ${payload.companyId ?? ""}`);
     lines.push(`Reset here: ${payload.resetUrl ?? ""}`);
     lines.push(`Company: ${payload.companyName ?? ""}`);
   } else if (task.type === "employee_recovery") {
     lines.push(`An employee password reset was requested.`);
+    lines.push(`Employee ID: ${payload.employeeId ?? ""}`);
     lines.push(`Reset here: ${payload.resetUrl ?? ""}`);
     lines.push(`Employee: ${payload.fullName ?? ""}`);
   } else if (task.type === "payroll_prep") {

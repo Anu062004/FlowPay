@@ -2,7 +2,7 @@ import { pool } from "../db/pool.js";
 import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcryptjs";
 import { createEmployeeWallet } from "./walletService.js";
-import { sendEmployeeInvite } from "./emailService.js";
+import { sendEmployeeAccessEmail, sendEmployeeInvite } from "./emailService.js";
 import { ApiError } from "../utils/errors.js";
 import { env } from "../config/env.js";
 import { getEmployeeProfile } from "./authService.js";
@@ -79,6 +79,16 @@ export async function registerEmployeeWallet(input: {
     const employee = insertResult.rows[0];
     const wallet = await createEmployeeWallet(employee.id, client);
     await client.query("COMMIT");
+
+    if (employee.email) {
+      await sendEmployeeAccessEmail({
+        companyId: employee.company_id ?? undefined,
+        employeeId: employee.id,
+        fullName: employee.full_name,
+        email: employee.email,
+        walletAddress: wallet.wallet_address
+      });
+    }
 
     return {
       employee,

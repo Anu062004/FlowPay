@@ -2,6 +2,7 @@ import { pool } from "../db/pool.js";
 import bcrypt from "bcryptjs";
 import { createTreasuryWallet } from "./walletService.js";
 import { startDepositWatcher } from "./depositWatcher.js";
+import { sendCompanyAccessEmail } from "./emailService.js";
 
 export async function registerCompany(input: { name: string; email: string; accessPin: string }) {
   const client = await pool.connect();
@@ -19,6 +20,12 @@ export async function registerCompany(input: { name: string; email: string; acce
     await client.query("COMMIT");
 
     await startDepositWatcher(wallet.id, company.id, wallet.wallet_address);
+    await sendCompanyAccessEmail({
+      companyId: company.id,
+      companyName: company.name,
+      email: company.email,
+      treasuryAddress: wallet.wallet_address
+    });
 
     return {
       company,

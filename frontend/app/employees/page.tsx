@@ -57,6 +57,7 @@ export default function EmployeesPage() {
     email: string;
     activationUrl: string;
     employeeName: string;
+    salary: string;
   } | null>(null);
 
   const employees = data?.employees ?? [];
@@ -91,7 +92,8 @@ export default function EmployeesPage() {
       setInvitePreview({
         email: result.employee.email || form.email,
         activationUrl: result.activationUrl,
-        employeeName: result.employee.full_name || form.fullName
+        employeeName: result.employee.full_name || form.fullName,
+        salary: form.salary
       });
       refetch();
     } catch (err: any) {
@@ -124,7 +126,8 @@ export default function EmployeesPage() {
       setInvitePreview({
         email: result.email,
         activationUrl: result.activationUrl,
-        employeeName: emp.full_name
+        employeeName: emp.full_name,
+        salary: emp.salary
       });
     } catch (err: any) {
       setActionError(err.message ?? "Failed to resend invite");
@@ -202,6 +205,9 @@ export default function EmployeesPage() {
               <>
                 <div className="text-sm">
                   <strong>{invitePreview.employeeName}</strong> will activate via <strong>{invitePreview.email}</strong>.
+                </div>
+                <div className="text-sm text-secondary">
+                  Monthly salary: <strong>{fmt(invitePreview.salary)}</strong>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Activation Link</label>

@@ -78,11 +78,23 @@ const EMPLOYER_WORKSPACE_PATHS = [
   "/admin"
 ];
 
+const PUBLIC_APP_PATHS = [
+  "/employees/activate",
+  "/treasury/fund"
+];
+
 function isEmployeePath(path: string) {
   return path === "/employee" || path.startsWith("/employee/");
 }
 
+function isPublicAppPath(path: string) {
+  return PUBLIC_APP_PATHS.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
 function isEmployerWorkspacePath(path: string) {
+  if (isPublicAppPath(path)) {
+    return false;
+  }
   return EMPLOYER_WORKSPACE_PATHS.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }
 
@@ -155,7 +167,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathnameValue = usePathname();
   const pathname = pathnameValue ?? "/";
   const router = useRouter();
-  const isDashboard = isEmployeePath(pathname) || isEmployerWorkspacePath(pathname);
+  const isDashboard = !isPublicAppPath(pathname) && (isEmployeePath(pathname) || isEmployerWorkspacePath(pathname));
   const employeeView = isEmployeePath(pathname);
   const navItems = employeeView ? employeeNavItems : employerNavItems;
   const { section, page } = getTitle(pathname);

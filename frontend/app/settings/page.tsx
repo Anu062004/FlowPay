@@ -15,6 +15,7 @@ import {
 type Status = { type: "success" | "error"; message: string } | null;
 
 const PAYROLL_SCHEDULE_PRESETS = [
+  { value: "today", label: "Today only (test)" },
   { value: "manual", label: "Manual only" },
   { value: "1st", label: "1st of each month" },
   { value: "15th", label: "15th of each month" },
@@ -31,8 +32,21 @@ function toOrdinal(day: number) {
   return `${day}th`;
 }
 
+function getTodayPayrollLabel(timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    day: "2-digit"
+  });
+  const parts = formatter.formatToParts(new Date());
+  const dayValue = parts.find((part) => part.type === "day")?.value ?? "15";
+  return `${toOrdinal(parseInt(dayValue, 10))} of each month`;
+}
+
 function parsePayrollSchedule(value: string) {
   const normalized = value.trim().toLowerCase();
+  if (normalized === "today only") {
+    return { preset: "today", customDay: 15 };
+  }
   if (normalized === "manual only") {
     return { preset: "manual", customDay: 15 };
   }
@@ -56,6 +70,8 @@ function parsePayrollSchedule(value: string) {
 
 function payrollScheduleLabel(preset: string, customDay: number) {
   switch (preset) {
+    case "today":
+      return "Today only";
     case "manual":
       return "Manual only";
     case "1st":
@@ -227,6 +243,7 @@ export default function SettingsPage() {
 
   const disabled = saving || loading;
   const payrollSchedule = parsePayrollSchedule(settings?.payroll.payrollDay ?? "15th of each month");
+  const todayPayrollLabel = settings ? getTodayPayrollLabel(settings.profile.timeZone) : "15th of each month";
 
   const saveAccessPin = async () => {
     if (!newAccessPin.trim()) {
@@ -377,7 +394,9 @@ export default function SettingsPage() {
                     ))}
                   </select>
                   <span className="form-hint">
-                    Choose which day of the month payroll should run automatically. Use the action below for one-off runs.
+                    {payrollSchedule.preset === "today"
+                      ? `Testing shortcut: saving Today only resolves to ${todayPayrollLabel} in ${settings.profile.timeZone}, so the automated scheduler treats payroll as due today. Switch it back after testing.`
+                      : "Choose which day of the month payroll should run automatically. Use the action below for one-off runs."}
                   </span>
                 </div>
                 {payrollSchedule.preset === "custom" ? (

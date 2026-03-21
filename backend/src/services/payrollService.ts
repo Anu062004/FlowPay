@@ -6,6 +6,11 @@ import { createOpsTask } from "./opsService.js";
 import { getTreasuryBalance } from "./treasuryService.js";
 import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
 import { evaluateAgentPolicy } from "./agentPolicyService.js";
+import { getCompanySettings } from "./settingsService.js";
+import {
+  formatPayrollMonthKey,
+  formatPayrollMonthLabel,
+} from "../utils/payrollSchedule.js";
 
 function calculateEmi(amount: number, annualInterestRate: number, durationMonths: number) {
   const monthlyRate = annualInterestRate / 100 / 12;
@@ -17,20 +22,12 @@ function calculateEmi(amount: number, annualInterestRate: number, durationMonths
   return numerator / denominator;
 }
 
-function getPayrollMonthStart(reference = new Date()) {
-  return new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), 1));
+function getPayrollMonthKey(reference = new Date(), timeZone = "UTC") {
+  return formatPayrollMonthKey(reference, timeZone);
 }
 
-function getPayrollMonthKey(reference = new Date()) {
-  return getPayrollMonthStart(reference).toISOString().slice(0, 10);
-}
-
-function getPayrollMonthLabel(reference = new Date()) {
-  return reference.toLocaleString("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC"
-  });
+function getPayrollMonthLabel(reference = new Date(), timeZone = "UTC") {
+  return formatPayrollMonthLabel(reference, timeZone);
 }
 
 async function getCompanyPayrollEmployees(companyId: string, payrollMonthKey: string) {
@@ -69,19 +66,45 @@ async function getCompanyPayrollEmployees(companyId: string, payrollMonthKey: st
   }>;
 }
 
-export async function runPayroll(companyId?: string, auditContext: AgentLogContext = {}) {
+async function tryAcquirePayrollLock(companyId: string) {
+  const result = await db.query(
+    "SELECT pg_try_advisory_lock(hashtext($1)) AS locked",
+    [`payroll:${companyId}`]
+  );
+  return Boolean(result.rows[0]?.locked);
+}
+
+async function releasePayrollLock(companyId: string) {
+  await db.query("SELECT pg_advisory_unlock(hashtext($1))", [`payroll:${companyId}`]);
+}
+
+export async function getDuePayrollEmployees(companyId: string, payrollMonthKey: string) {
+  const activeEmployees = await getCompanyPayrollEmployees(companyId, payrollMonthKey);
+  return activeEmployees.filter((employee) => !employee.paid_at_this_period);
+}
+
+export async function runPayroll(
+  companyId?: string,
+  auditContext: AgentLogContext = {},
+  options?: {
+    payrollMonthKey?: string;
+    payrollMonthLabel?: string;
+    emiAutoDeduction?: boolean;
+  }
+) {
   const companyQuery = companyId
     ? "SELECT id, treasury_wallet_id FROM companies WHERE id = $1"
     : "SELECT id, treasury_wallet_id FROM companies";
   const companyParams = companyId ? [companyId] : [];
   const companies = await db.query(companyQuery, companyParams);
-  const payrollMonthKey = getPayrollMonthKey();
-  const payrollMonthLabel = getPayrollMonthLabel();
+  const referenceDate = new Date();
 
   if (companies.rowCount === 0) {
     throw new ApiError(404, "No companies found for payroll");
   }
 
+  let responsePayrollMonthKey = options?.payrollMonthKey ?? getPayrollMonthKey(referenceDate);
+  let responsePayrollMonthLabel = options?.payrollMonthLabel ?? getPayrollMonthLabel(referenceDate);
   const results = [];
   const companySummaries: Array<{
     companyId: string;
@@ -98,102 +121,122 @@ export async function runPayroll(companyId?: string, auditContext: AgentLogConte
     if (!company.treasury_wallet_id) {
       continue;
     }
-    const activeEmployees = await getCompanyPayrollEmployees(company.id, payrollMonthKey);
-    const dueEmployees = activeEmployees.filter((employee) => !employee.paid_at_this_period);
-    const alreadyPaidEmployees = activeEmployees.length - dueEmployees.length;
+    const companySettings = await getCompanySettings(company.id);
+    const payrollMonthKey =
+      options?.payrollMonthKey ?? getPayrollMonthKey(referenceDate, companySettings.profile.timeZone);
+    const payrollMonthLabel =
+      options?.payrollMonthLabel ?? getPayrollMonthLabel(referenceDate, companySettings.profile.timeZone);
+    responsePayrollMonthKey = payrollMonthKey;
+    responsePayrollMonthLabel = payrollMonthLabel;
+    const emiAutoDeduction = options?.emiAutoDeduction ?? companySettings.payroll.emiAutoDeduction;
+    const locked = await tryAcquirePayrollLock(company.id);
 
-    const employeePayrolls: Array<{
-      employeeId: string;
-      walletAddress: string;
-      walletId: string;
-      netSalary: number;
-      totalEmi: number;
-      loanRows: Array<any>;
-    }> = [];
-
-    let totalNetSalary = 0;
-    let totalEmiCollected = 0;
-
-    for (const employee of dueEmployees) {
-      const salary = parseFloat(employee.salary);
-      const loans = await db.query(
-        "SELECT id, amount, interest_rate, duration_months, remaining_balance FROM loans WHERE employee_id = $1 AND status = 'active'",
-        [employee.id]
-      );
-
-      let totalEmi = 0;
-      for (const loan of loans.rows) {
-        const emi = calculateEmi(
-          parseFloat(loan.amount),
-          parseFloat(loan.interest_rate),
-          parseInt(loan.duration_months, 10)
-        );
-        totalEmi += emi;
+    if (!locked) {
+      if (companyId) {
+        throw new ApiError(409, "Payroll is already running for this company");
       }
-
-      const netSalary = Math.max(salary - totalEmi, 0);
-      totalNetSalary += netSalary;
-      totalEmiCollected += totalEmi;
-
-      employeePayrolls.push({
-        employeeId: employee.id,
-        walletAddress: employee.wallet_address,
-        walletId: employee.wallet_id,
-        netSalary,
-        totalEmi,
-        loanRows: loans.rows
-      });
-    }
-
-    if (employeePayrolls.length === 0) {
-      companySummaries.push({
-        companyId: company.id,
-        payrollMonth: payrollMonthKey,
-        payrollMonthLabel,
-        activeEmployees: activeEmployees.length,
-        eligibleEmployees: 0,
-        alreadyPaidEmployees,
-        processedEmployees: 0,
-        totalNetSalary: 0
-      });
       continue;
     }
 
-    const policyResult = await evaluateAgentPolicy({
-      companyId: company.id,
-      action: "payroll",
-      amount: totalNetSalary
-    });
-
-    await logAgentAction(
-      "FlowPayPolicyEngine",
-      {
-        companyId: company.id,
-        employees: employeePayrolls.length,
-        totalNetSalary,
-        totalEmiCollected
-      },
-      {
-        action: "payroll"
-      },
-      policyResult.reasons.join(" ") || "Payroll run passed wallet policy checks.",
-      `Payroll policy status: ${policyResult.status.toUpperCase()}`,
-      company.id,
-      {
-        ...auditContext,
-        stage: "policy_validation",
-        policyResult,
-        executionStatus: policyResult.status
-      }
-    );
-
-    if (policyResult.status === "block") {
-      throw new ApiError(400, policyResult.reasons[0] ?? "Payroll blocked by wallet policy");
-    }
-
-    const txHashes: Array<{ employeeId: string; txHash: string | null }> = [];
-
     try {
+      const activeEmployees = await getCompanyPayrollEmployees(company.id, payrollMonthKey);
+      const dueEmployees = activeEmployees.filter((employee) => !employee.paid_at_this_period);
+      const alreadyPaidEmployees = activeEmployees.length - dueEmployees.length;
+
+      const employeePayrolls: Array<{
+        employeeId: string;
+        walletAddress: string;
+        walletId: string;
+        netSalary: number;
+        totalEmi: number;
+        loanRows: Array<any>;
+      }> = [];
+
+      let totalNetSalary = 0;
+      let totalEmiCollected = 0;
+
+      for (const employee of dueEmployees) {
+        const salary = parseFloat(employee.salary);
+        const loans = await db.query(
+          "SELECT id, amount, interest_rate, duration_months, remaining_balance FROM loans WHERE employee_id = $1 AND status = 'active'",
+          [employee.id]
+        );
+
+        let totalEmi = 0;
+        if (emiAutoDeduction) {
+          for (const loan of loans.rows) {
+            const emi = calculateEmi(
+              parseFloat(loan.amount),
+              parseFloat(loan.interest_rate),
+              parseInt(loan.duration_months, 10)
+            );
+            totalEmi += emi;
+          }
+        }
+
+        const netSalary = Math.max(salary - totalEmi, 0);
+        totalNetSalary += netSalary;
+        totalEmiCollected += totalEmi;
+
+        employeePayrolls.push({
+          employeeId: employee.id,
+          walletAddress: employee.wallet_address,
+          walletId: employee.wallet_id,
+          netSalary,
+          totalEmi,
+          loanRows: loans.rows
+        });
+      }
+
+      if (employeePayrolls.length === 0) {
+        companySummaries.push({
+          companyId: company.id,
+          payrollMonth: payrollMonthKey,
+          payrollMonthLabel,
+          activeEmployees: activeEmployees.length,
+          eligibleEmployees: 0,
+          alreadyPaidEmployees,
+          processedEmployees: 0,
+          totalNetSalary: 0
+        });
+        continue;
+      }
+
+      const policyResult = await evaluateAgentPolicy({
+        companyId: company.id,
+        action: "payroll",
+        amount: totalNetSalary
+      });
+
+      await logAgentAction(
+        "FlowPayPolicyEngine",
+        {
+          companyId: company.id,
+          employees: employeePayrolls.length,
+          totalNetSalary,
+          totalEmiCollected
+        },
+        {
+          action: "payroll"
+        },
+        policyResult.reasons.join(" ") || "Payroll run passed wallet policy checks.",
+        `Payroll policy status: ${policyResult.status.toUpperCase()}`,
+        company.id,
+        {
+          ...auditContext,
+          stage: "policy_validation",
+          policyResult,
+          executionStatus: policyResult.status
+        }
+      );
+
+      if (policyResult.status === "block") {
+        throw new ApiError(400, policyResult.reasons[0] ?? "Payroll blocked by wallet policy");
+      }
+
+      const txHashes: Array<{ employeeId: string; txHash: string | null }> = [];
+
+      try {
       for (const employee of employeePayrolls) {
         let payrollTxHash: string | null = null;
         if (employee.netSalary > 0) {
@@ -224,23 +267,25 @@ export async function runPayroll(companyId?: string, auditContext: AgentLogConte
           );
         }
 
-        for (const loan of employee.loanRows) {
-          const emi = calculateEmi(
-            parseFloat(loan.amount),
-            parseFloat(loan.interest_rate),
-            parseInt(loan.duration_months, 10)
-          );
-          const remaining = parseFloat(loan.remaining_balance) - emi;
-          if (remaining <= 0) {
-            await db.query(
-              "UPDATE loans SET remaining_balance = 0, status = 'repaid', updated_at = now() WHERE id = $1",
-              [loan.id]
+        if (emiAutoDeduction) {
+          for (const loan of employee.loanRows) {
+            const emi = calculateEmi(
+              parseFloat(loan.amount),
+              parseFloat(loan.interest_rate),
+              parseInt(loan.duration_months, 10)
             );
-          } else {
-            await db.query(
-              "UPDATE loans SET remaining_balance = $1, updated_at = now() WHERE id = $2",
-              [remaining.toFixed(6), loan.id]
-            );
+            const remaining = parseFloat(loan.remaining_balance) - emi;
+            if (remaining <= 0) {
+              await db.query(
+                "UPDATE loans SET remaining_balance = 0, status = 'repaid', updated_at = now() WHERE id = $1",
+                [loan.id]
+              );
+            } else {
+              await db.query(
+                "UPDATE loans SET remaining_balance = $1, updated_at = now() WHERE id = $2",
+                [remaining.toFixed(6), loan.id]
+              );
+            }
           }
         }
 
@@ -298,7 +343,7 @@ export async function runPayroll(companyId?: string, auditContext: AgentLogConte
           }
         }
       );
-    } catch (error) {
+      } catch (error) {
       await logAgentAction(
         "WDKExecutionLayer",
         {
@@ -324,19 +369,28 @@ export async function runPayroll(companyId?: string, auditContext: AgentLogConte
         }
       );
       throw error;
+      }
+    } finally {
+      await releasePayrollLock(company.id);
     }
   }
 
   return {
     processed: results.length,
-    payrollMonth: payrollMonthKey,
-    payrollMonthLabel,
+    payrollMonth: responsePayrollMonthKey,
+    payrollMonthLabel: responsePayrollMonthLabel,
     companySummaries,
     results
   };
 }
 
-export async function requestPayrollApproval(companyId?: string) {
+export async function requestPayrollApproval(
+  companyId?: string,
+  options?: {
+    payrollMonthKey?: string;
+    payrollMonthLabel?: string;
+  }
+) {
   const companyQuery = companyId
     ? "SELECT id, treasury_wallet_id FROM companies WHERE id = $1"
     : "SELECT id, treasury_wallet_id FROM companies";
@@ -348,13 +402,17 @@ export async function requestPayrollApproval(companyId?: string) {
   }
 
   const approvals: Array<Record<string, unknown>> = [];
-  const payrollMonthKey = getPayrollMonthKey();
-  const payrollMonthLabel = getPayrollMonthLabel();
+  const referenceDate = new Date();
 
   for (const company of companies.rows) {
     if (!company.treasury_wallet_id) {
       continue;
     }
+    const companySettings = await getCompanySettings(company.id);
+    const payrollMonthKey =
+      options?.payrollMonthKey ?? getPayrollMonthKey(referenceDate, companySettings.profile.timeZone);
+    const payrollMonthLabel =
+      options?.payrollMonthLabel ?? getPayrollMonthLabel(referenceDate, companySettings.profile.timeZone);
 
     const existing = await db.query(
       "SELECT 1 FROM ops_approvals WHERE company_id = $1 AND kind = 'payroll' AND status = 'pending' LIMIT 1",

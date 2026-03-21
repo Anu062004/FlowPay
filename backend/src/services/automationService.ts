@@ -1,4 +1,3 @@
-import { CronExpressionParser } from "cron-parser";
 import { env } from "../config/env.js";
 import { db } from "../db/pool.js";
 import { requestPayrollApproval } from "./payrollService.js";
@@ -10,6 +9,8 @@ import { getEthPrice } from "./priceService.js";
 import { startAllTreasuryWatchers } from "./depositWatcher.js";
 import { getTokenTransfers } from "./indexerService.js";
 import { withRpcFailover } from "./rpcService.js";
+import { getCompanySettings } from "./settingsService.js";
+import { getNextPayrollRun } from "../utils/payrollSchedule.js";
 
 export type AutomationJobName =
   | "finance"
@@ -69,21 +70,24 @@ async function listCompanies(companyId?: string): Promise<CompanyRow[]> {
   return result.rows as CompanyRow[];
 }
 
-function getHoursToNextPayroll(): number {
-  const interval = CronExpressionParser.parse(env.PAYROLL_CRON);
-  const nextPayroll = interval.next().toDate();
-  return (nextPayroll.getTime() - Date.now()) / (1000 * 60 * 60);
-}
-
 async function runFinanceAutomation(companyId?: string): Promise<Record<string, unknown>> {
   const companies = await listCompanies(companyId);
   const createdTasks: Record<string, number> = {};
   let processed = 0;
-  const hoursToPayroll = getHoursToNextPayroll();
   const payrollLookahead = parseIntSafe(env.PAYROLL_PREP_LOOKAHEAD_HOURS, 72);
+  const runHourLocal = parseIntSafe(env.PAYROLL_AUTOMATION_LOCAL_HOUR, 9);
+  const runMinuteLocal = parseIntSafe(env.PAYROLL_AUTOMATION_LOCAL_MINUTE, 0);
 
   for (const company of companies) {
     processed += 1;
+    const settings = await getCompanySettings(company.id);
+    const nextPayroll = getNextPayrollRun({
+      payrollDayLabel: settings.payroll.payrollDay,
+      companyTimeZone: settings.profile.timeZone,
+      runHourLocal,
+      runMinuteLocal
+    });
+    const hoursToPayroll = nextPayroll?.hoursUntilRun ?? null;
     const employeeStatsResult = await db.query(
       `SELECT
          COUNT(*) FILTER (WHERE status = 'active') AS active_employees,
@@ -124,7 +128,9 @@ async function runFinanceAutomation(companyId?: string): Promise<Record<string, 
       companyId: company.id,
       companyName: company.name,
       generatedAt: new Date().toISOString(),
-      hoursToNextPayroll: parseFloat(hoursToPayroll.toFixed(2)),
+      hoursToNextPayroll: hoursToPayroll === null ? null : parseFloat(hoursToPayroll.toFixed(2)),
+      nextPayrollAt: nextPayroll?.runAt.toISOString() ?? null,
+      nextPayrollMonth: nextPayroll?.payrollMonthKey ?? null,
       employees: employeeStatsResult.rows[0],
       loans: loanStatsResult.rows[0],
       treasury,
@@ -159,7 +165,7 @@ async function runFinanceAutomation(companyId?: string): Promise<Record<string, 
       createdTasks.reconciliation_report = (createdTasks.reconciliation_report ?? 0) + 1;
     }
 
-    if (hoursToPayroll <= payrollLookahead) {
+    if (hoursToPayroll !== null && hoursToPayroll <= payrollLookahead) {
       const payrollPrepResult = await createOpsTaskIfNotRecent({
         companyId: company.id,
         type: "payroll_prep",
@@ -168,6 +174,8 @@ async function runFinanceAutomation(companyId?: string): Promise<Record<string, 
           companyId: company.id,
           companyName: company.name,
           hoursToPayroll: parseFloat(hoursToPayroll.toFixed(2)),
+          nextPayrollAt: nextPayroll?.runAt.toISOString() ?? null,
+          nextPayrollMonth: nextPayroll?.payrollMonthKey ?? null,
           activeEmployees: toNumber(employeeStatsResult.rows[0]?.active_employees),
           totalSalary: toNumber(employeeStatsResult.rows[0]?.total_salary),
           treasuryBalance: treasury ? toNumber((treasury as any).balance) : null
@@ -208,17 +216,27 @@ async function runFinanceAutomation(companyId?: string): Promise<Record<string, 
 async function runBackendWorkflowAutomation(companyId?: string): Promise<Record<string, unknown>> {
   const companies = await listCompanies(companyId);
   const companyIds = companies.map((company) => company.id);
-
-  const hoursToPayroll = getHoursToNextPayroll();
   const payrollLookahead = parseIntSafe(env.PAYROLL_PREP_LOOKAHEAD_HOURS, 72);
+  const runHourLocal = parseIntSafe(env.PAYROLL_AUTOMATION_LOCAL_HOUR, 9);
+  const runMinuteLocal = parseIntSafe(env.PAYROLL_AUTOMATION_LOCAL_MINUTE, 0);
   let payrollRequests = 0;
-  if (hoursToPayroll <= payrollLookahead) {
-    if (companyId) {
-      const result = await requestPayrollApproval(companyId);
+  let companiesWithinPayrollLookahead = 0;
+  for (const company of companies) {
+    const settings = await getCompanySettings(company.id);
+    const nextPayroll = getNextPayrollRun({
+      payrollDayLabel: settings.payroll.payrollDay,
+      companyTimeZone: settings.profile.timeZone,
+      runHourLocal,
+      runMinuteLocal
+    });
+
+    if (nextPayroll && nextPayroll.hoursUntilRun <= payrollLookahead) {
+      const result = await requestPayrollApproval(company.id, {
+        payrollMonthKey: nextPayroll.payrollMonthKey,
+        payrollMonthLabel: nextPayroll.payrollMonthLabel
+      });
       payrollRequests += toNumber(result.requested);
-    } else {
-      const result = await requestPayrollApproval();
-      payrollRequests += toNumber(result.requested);
+      companiesWithinPayrollLookahead += 1;
     }
   }
 
@@ -294,7 +312,7 @@ async function runBackendWorkflowAutomation(companyId?: string): Promise<Record<
 
   return {
     companies: companies.length,
-    hoursToPayroll: parseFloat(hoursToPayroll.toFixed(2)),
+    companiesWithinPayrollLookahead,
     payrollRequests,
     unsyncedLoans,
     staleOpsItems

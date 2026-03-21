@@ -2,9 +2,11 @@ import { Router } from "express";
 import { z } from "zod";
 import { addEmployee, activateEmployee, registerEmployeeWallet, resendEmployeeInvite } from "../services/employeeService.js";
 import { getEmployeeWalletDetails, withdrawEmployeeFunds } from "../services/employeeWalletService.js";
+import { getCompanySettings } from "../services/settingsService.js";
 import { asyncHandler } from "../utils/errors.js";
 import { db } from "../db/pool.js";
 import { uuidQueryParam } from "../utils/validation.js";
+import { getPayrollScheduleStatus } from "../utils/payrollSchedule.js";
 import {
   authenticateEmployee,
   clearEmployeeSession,
@@ -69,6 +71,11 @@ router.get(
   asyncHandler(async (req, res) => {
     const companyId = uuidQueryParam.parse(req.query.companyId);
     assertCompanyScope(res, companyId);
+    const settings = await getCompanySettings(companyId);
+    const payrollSchedule = getPayrollScheduleStatus({
+      payrollDayLabel: settings.payroll.payrollDay,
+      companyTimeZone: settings.profile.timeZone
+    });
     const result = await db.query(
       `SELECT
          e.id,
@@ -107,10 +114,18 @@ router.get(
          WHERE pd.employee_id = e.id
        ) payroll_summary ON true
        WHERE e.company_id = $1
-       ORDER BY e.created_at DESC`,
+      ORDER BY e.created_at DESC`,
       [companyId]
     );
-    res.status(200).json({ employees: result.rows });
+    const employees = result.rows.map((row) => ({
+      ...row,
+      payroll_status: row.paid_this_period
+        ? "paid"
+        : payrollSchedule.due
+          ? "due"
+          : "scheduled"
+    }));
+    res.status(200).json({ employees });
   })
 );
 

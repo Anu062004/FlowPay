@@ -39,6 +39,16 @@ function fmtEth(value: string | number | null | undefined) {
   return formatEth(value, 6, "ETH");
 }
 
+function getEmployeePayrollStatus(employee: {
+  payroll_status?: "paid" | "due" | "scheduled";
+  paid_this_period?: boolean;
+}) {
+  if (employee.payroll_status) {
+    return employee.payroll_status;
+  }
+  return employee.paid_this_period ? "paid" : "due";
+}
+
 function isSameUtcPayrollMonth(isoDate: string, reference: Date) {
   const value = new Date(isoDate);
   return (
@@ -119,10 +129,11 @@ export default function PayrollPage() {
     timeZone: "UTC"
   });
   const activeEmployees = employees.filter((employee) => employee.status === "active");
-  const paidEmployees = activeEmployees.filter((employee) => employee.paid_this_period);
-  const dueEmployees = activeEmployees.filter((employee) => !employee.paid_this_period);
+  const paidEmployees = activeEmployees.filter((employee) => getEmployeePayrollStatus(employee) === "paid");
+  const scheduledEmployees = activeEmployees.filter((employee) => getEmployeePayrollStatus(employee) === "scheduled");
+  const unpaidEmployees = activeEmployees.filter((employee) => getEmployeePayrollStatus(employee) !== "paid");
   const totalGrossPayroll = activeEmployees.reduce((sum, employee) => sum + parseFloat(employee.salary), 0);
-  const grossDuePayroll = dueEmployees.reduce((sum, employee) => sum + parseFloat(employee.salary), 0);
+  const grossDuePayroll = unpaidEmployees.reduce((sum, employee) => sum + parseFloat(employee.salary), 0);
   const monthlyHistory = history.filter((entry) => isSameUtcPayrollMonth(entry.created_at, now));
   const totalDisbursed = monthlyHistory.reduce((sum, entry) => sum + parseFloat(entry.amount), 0);
 
@@ -151,7 +162,7 @@ export default function PayrollPage() {
           <p className="page-subtitle">Automated salary disbursement and payroll history in ETH.</p>
         </div>
         <div className="row">
-          <button className="btn btn-primary" onClick={() => setShowConfirm(true)} disabled={dueEmployees.length === 0}>
+          <button className="btn btn-primary" onClick={() => setShowConfirm(true)} disabled={unpaidEmployees.length === 0}>
             <Icon d="M12 4v16m8-8H4" size={14} />
             Process Payroll
           </button>
@@ -174,7 +185,7 @@ export default function PayrollPage() {
       <div className="grid-4">
         {[
           { label: "Total Monthly Salary", value: employeesHook.loading ? "--" : fmtEth(totalGrossPayroll) },
-          { label: "Due This Month", value: employeesHook.loading ? "--" : `${dueEmployees.length}` },
+          { label: "Unpaid This Month", value: employeesHook.loading ? "--" : `${unpaidEmployees.length}` },
           { label: "Payroll Runs This Month", value: historyHook.loading ? "--" : String(monthlyHistory.length) },
           { label: "Disbursed This Month", value: historyHook.loading ? "--" : fmtEth(totalDisbursed) },
         ].map((item) => (
@@ -196,7 +207,7 @@ export default function PayrollPage() {
           <div className="card-header">
             <div className="card-title">Salary Breakdown</div>
             <div className="card-subtitle">
-              {dueEmployees.length} due and {paidEmployees.length} already paid for {currentPayrollLabel}.
+              {unpaidEmployees.length} unpaid, {scheduledEmployees.length} scheduled later, and {paidEmployees.length} already paid for {currentPayrollLabel}.
             </div>
           </div>
           {employeesHook.loading ? (
@@ -225,23 +236,30 @@ export default function PayrollPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {activeEmployees.map((employee) => (
-                    <tr key={employee.id}>
-                      <td>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{employee.full_name}</div>
-                        <div className="text-xs text-secondary">{employee.email}</div>
-                      </td>
-                      <td className="data-table-num">{fmtEth(employee.salary)}</td>
-                      <td className="data-table-num">
-                        {parseFloat(employee.outstanding_balance) > 0 ? fmtEth(employee.outstanding_balance) : "--"}
-                      </td>
-                      <td>
-                        <Badge variant={employee.paid_this_period ? "success" : "warning"}>
-                          {employee.paid_this_period ? "paid this month" : "due"}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
+                  {activeEmployees.map((employee) => {
+                    const payrollStatus = getEmployeePayrollStatus(employee);
+                    return (
+                      <tr key={employee.id}>
+                        <td>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{employee.full_name}</div>
+                          <div className="text-xs text-secondary">{employee.email}</div>
+                        </td>
+                        <td className="data-table-num">{fmtEth(employee.salary)}</td>
+                        <td className="data-table-num">
+                          {parseFloat(employee.outstanding_balance) > 0 ? fmtEth(employee.outstanding_balance) : "--"}
+                        </td>
+                        <td>
+                          <Badge variant={payrollStatus === "paid" ? "success" : payrollStatus === "due" ? "warning" : "neutral"}>
+                            {payrollStatus === "paid"
+                              ? "paid this month"
+                              : payrollStatus === "due"
+                                ? "due today"
+                                : "scheduled"}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -327,8 +345,8 @@ export default function PayrollPage() {
             </div>
             <div className="modal-body">
               <div className="stack">
-                {[
-                  ["Employees to pay", String(dueEmployees.length)],
+                {[ 
+                  ["Employees to pay", String(unpaidEmployees.length)],
                   ["Already paid this month", String(paidEmployees.length)],
                   ["Total gross payout", fmtEth(grossDuePayroll)],
                 ].map(([label, value], index) => (
@@ -345,12 +363,20 @@ export default function PayrollPage() {
                   </div>
                 ))}
                 {runError ? <div className="alert alert-danger">{runError}</div> : null}
-                {dueEmployees.length === 0 ? (
+                {unpaidEmployees.length === 0 ? (
                   <div className="alert alert-success">
                     <span className="alert-icon">
                       <Icon d="M5 13l4 4L19 7" size={16} />
                     </span>
                     <span>Payroll is already complete for {currentPayrollLabel}. Only unpaid employees are processed each month.</span>
+                  </div>
+                ) : null}
+                {scheduledEmployees.length > 0 ? (
+                  <div className="alert alert-info">
+                    <span className="alert-icon">
+                      <Icon d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={16} />
+                    </span>
+                    <span>{scheduledEmployees.length} employee{scheduledEmployees.length === 1 ? "" : "s"} are not due yet, but manual payroll can still pay them early.</span>
                   </div>
                 ) : null}
                 <div className="alert alert-warning">
@@ -360,7 +386,7 @@ export default function PayrollPage() {
                       size={16}
                     />
                   </span>
-                  <span>This will only pay employees who are still due for {currentPayrollLabel}. Already-paid employees are skipped.</span>
+                  <span>This will pay every unpaid employee for {currentPayrollLabel}. Already-paid employees are skipped.</span>
                 </div>
               </div>
             </div>
@@ -368,7 +394,7 @@ export default function PayrollPage() {
               <button className="btn btn-secondary" onClick={() => setShowConfirm(false)}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={handleRunPayroll} disabled={running || dueEmployees.length === 0}>
+              <button className="btn btn-primary" onClick={handleRunPayroll} disabled={running || unpaidEmployees.length === 0}>
                 {running ? "Processing..." : "Confirm & Run Payroll"}
               </button>
             </div>

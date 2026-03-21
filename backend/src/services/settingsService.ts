@@ -1,5 +1,9 @@
 import { db } from "../db/pool.js";
 import { ApiError } from "../utils/errors.js";
+import {
+  canonicalizePayrollDayLabel,
+  normalizeCompanyTimeZone,
+} from "../utils/payrollSchedule.js";
 
 export type CompanySettings = {
   profile: {
@@ -43,6 +47,7 @@ export type CompanySettings = {
       humanReviewAbove: number;
     };
   };
+  updated_at?: string;
 };
 
 function buildDefaultSettings(companyName: string, companyEmail: string): CompanySettings {
@@ -51,7 +56,7 @@ function buildDefaultSettings(companyName: string, companyEmail: string): Compan
       companyName,
       legalEntity: "",
       companyEmail,
-      timeZone: "UTC+0 - London"
+      timeZone: "Europe/London"
     },
     payroll: {
       payrollDay: "15th of each month",
@@ -94,19 +99,27 @@ function normalizeSettings(
   raw: Partial<CompanySettings> | undefined,
   companyName: string,
   companyEmail: string,
-  accessPinConfigured: boolean
+  accessPinConfigured: boolean,
+  settingsUpdatedAt?: string | null
 ): CompanySettings {
   const defaults = buildDefaultSettings(companyName, companyEmail);
   const next = raw ?? {};
+  const normalizedTimeZone = normalizeCompanyTimeZone(next.profile?.timeZone ?? defaults.profile.timeZone);
+  const payrollReferenceDate = settingsUpdatedAt ? new Date(settingsUpdatedAt) : new Date();
 
   return {
     profile: {
       ...defaults.profile,
-      ...(next.profile ?? {})
+      ...(next.profile ?? {}),
+      timeZone: normalizedTimeZone
     },
     payroll: {
       ...defaults.payroll,
-      ...(next.payroll ?? {})
+      ...(next.payroll ?? {}),
+      payrollDay: canonicalizePayrollDayLabel(next.payroll?.payrollDay ?? defaults.payroll.payrollDay, {
+        referenceDate: payrollReferenceDate,
+        timeZone: normalizedTimeZone
+      })
     },
     security: {
       ...defaults.security,
@@ -121,7 +134,8 @@ function normalizeSettings(
         ...(next.agent?.walletPolicy ?? {})
       },
       lending_paused: next.agent?.lending_paused ?? defaults.agent.lending_paused
-    }
+    },
+    updated_at: settingsUpdatedAt ? new Date(settingsUpdatedAt).toISOString() : undefined
   };
 }
 
@@ -132,7 +146,7 @@ export async function getCompanySettings(companyId: string): Promise<CompanySett
   }
 
   const existing = await db.query(
-    "SELECT profile, payroll, security, agent FROM company_settings WHERE company_id = $1",
+    "SELECT profile, payroll, security, agent, updated_at FROM company_settings WHERE company_id = $1",
     [companyId]
   );
 
@@ -141,7 +155,8 @@ export async function getCompanySettings(companyId: string): Promise<CompanySett
       existing.rows[0] as Partial<CompanySettings>,
       company.rows[0].name,
       company.rows[0].email,
-      Boolean(company.rows[0].access_pin_hash)
+      Boolean(company.rows[0].access_pin_hash),
+      existing.rows[0].updated_at ?? null
     );
   }
 
@@ -149,7 +164,7 @@ export async function getCompanySettings(companyId: string): Promise<CompanySett
   const inserted = await db.query(
     `INSERT INTO company_settings (company_id, profile, payroll, security, agent)
      VALUES ($1, $2, $3, $4, $5)
-     RETURNING profile, payroll, security, agent`,
+     RETURNING profile, payroll, security, agent, updated_at`,
     [companyId, defaults.profile, defaults.payroll, defaults.security, defaults.agent]
   );
 
@@ -157,7 +172,8 @@ export async function getCompanySettings(companyId: string): Promise<CompanySett
     inserted.rows[0] as Partial<CompanySettings>,
     company.rows[0].name,
     company.rows[0].email,
-    Boolean(company.rows[0].access_pin_hash)
+    Boolean(company.rows[0].access_pin_hash),
+    inserted.rows[0].updated_at ?? null
   );
 }
 
@@ -176,12 +192,14 @@ export async function upsertCompanySettings(
       ...settings,
       profile: {
         ...settings.profile,
-        companyEmail: canonicalEmail
+        companyEmail: canonicalEmail,
+        timeZone: normalizeCompanyTimeZone(settings.profile.timeZone)
       }
     },
     settings.profile.companyName,
     canonicalEmail,
-    Boolean(company.rows[0].access_pin_hash)
+    Boolean(company.rows[0].access_pin_hash),
+    settings.updated_at ?? null
   );
   const nextSettings: CompanySettings = {
     ...normalized,
@@ -205,7 +223,7 @@ export async function upsertCompanySettings(
        security = EXCLUDED.security,
        agent = EXCLUDED.agent,
        updated_at = now()
-     RETURNING profile, payroll, security, agent`,
+     RETURNING profile, payroll, security, agent, updated_at`,
     [companyId, nextSettings.profile, nextSettings.payroll, nextSettings.security, nextSettings.agent]
   );
 
@@ -213,6 +231,7 @@ export async function upsertCompanySettings(
     result.rows[0] as Partial<CompanySettings>,
     nextSettings.profile.companyName,
     canonicalEmail,
-    Boolean(company.rows[0].access_pin_hash)
+    Boolean(company.rows[0].access_pin_hash),
+    result.rows[0].updated_at ?? null
   );
 }

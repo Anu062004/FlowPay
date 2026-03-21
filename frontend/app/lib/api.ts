@@ -106,6 +106,7 @@ export type Employee = {
   company_name?: string;
   last_payroll_at?: string | null;
   paid_this_period?: boolean;
+  payroll_status?: "paid" | "due" | "scheduled";
 };
 
 export type Loan = {

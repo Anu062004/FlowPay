@@ -15,10 +15,7 @@ import {
 type Status = { type: "success" | "error"; message: string } | null;
 
 const PAYROLL_SCHEDULE_PRESETS = [
-  { value: "today", label: "Today only" },
   { value: "manual", label: "Manual only" },
-  { value: "weekly", label: "Weekly" },
-  { value: "bi-weekly", label: "Bi-weekly" },
   { value: "1st", label: "1st of each month" },
   { value: "15th", label: "15th of each month" },
   { value: "last-day", label: "Last day of month" },
@@ -36,17 +33,8 @@ function toOrdinal(day: number) {
 
 function parsePayrollSchedule(value: string) {
   const normalized = value.trim().toLowerCase();
-  if (normalized === "today only") {
-    return { preset: "today", customDay: 15 };
-  }
   if (normalized === "manual only") {
     return { preset: "manual", customDay: 15 };
-  }
-  if (normalized === "weekly") {
-    return { preset: "weekly", customDay: 15 };
-  }
-  if (normalized === "bi-weekly") {
-    return { preset: "bi-weekly", customDay: 15 };
   }
   if (normalized === "1st of each month") {
     return { preset: "1st", customDay: 1 };
@@ -68,14 +56,8 @@ function parsePayrollSchedule(value: string) {
 
 function payrollScheduleLabel(preset: string, customDay: number) {
   switch (preset) {
-    case "today":
-      return "Today only";
     case "manual":
       return "Manual only";
-    case "weekly":
-      return "Weekly";
-    case "bi-weekly":
-      return "Bi-weekly";
     case "1st":
       return "1st of each month";
     case "15th":
@@ -362,10 +344,10 @@ export default function SettingsPage() {
                     value={settings.profile.timeZone}
                     onChange={(e) => updateProfile({ timeZone: e.target.value })}
                   >
-                    <option>UTC+0 - London</option>
-                    <option>UTC-5 - New York</option>
-                    <option>UTC-8 - San Francisco</option>
-                    <option>UTC+5:30 - Mumbai</option>
+                    <option value="Europe/London">London (UTC/BST)</option>
+                    <option value="America/New_York">New York (ET)</option>
+                    <option value="America/Los_Angeles">San Francisco (PT)</option>
+                    <option value="Asia/Kolkata">Mumbai (IST)</option>
                   </select>
                 </div>
                 <button
@@ -395,7 +377,7 @@ export default function SettingsPage() {
                     ))}
                   </select>
                   <span className="form-hint">
-                    Choose when payroll should normally be processed. Use the action below if you want to run it today immediately.
+                    Choose which day of the month payroll should run automatically. Use the action below for one-off runs.
                   </span>
                 </div>
                 {payrollSchedule.preset === "custom" ? (
@@ -427,7 +409,7 @@ export default function SettingsPage() {
                 </div>
                 <ToggleRow
                   label="Auto-process Payroll"
-                  desc="Automatically disburse salaries on scheduled date"
+                  desc="Automatically disburse salaries at 09:00 in the company time zone on the scheduled date"
                   checked={settings.payroll.autoProcess}
                   onChange={(next) => updatePayroll({ autoProcess: next })}
                 />
@@ -454,7 +436,7 @@ export default function SettingsPage() {
                 >
                   <div className="fw-medium text-sm">Quick Payroll Actions</div>
                   <div className="text-xs text-secondary">
-                    Current schedule: <strong>{settings.payroll.payrollDay}</strong>. You can also bypass the schedule and process payroll immediately for today.
+                    Current schedule: <strong>{settings.payroll.payrollDay}</strong>. When auto-process is enabled, payroll runs at 09:00 in <strong>{settings.profile.timeZone}</strong>. You can still bypass the schedule and process payroll immediately today.
                   </div>
                   <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
                     <button

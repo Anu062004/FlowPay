@@ -1,13 +1,13 @@
 import { randomUUID } from "crypto";
-import { CronExpressionParser } from "cron-parser";
 import { db } from "../db/pool.js";
-import { env } from "../config/env.js";
 import { logAgentAction, type AgentLogContext } from "../services/agentLogService.js";
 import { withdrawFromAave } from "../services/aaveService.js";
 import { getEthPrice } from "../services/priceService.js";
 import { allocateTreasury, getTreasuryBalance } from "../services/treasuryService.js";
 import { runInvestment } from "../services/investmentService.js";
 import { createOpsTask } from "../services/opsService.js";
+import { getCompanySettings } from "../services/settingsService.js";
+import { getNextPayrollRun } from "../utils/payrollSchedule.js";
 
 type ActivePosition = {
   id: string;
@@ -166,13 +166,6 @@ async function withdrawAllPositions(
   return total;
 }
 
-function getHoursToNextPayroll(): number {
-  const interval = CronExpressionParser.parse(env.PAYROLL_CRON);
-  const nextPayroll = interval.next().toDate();
-  const now = new Date();
-  return (nextPayroll.getTime() - now.getTime()) / (1000 * 60 * 60);
-}
-
 export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
   const companies = options.companyId
     ? await db.query("SELECT id FROM companies WHERE id = $1", [options.companyId])
@@ -207,6 +200,11 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
       const initialBalance = await getTreasuryBalance(companyId);
       let balanceEth = parseFloat(initialBalance.balance);
       const monthlyPayroll = await getMonthlyPayroll(companyId);
+      const settings = await getCompanySettings(companyId);
+      const nextPayroll = getNextPayrollRun({
+        payrollDayLabel: settings.payroll.payrollDay,
+        companyTimeZone: settings.profile.timeZone
+      });
 
       if (balanceEth < monthlyPayroll * 1.5) {
         const needed = monthlyPayroll * 1.5 - balanceEth;
@@ -279,8 +277,8 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
         );
       }
 
-      const hoursToPayroll = getHoursToNextPayroll();
-      if (hoursToPayroll <= 48 && balanceEth < monthlyPayroll) {
+      const hoursToPayroll = nextPayroll?.hoursUntilRun ?? Number.POSITIVE_INFINITY;
+      if (nextPayroll && hoursToPayroll <= 48 && balanceEth < monthlyPayroll) {
         const shortfall = monthlyPayroll - balanceEth;
         const withdrawn = await withdrawFromPositions(companyId, shortfall, auditContext);
 

@@ -156,4 +156,33 @@ export async function ensureRuntimeSchema() {
     CREATE INDEX IF NOT EXISTS idx_payroll_disbursements_employee_month
       ON payroll_disbursements(employee_id, payroll_month DESC)
   `);
+
+  await db.query(`
+    INSERT INTO payroll_disbursements
+      (company_id, employee_id, payroll_month, gross_salary, net_salary, emi_deducted, tx_hash, created_at)
+    SELECT DISTINCT ON (
+      e.company_id,
+      e.id,
+      date_trunc('month', t.created_at AT TIME ZONE 'UTC')::date
+    )
+      e.company_id,
+      e.id,
+      date_trunc('month', t.created_at AT TIME ZONE 'UTC')::date AS payroll_month,
+      t.amount,
+      t.amount,
+      0,
+      t.tx_hash,
+      t.created_at
+    FROM transactions t
+    JOIN wallets w ON w.id = t.wallet_id
+    JOIN employees e ON e.wallet_id = w.id
+    WHERE t.type = 'payroll'
+      AND e.company_id IS NOT NULL
+    ORDER BY
+      e.company_id,
+      e.id,
+      date_trunc('month', t.created_at AT TIME ZONE 'UTC')::date,
+      t.created_at DESC
+    ON CONFLICT (company_id, employee_id, payroll_month) DO NOTHING
+  `);
 }

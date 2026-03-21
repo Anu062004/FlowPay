@@ -7,6 +7,18 @@
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
+export class ApiFetchError extends Error {
+  status: number;
+  details?: unknown;
+
+  constructor(message: string, status: number, details?: unknown) {
+    super(message);
+    this.name = "ApiFetchError";
+    this.status = status;
+    this.details = details;
+  }
+}
+
 function clearStoredContexts() {
   if (typeof window === "undefined") {
     return;
@@ -58,7 +70,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       }, 0);
     }
   }
-  if (!res.ok) throw new Error(data?.error ?? `API error ${res.status}`);
+  if (!res.ok) {
+    throw new ApiFetchError(data?.error ?? `API error ${res.status}`, res.status, data?.details);
+  }
   return data as T;
 }
 

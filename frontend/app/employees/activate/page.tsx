@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { apiFetch, type Employee } from "../../lib/api";
+import { ApiFetchError, apiFetch, type Employee } from "../../lib/api";
 import { PageHeader } from "../../components/PageHeader";
 import { saveEmployeeContext } from "../../lib/companyContext";
 
@@ -16,15 +16,24 @@ function EmployeeActivateInner() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   type ActivateResponse = { employeeId: string; employee: Employee };
 
   const handleActivate = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+    setStatus(null);
+    const trimmedPassword = password.trim();
+    if (trimmedPassword.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const data = await apiFetch<ActivateResponse>("/employees/activate", {
         method: "POST",
-        body: JSON.stringify({ token, password })
+        body: JSON.stringify({ token, password: trimmedPassword })
       });
       setStatus(`Account activated for employee ${data.employeeId}`);
       setEmployeeId(data.employeeId);
@@ -35,8 +44,23 @@ function EmployeeActivateInner() {
         companyName: data.employee.company_name ?? undefined,
         walletAddress: data.employee.wallet_address ?? null
       });
-    } catch (err: any) {
-      setError(err.message ?? "Activation failed");
+    } catch (err) {
+      if (err instanceof ApiFetchError) {
+        const fieldErrors = (err.details as { fieldErrors?: Record<string, string[]> } | undefined)?.fieldErrors;
+        if (fieldErrors?.password?.length) {
+          setError(fieldErrors.password[0] ?? "Password must be at least 8 characters.");
+        } else if (err.status === 404) {
+          setError("This invite link is invalid or already used. Ask your employer to resend the invitation.");
+        } else {
+          setError(err.message);
+        }
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Activation failed");
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -50,8 +74,17 @@ function EmployeeActivateInner() {
           <label className="label">Activation Token</label>
           <input value={token} disabled />
           <label className="label">Set Password</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <button type="submit">Activate Account</button>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={8}
+            required
+          />
+          <div className="label">Use at least 8 characters.</div>
+          <button type="submit" disabled={submitting}>
+            {submitting ? "Activating..." : "Activate Account"}
+          </button>
           {status ? <div className="label">{status}</div> : null}
           {error ? <div className="label" style={{ color: "var(--danger)" }}>{error}</div> : null}
           {employeeId ? (

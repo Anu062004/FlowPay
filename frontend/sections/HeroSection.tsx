@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { heroConfig } from '../config';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -171,6 +171,25 @@ export function HeroSection() {
           </div>
         </div>
       </div>
+
+      <motion.a
+        href="#landing-flow"
+        className="absolute left-1/2 bottom-8 z-30 flex -translate-x-1/2 flex-col items-center gap-2 rounded-full border border-[#476640]/16 bg-[#FFFFFF]/92 px-4 py-3 text-[#344535] shadow-[0_18px_36px_rgba(17,26,18,0.08)] backdrop-blur-sm transition-colors hover:border-[#476640]/28 hover:text-[#111A12]"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1, duration: 0.5, ease: 'easeOut' }}
+        whileHover={{ y: -2 }}
+      >
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em]">
+          Scroll for more
+        </span>
+        <motion.span
+          animate={{ y: [0, 4, 0] }}
+          transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+        >
+          <ChevronDown size={16} />
+        </motion.span>
+      </motion.a>
 
       {/* Bottom Gradient Fade */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#FFFFFF] to-transparent z-20" />

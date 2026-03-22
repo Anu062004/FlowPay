@@ -63,6 +63,7 @@ export function FeatureSection() {
   return (
     <section
       ref={sectionRef}
+      id="landing-flow"
       className="relative w-full h-screen overflow-hidden bg-[#FFFFFF] z-20"
     >
       {/* Main Content */}

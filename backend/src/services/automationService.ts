@@ -12,6 +12,7 @@ import { withRpcFailover } from "./rpcService.js";
 import { getCompanySettings } from "./settingsService.js";
 import { sendCompanyPayrollBalanceAlert } from "./emailService.js";
 import { getNextPayrollRun } from "../utils/payrollSchedule.js";
+import { expirePendingReviewLoans } from "./loanService.js";
 
 export type AutomationJobName =
   | "finance"
@@ -337,6 +338,7 @@ async function runBackendWorkflowAutomation(companyId?: string): Promise<Record<
   const payrollLookahead = parseIntSafe(env.PAYROLL_PREP_LOOKAHEAD_HOURS, 72);
   const runHourLocal = parseIntSafe(env.PAYROLL_AUTOMATION_LOCAL_HOUR, 9);
   const runMinuteLocal = parseIntSafe(env.PAYROLL_AUTOMATION_LOCAL_MINUTE, 0);
+  const expiredReviewLoans = await expirePendingReviewLoans(companyId);
   let payrollRequests = 0;
   let companiesWithinPayrollLookahead = 0;
   for (const company of companies) {
@@ -433,7 +435,8 @@ async function runBackendWorkflowAutomation(companyId?: string): Promise<Record<
     companiesWithinPayrollLookahead,
     payrollRequests,
     unsyncedLoans,
-    staleOpsItems
+    staleOpsItems,
+    expiredReviewLoans: expiredReviewLoans.expired
   };
 }
 

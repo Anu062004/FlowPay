@@ -39,14 +39,6 @@ export async function approveRequest(approvalId: string, decidedBy?: string, dec
     workflowName: "ops_approval"
   };
 
-  await db.query(
-    `UPDATE ops_approvals
-     SET status = 'approved', decided_at = now(), decided_by = $1, decision_payload = $2
-     WHERE id = $3`,
-    [decidedBy ?? null, decisionPayload ?? {}, approvalId]
-  );
-  await updateOpsTaskStatus(approval.task_id, "approved");
-
   let actionResult: unknown = null;
   if (approval.kind === "payroll") {
     actionResult = await runPayroll(approval.company_id, auditContext);
@@ -58,6 +50,14 @@ export async function approveRequest(approvalId: string, decidedBy?: string, dec
     }
     actionResult = await executeApprovedLoan(loanId, auditContext);
   }
+
+  await db.query(
+    `UPDATE ops_approvals
+     SET status = 'approved', decided_at = now(), decided_by = $1, decision_payload = $2
+     WHERE id = $3`,
+    [decidedBy ?? null, decisionPayload ?? {}, approvalId]
+  );
+  await updateOpsTaskStatus(approval.task_id, "approved");
 
   return { approvalId, status: "approved", actionResult };
 }

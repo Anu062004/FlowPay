@@ -5,7 +5,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE TYPE loan_status AS ENUM ('pending', 'active', 'repaid', 'rejected');
+  CREATE TYPE loan_status AS ENUM ('pending', 'pending_review', 'active', 'repaid', 'rejected', 'expired');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS loans (
   remaining_balance NUMERIC(18,6) NOT NULL,
   status loan_status NOT NULL DEFAULT 'pending',
   contract_synced BOOLEAN NOT NULL DEFAULT false,
+  contract_loan_id BIGINT,
+  review_requested_at TIMESTAMPTZ,
+  review_expires_at TIMESTAMPTZ,
+  review_reason TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

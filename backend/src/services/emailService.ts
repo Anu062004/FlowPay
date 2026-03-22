@@ -83,7 +83,8 @@ async function deliverEmail(input: {
     | "employee_access"
     | "company_recovery"
     | "employee_recovery"
-    | "payroll_balance_alert";
+    | "payroll_balance_alert"
+    | "loan_review_status";
   recipientEmail: string;
   subject: string;
   text: string;
@@ -348,5 +349,41 @@ export async function sendCompanyPayrollBalanceAlert(input: {
       currency: input.currency
     },
     queueViaOpsTask: false
+  });
+}
+
+export async function sendLoanReviewStatusEmail(input: {
+  companyId?: string;
+  email: string;
+  employeeId: string;
+  employeeName: string;
+  amount: number;
+  status: "rejected" | "expired";
+  reason?: string | null;
+}) {
+  const statusLabel = input.status === "expired" ? "expired" : "rejected";
+  return deliverEmail({
+    companyId: input.companyId,
+    type: "loan_review_status",
+    recipientEmail: input.email,
+    subject: `Your FlowPay loan review was ${statusLabel}`,
+    text: [
+      `Hello ${input.employeeName},`,
+      "",
+      `Your FlowPay loan review for ${input.amount.toFixed(6)} ETH was ${statusLabel}.`,
+      ...(input.reason ? [`Reason: ${input.reason}`] : []),
+      "",
+      input.status === "expired"
+        ? "The request was not approved within the 48 hour review window. You can submit a new request at any time."
+        : "No funds were disbursed and your on-chain score was not changed."
+    ].join("\n"),
+    payload: {
+      employeeId: input.employeeId,
+      employeeName: input.employeeName,
+      email: input.email,
+      amount: input.amount,
+      status: input.status,
+      reason: input.reason ?? null
+    }
   });
 }

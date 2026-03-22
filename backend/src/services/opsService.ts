@@ -11,6 +11,7 @@ export type OpsTaskType =
   | "payroll_approval"
   | "payroll_prep"
   | "payroll_balance_alert"
+  | "loan_review_status"
   | "loan_approval"
   | "treasury_topup"
   | "finance_snapshot"

@@ -6,6 +6,7 @@ function updateBackendEnv(addresses: {
   core: string;
   loan: string;
   investment: string;
+  scoreTierVerifier: string;
 }) {
   const envPath = path.resolve(process.cwd(), "../backend/.env");
   if (!fs.existsSync(envPath)) {
@@ -26,6 +27,7 @@ function updateBackendEnv(addresses: {
   replaceOrAppend("FLOW_PAY_CORE_ADDRESS", addresses.core);
   replaceOrAppend("FLOW_PAY_LOAN_ADDRESS", addresses.loan);
   replaceOrAppend("FLOW_PAY_INVESTMENT_ADDRESS", addresses.investment);
+  replaceOrAppend("SCORE_TIER_VERIFIER_ADDRESS", addresses.scoreTierVerifier);
 
   fs.writeFileSync(envPath, content);
   console.log("Updated backend/.env with deployed contract addresses.");
@@ -58,10 +60,17 @@ async function main() {
   const investmentAddress = await investment.getAddress();
   console.log(`FlowPayInvestment deployed to ${investmentAddress}`);
 
+  const ScoreTierVerifier = await ethers.getContractFactory("ScoreTierVerifier");
+  const scoreTierVerifier = await ScoreTierVerifier.deploy(admin);
+  await scoreTierVerifier.waitForDeployment();
+  const scoreTierVerifierAddress = await scoreTierVerifier.getAddress();
+  console.log(`ScoreTierVerifier deployed to ${scoreTierVerifierAddress}`);
+
   updateBackendEnv({
     core: coreAddress,
     loan: loanAddress,
-    investment: investmentAddress
+    investment: investmentAddress,
+    scoreTierVerifier: scoreTierVerifierAddress
   });
 }
 

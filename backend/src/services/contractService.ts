@@ -160,6 +160,15 @@ export async function recordLoanClosureOnCore(employeeAddress: string): Promise<
   );
 }
 
+export async function recordEmiRepaidOnCore(employeeAddress: string): Promise<string> {
+  return sendAdminTransaction(
+    env.CORE_CONTRACT_ADDRESS,
+    CORE_ABI,
+    "recordEMIRepaid",
+    [employeeAddress]
+  );
+}
+
 export async function allocateCore(
   payrollPct: number,
   lendingPct: number,

@@ -496,6 +496,14 @@ function formatTaskEmail(task: OpsTask) {
       lines.push("");
       lines.push(`Context: ${JSON.stringify(payload.payload, null, 2)}`);
     }
+  } else if (task.type === "loan_review_status") {
+    lines.push(`Loan review outcome for ${payload.employeeName ?? ""}.`);
+    lines.push(`Employee ID: ${payload.employeeId ?? ""}`);
+    lines.push(`Status: ${payload.status ?? ""}`);
+    lines.push(`Amount: ${payload.amount ?? ""}`);
+    if (payload.reason) {
+      lines.push(`Reason: ${payload.reason}`);
+    }
   } else if (task.type === "admin_report") {
     lines.push(`Weekly summary attached in payload.`);
     lines.push(JSON.stringify(payload, null, 2));

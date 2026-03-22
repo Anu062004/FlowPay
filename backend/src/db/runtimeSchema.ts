@@ -7,6 +7,16 @@ export async function ensureRuntimeSchema() {
   `);
 
   await db.query(`
+    ALTER TYPE loan_status
+    ADD VALUE IF NOT EXISTS 'pending_review'
+  `);
+
+  await db.query(`
+    ALTER TYPE loan_status
+    ADD VALUE IF NOT EXISTS 'expired'
+  `);
+
+  await db.query(`
     ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS email TEXT
   `);
@@ -70,6 +80,21 @@ export async function ensureRuntimeSchema() {
   await db.query(`
     ALTER TABLE loans
     ADD COLUMN IF NOT EXISTS contract_loan_id BIGINT
+  `);
+
+  await db.query(`
+    ALTER TABLE loans
+    ADD COLUMN IF NOT EXISTS review_requested_at TIMESTAMPTZ
+  `);
+
+  await db.query(`
+    ALTER TABLE loans
+    ADD COLUMN IF NOT EXISTS review_expires_at TIMESTAMPTZ
+  `);
+
+  await db.query(`
+    ALTER TABLE loans
+    ADD COLUMN IF NOT EXISTS review_reason TEXT
   `);
 
   await db.query(`

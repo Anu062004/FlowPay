@@ -92,6 +92,7 @@ const envSchema = z.object({
   VAULT_CONTRACT_ADDRESS: z.string().optional(),
   FLOW_PAY_LOAN_ADDRESS: z.string().optional(),
   LOAN_CONTRACT_ADDRESS: z.string().optional(),
+  SCORE_TIER_VERIFIER_ADDRESS: z.string().optional(),
   DEPOSIT_WATCHERS_ENABLED: z.string().default(isProduction ? "true" : "false"),
   ORCHESTRATOR_ENABLED: z.string().default(isProduction ? "true" : "false"),
   ORCHESTRATOR_INTERVAL_MS: z.string().default("120000"),

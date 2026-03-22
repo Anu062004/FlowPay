@@ -40,6 +40,7 @@ app.get("/health", (_req, res) => {
 app.use("/companies", companyRoutes);
 app.use("/employees", employeeRoutes);
 app.use("/loans", loanRoutes);
+app.use("/api/loans", loanRoutes);
 app.use("/payroll", payrollRoutes);
 app.use("/treasury", treasuryRoutes);
 app.use("/lending", lendingRoutes);

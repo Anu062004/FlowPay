@@ -1,0 +1,16 @@
+[Unit]
+Description=FlowPay OpenClaw Ops Worker
+After=network.target flowpay-backend.service
+Requires=flowpay-backend.service
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/opt/flowpay/backend
+EnvironmentFile=/opt/flowpay/backend/.env
+ExecStart=/opt/flowpay/backend/node_modules/.bin/tsx /opt/flowpay/backend/scripts/openclawOpsWorker.ts
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

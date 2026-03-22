@@ -137,6 +137,7 @@ const envSchema = z.object({
 });
 
 const parsedEnv = envSchema.parse(process.env);
+const indexerApiKey = parsedEnv.WDK_INDEXER_API_KEY?.trim() || parsedEnv.WDK_API_KEY.trim();
 const coreContractAddress =
   parsedEnv.FLOW_PAY_CORE_ADDRESS?.trim() || parsedEnv.VAULT_CONTRACT_ADDRESS?.trim();
 const loanContractAddress =
@@ -154,6 +155,7 @@ if (!loanContractAddress) {
 
 export const env = {
   ...parsedEnv,
+  WDK_INDEXER_API_KEY: indexerApiKey,
   CORE_CONTRACT_ADDRESS: coreContractAddress,
   LOAN_CONTRACT_ADDRESS: loanContractAddress,
   INVESTMENT_CONTRACT_ADDRESS: investmentContractAddress

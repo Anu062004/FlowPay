@@ -190,6 +190,8 @@ button, input, select, textarea {
   position: relative;
   display: flex;
   min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* ── Sidebar ── */
@@ -400,6 +402,10 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  min-width: 0;
+  overflow: hidden;
   transition: margin-left var(--transition-base);
 }
 
@@ -550,7 +556,11 @@ button, input, select, textarea {
   max-width: var(--content-max-width);
   width: 100%;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ──────────────────────────────────────────────────────────── 
@@ -2121,6 +2131,9 @@ button, input, select, textarea {
   .main-content {
     margin-left: 0;
     width: 100%;
+    min-height: 100dvh;
+    height: 100dvh;
+    max-height: 100dvh;
   }
   .top-header { padding: 0 var(--sp-4); }
   .search-input-wrap { display: none; }

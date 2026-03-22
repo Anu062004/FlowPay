@@ -576,10 +576,31 @@ button, input, select, textarea {
   overflow-x: hidden;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
+  scrollbar-color: var(--gray-400) transparent;
 }
 
 .page-body > * {
   min-width: 0;
+}
+
+.page-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.page-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.page-body::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.page-body::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-400);
+  background-clip: padding-box;
 }
 
 /* ──────────────────────────────────────────────────────────── 

@@ -9,10 +9,18 @@ import { PageHeader } from "../../components/PageHeader";
 
 export const dynamic = "force-dynamic";
 
+function getSafeNextPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return null;
+  }
+  return value;
+}
+
 function EmployeeRecoveryInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token")?.trim() ?? "";
+  const nextPath = getSafeNextPath(searchParams.get("next"));
   const hasToken = token.length > 0;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -69,7 +77,7 @@ function EmployeeRecoveryInner() {
         companyName: response.employee.company_name ?? undefined,
         walletAddress: response.employee.wallet_address ?? null
       });
-      router.push(response.employee.wallet_address ? "/employee/wallet" : "/employee/overview");
+      router.push(nextPath ?? (response.employee.wallet_address ? "/employee/wallet" : "/employee/overview"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reset employee password");
     } finally {

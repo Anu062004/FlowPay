@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   loginCompany,
   registerCompany,
@@ -15,8 +15,16 @@ import {
 
 type Status = { type: "success" | "error"; message: string } | null;
 
-export default function EmployerLoginPage() {
+function getSafeNextPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return null;
+  }
+  return value;
+}
+
+function EmployerLoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [companyName, setCompanyName] = useState("");
   const [companyEmail, setCompanyEmail] = useState("");
   const [companyAccessPin, setCompanyAccessPin] = useState("");
@@ -25,6 +33,7 @@ export default function EmployerLoginPage() {
   const [companyLoginEmail, setCompanyLoginEmail] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>(null);
+  const nextPath = getSafeNextPath(searchParams.get("next"));
 
   const openCompany = (company: Company) => {
     clearEmployeeContext();
@@ -34,7 +43,7 @@ export default function EmployerLoginPage() {
       email: company.email,
       treasuryAddress: company.treasury_address ?? null
     });
-    router.push("/dashboard");
+    router.push(nextPath ?? "/dashboard");
   };
 
   const handleCreateCompany = async (event: React.FormEvent) => {
@@ -216,5 +225,13 @@ export default function EmployerLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function EmployerLoginPage() {
+  return (
+    <Suspense fallback={<div className="landing-shell" style={{ minHeight: "100vh" }} />}>
+      <EmployerLoginInner />
+    </Suspense>
   );
 }

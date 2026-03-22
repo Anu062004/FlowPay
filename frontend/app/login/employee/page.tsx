@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   loginEmployee,
   registerEmployeeWallet,
@@ -15,8 +15,16 @@ import {
 
 type Status = { type: "success" | "error"; message: string } | null;
 
-export default function EmployeeLoginPage() {
+function getSafeNextPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return null;
+  }
+  return value;
+}
+
+function EmployeeLoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [employeeName, setEmployeeName] = useState("");
   const [employeeEmail, setEmployeeEmail] = useState("");
   const [employeePassword, setEmployeePassword] = useState("");
@@ -25,6 +33,7 @@ export default function EmployeeLoginPage() {
   const [employeeLoginEmail, setEmployeeLoginEmail] = useState("");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>(null);
+  const nextPath = getSafeNextPath(searchParams.get("next"));
 
   const openEmployee = (employee: Employee, walletAddress?: string | null) => {
     clearCompanyContext();
@@ -35,7 +44,7 @@ export default function EmployeeLoginPage() {
       companyName: employee.company_name ?? undefined,
       walletAddress: walletAddress ?? employee.wallet_address ?? null
     });
-    router.push(walletAddress || employee.wallet_address ? "/employee/wallet" : "/employee/overview");
+    router.push(nextPath ?? (walletAddress || employee.wallet_address ? "/employee/wallet" : "/employee/overview"));
   };
 
   const handleCreateEmployee = async (event: React.FormEvent) => {
@@ -212,5 +221,13 @@ export default function EmployeeLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function EmployeeLoginPage() {
+  return (
+    <Suspense fallback={<div className="landing-shell" style={{ minHeight: "100vh" }} />}>
+      <EmployeeLoginInner />
+    </Suspense>
   );
 }

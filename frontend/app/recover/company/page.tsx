@@ -9,10 +9,18 @@ import { PageHeader } from "../../components/PageHeader";
 
 export const dynamic = "force-dynamic";
 
+function getSafeNextPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return null;
+  }
+  return value;
+}
+
 function CompanyRecoveryInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token")?.trim() ?? "";
+  const nextPath = getSafeNextPath(searchParams.get("next"));
   const hasToken = token.length > 0;
   const [email, setEmail] = useState("");
   const [accessPin, setAccessPin] = useState("");
@@ -68,7 +76,7 @@ function CompanyRecoveryInner() {
         email: response.company.email,
         treasuryAddress: response.company.treasury_address ?? null
       });
-      router.push("/dashboard");
+      router.push(nextPath ?? "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reset company PIN");
     } finally {

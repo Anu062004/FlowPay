@@ -129,7 +129,7 @@ function shortAddress(address?: string | null) {
   return `${address.slice(0, 10)}...${address.slice(-6)}`;
 }
 
-function SessionRequired({ employee }: { employee: boolean }) {
+function SessionRequired({ employee, signInHref }: { employee: boolean; signInHref: string }) {
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #f8fafc 0%, #eef4ff 100%)" }}>
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "72px 24px" }} className="stack-xl">
@@ -147,7 +147,8 @@ function SessionRequired({ employee }: { employee: boolean }) {
                 : "This space is isolated for employer treasury sessions."}
             </div>
             <div className="row" style={{ gap: 12 }}>
-              <Link className="btn btn-primary" href="/">Go to Get In</Link>
+              <Link className="btn btn-primary" href={signInHref}>Sign In to Continue</Link>
+              <Link className="btn btn-secondary" href="/">Back to Get In</Link>
             </div>
           </div>
         </div>
@@ -164,6 +165,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const employeeView = isEmployeePath(pathname);
   const navItems = employeeView ? employeeNavItems : employerNavItems;
   const { section, page } = getTitle(pathname);
+  const signInHref = `${employeeView ? "/login/employee" : "/login"}?next=${encodeURIComponent(pathname)}`;
 
   const [ready, setReady] = useState(false);
   const [companyCtx, setCompanyCtx] = useState<CompanyContext | null>(null);
@@ -309,7 +311,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!activeSession) {
-    return <SessionRequired employee={employeeView} />;
+    return <SessionRequired employee={employeeView} signInHref={signInHref} />;
   }
 
   const shellClassName = [

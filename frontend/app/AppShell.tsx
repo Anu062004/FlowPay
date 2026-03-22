@@ -189,7 +189,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       let nextCompany = loadCompanyContext();
       let nextEmployee = loadEmployeeContext();
 
-      if (!employeeView && !nextCompany) {
+      if (!employeeView) {
         const currentCompany = await fetchCurrentCompanySession().catch(() => null);
         if (currentCompany?.company) {
           nextCompany = {
@@ -199,10 +199,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             treasuryAddress: currentCompany.company.treasury_address ?? null
           };
           saveCompanyContext(nextCompany);
+        } else {
+          nextCompany = null;
+          clearCompanyContext();
         }
       }
 
-      if (employeeView && !nextEmployee) {
+      if (employeeView) {
         const currentEmployee = await fetchCurrentEmployeeSession().catch(() => null);
         if (currentEmployee?.employee) {
           nextEmployee = {
@@ -213,6 +216,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             walletAddress: currentEmployee.employee.wallet_address ?? null
           };
           saveEmployeeContext(nextEmployee);
+        } else {
+          nextEmployee = null;
+          clearEmployeeContext();
         }
       }
 

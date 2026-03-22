@@ -1,7 +1,6 @@
 import { db } from "../db/pool.js";
 import { runLoanDecisionAgent } from "../agents/loanAgent.js";
 import { ApiError } from "../utils/errors.js";
-import { getEthPrice } from "./priceService.js";
 import {
   checkLoanEligibilityOnCore,
   ensureEmployeeInitializedOnCore
@@ -38,12 +37,17 @@ import { sendLoanReviewStatusEmail } from "./emailService.js";
 
 export { expirePendingReviewLoans, listPendingReviewLoans, rejectPendingReviewLoan, repayLoanEmi, repayLoanInFull };
 
+function getTreasuryCurrency() {
+  return env.TREASURY_TOKEN_SYMBOL?.trim() || "ETH";
+}
+
 export async function requestLoan(
   employeeId: string,
   requestedAmount: number,
   auditContext: AgentLogContext = {}
 ) {
   await expirePendingReviewLoans();
+  const treasuryCurrency = getTreasuryCurrency();
 
   const empCompanyResult = await db.query("SELECT company_id FROM employees WHERE id = $1", [employeeId]);
   if ((empCompanyResult.rowCount ?? 0) > 0) {
@@ -51,11 +55,6 @@ export async function requestLoan(
     if (settings.agent?.lending_paused === true) {
       throw new ApiError(403, "Lending temporarily paused due to elevated default risk");
     }
-  }
-
-  const { price: ethPrice, changePct } = await getEthPrice();
-  if (changePct < -15) {
-    throw new ApiError(400, "High volatility period - lending paused");
   }
 
   const result = await db.query(
@@ -112,7 +111,7 @@ export async function requestLoan(
     throw new ApiError(400, "Employee is not eligible for a loan under FlowPayCore");
   }
   if (requestedAmount > maxEligibleAmount) {
-    throw new ApiError(400, `Requested amount exceeds FlowPayCore limit (${maxEligibleAmount} ETH)`);
+    throw new ApiError(400, `Requested amount exceeds FlowPayCore limit (${maxEligibleAmount} ${treasuryCurrency})`);
   }
 
   const tierContext = getScoreTierContext(syncedScore);
@@ -147,9 +146,7 @@ export async function requestLoan(
     avg_days_to_close: repaymentMetrics.avgDaysToClose,
     missed_emi_count: repaymentMetrics.missedEmiCount,
     closed_loans_count: repaymentMetrics.totalClosed,
-    has_prior_loans: repaymentMetrics.hasPriorLoans,
-    eth_price_usd: ethPrice,
-    price_change_24h: changePct
+    has_prior_loans: repaymentMetrics.hasPriorLoans
   };
 
   const decision = await runLoanDecisionAgent(agentInput).catch(() =>
@@ -160,8 +157,7 @@ export async function requestLoan(
       tierInterestRate: eligibility.interestRatePct,
       tierLabel: tierContext.label,
       repaymentRate: repaymentMetrics.repaymentRate,
-      hasPriorLoans: repaymentMetrics.hasPriorLoans,
-      changePct
+      hasPriorLoans: repaymentMetrics.hasPriorLoans
     })
   );
 
@@ -170,7 +166,9 @@ export async function requestLoan(
     agentInput,
     decision,
     decision.rationale,
-    decision.decision === "approve" ? `Approved loan of ${decision.amount} ETH` : `Rejected loan request of ${requestedAmount} ETH`,
+    decision.decision === "approve"
+      ? `Approved loan of ${decision.amount} ${treasuryCurrency}`
+      : `Rejected loan request of ${requestedAmount} ${treasuryCurrency}`,
     employee.company_id,
     {
       ...auditContext,

@@ -60,7 +60,7 @@ function buildDefaultSettings(companyName: string, companyEmail: string): Compan
     },
     payroll: {
       payrollDay: "15th of each month",
-      currency: "USDC",
+      currency: "USDT",
       autoProcess: true,
       emiAutoDeduction: true,
       emailNotifications: true

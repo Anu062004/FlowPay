@@ -370,7 +370,7 @@ export async function sendLoanReviewStatusEmail(input: {
     text: [
       `Hello ${input.employeeName},`,
       "",
-      `Your FlowPay loan review for ${input.amount.toFixed(6)} ETH was ${statusLabel}.`,
+      `Your FlowPay loan review for ${input.amount.toFixed(6)} ${env.TREASURY_TOKEN_SYMBOL ?? "ETH"} was ${statusLabel}.`,
       ...(input.reason ? [`Reason: ${input.reason}`] : []),
       "",
       input.status === "expired"

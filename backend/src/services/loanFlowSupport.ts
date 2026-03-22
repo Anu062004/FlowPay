@@ -78,10 +78,7 @@ export function buildFallbackLoanDecision(input: {
   tierLabel: ScoreTierContext["label"];
   repaymentRate: number;
   hasPriorLoans: boolean;
-  changePct: number;
 }) {
-  const stressedMarket = input.changePct < -10;
-
   if (input.tierLabel === "450-499" && input.hasPriorLoans && input.repaymentRate < 0.7) {
     return {
       decision: "reject" as const,
@@ -98,9 +95,6 @@ export function buildFallbackLoanDecision(input: {
   } else if (input.hasPriorLoans) {
     approvalFactor = input.repaymentRate >= 0.9 ? 1 : input.repaymentRate >= 0.7 ? 0.75 : 0.5;
   }
-  if (stressedMarket) {
-    approvalFactor *= 0.85;
-  }
 
   const approvedAmount = Math.min(input.requestedAmount, Math.max(input.tierLimitAmount * approvalFactor, 0));
   if (approvedAmount <= 0) {
@@ -113,7 +107,7 @@ export function buildFallbackLoanDecision(input: {
     };
   }
 
-  const candidateDurations = stressedMarket ? [6, 9, 12, 18, 24] : [3, 6, 9, 12, 18, 24];
+  const candidateDurations = [3, 6, 9, 12, 18, 24];
   let duration = candidateDurations[candidateDurations.length - 1];
   for (const months of candidateDurations) {
     if (calculateEmi(approvedAmount, input.tierInterestRate, months) <= input.salary * 0.3) {

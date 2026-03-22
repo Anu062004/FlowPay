@@ -1,8 +1,9 @@
 import { ethers } from "ethers";
 import { db } from "../db/pool.js";
+import { env } from "../config/env.js";
 import { ApiError } from "../utils/errors.js";
 import { formatAmount, parseAmount } from "../utils/amounts.js";
-import { getWalletBalance, nativeTransferMaxFee, sendTransaction } from "./walletService.js";
+import { getWalletBalance, minimumGasReserveWei, nativeTransferMaxFee, sendTransaction } from "./walletService.js";
 
 async function getEmployeeWalletRow(employeeId: string) {
   const result = await db.query(
@@ -46,7 +47,10 @@ export async function getEmployeeWalletDetails(employeeId: string) {
     balance: balance.balanceEth,
     token_symbol: balance.tokenSymbol,
     chain: wallet.chain,
-    max_withdrawable: balance.tokenSymbol === "ETH" ? formatAmount(maxWithdrawableWei) : balance.balanceEth
+    max_withdrawable: balance.tokenSymbol === "ETH" ? formatAmount(maxWithdrawableWei) : balance.balanceEth,
+    native_gas_balance: balance.nativeGasBalanceEth,
+    native_gas_reserve: formatAmount(minimumGasReserveWei),
+    gas_reserve_satisfied: balance.gasReserveSatisfied
   };
 }
 
@@ -84,6 +88,10 @@ export async function withdrawEmployeeFunds(
     amount: amountEth.toString(),
     from: transfer.from,
     to: transfer.to,
-    token_symbol: "ETH"
+    token_symbol: balanceTokenSymbol()
   };
+}
+
+function balanceTokenSymbol() {
+  return env.TREASURY_TOKEN_SYMBOL ?? "ETH";
 }

@@ -24,8 +24,6 @@ export async function runLoanDecisionAgent(input: {
   missed_emi_count: number;
   closed_loans_count: number;
   has_prior_loans: boolean;
-  eth_price_usd: number;
-  price_change_24h: number;
 }) {
   return runOpenClawTask<LoanDecision>(
     {
@@ -40,7 +38,6 @@ export async function runLoanDecisionAgent(input: {
         "- Keep the approved amount at or below tier_limit_amount.\n" +
         "- Monthly EMI must not exceed 30% of the monthly salary.\n" +
         "- Interest rates should range between 3% (low risk) and 12% (high risk).\n" +
-        "- ETH Market Context: If price_change_24h is very negative (<-10%), be more conservative.\n" +
         "- No prior loans means neutral history. Do not treat repayment_rate = 0 as bad if has_prior_loans is false.\n" +
         "- If tier_label is 450-499 and has_prior_loans is true and repayment_rate < 0.7, reject.\n" +
         "- If tier_label is 450-499 and the request is approvable, cap approval at 50% of tier_limit_amount.\n" +

@@ -18,9 +18,11 @@ import { getTokenBalance as getIndexedTokenBalance } from "./indexerService.js";
 import { getRoundRobinRpcUrl, withRpcFailover } from "./rpcService.js";
 
 const transferMaxFee = BigInt(env.WDK_TRANSFER_MAX_FEE);
+const minimumNativeGasReserveWei = parseAmount(env.MIN_NATIVE_GAS_RESERVE_ETH);
 const SUPPORTED_EVM_CHAINS = new Set(["ethereum", "sepolia"]);
 const EMPLOYEE_LEDGER_MIRROR_TYPES = new Set(["payroll", "loan_disbursement", "emi_repayment"]);
 export const nativeTransferMaxFee = transferMaxFee;
+export const minimumGasReserveWei = minimumNativeGasReserveWei;
 const ERC20_ABI = ["function balanceOf(address owner) view returns (uint256)"];
 
 type Queryable = {
@@ -181,6 +183,10 @@ export async function createEmployeeWallet(employeeId: string, client?: PoolClie
 
 export async function getWalletBalance(walletId: string) {
   const wallet = await getWalletRecord(walletId);
+  const nativeGasBalance = await withRpcFailover("wallet native gas balance", async (provider) =>
+    provider.getBalance(wallet.wallet_address)
+  );
+
   if (env.TREASURY_TOKEN_ADDRESS && env.TREASURY_TOKEN_SYMBOL) {
     const token = env.TREASURY_TOKEN_SYMBOL.toLowerCase();
     const blockchain = env.TREASURY_TOKEN_BLOCKCHAIN;
@@ -202,18 +208,26 @@ export async function getWalletBalance(walletId: string) {
       balanceWei: amountRaw.toString(),
       balanceEth: formatTokenAmount(amountRaw, decimals),
       walletAddress: wallet.wallet_address,
-      tokenSymbol: env.TREASURY_TOKEN_SYMBOL
+      tokenSymbol: env.TREASURY_TOKEN_SYMBOL,
+      nativeGasBalanceWei: nativeGasBalance.toString(),
+      nativeGasBalanceEth: formatAmount(nativeGasBalance),
+      minimumGasReserveWei: minimumNativeGasReserveWei.toString(),
+      minimumGasReserveEth: formatAmount(minimumNativeGasReserveWei),
+      gasReserveSatisfied: nativeGasBalance >= minimumNativeGasReserveWei
     };
   }
 
-  const balanceWei = await withRpcFailover("wallet native balance", async (provider) =>
-    provider.getBalance(wallet.wallet_address)
-  );
+  const balanceWei = nativeGasBalance;
   return {
     balanceWei: balanceWei.toString(),
     balanceEth: formatAmount(balanceWei),
     walletAddress: wallet.wallet_address,
-    tokenSymbol: "ETH"
+    tokenSymbol: "ETH",
+    nativeGasBalanceWei: nativeGasBalance.toString(),
+    nativeGasBalanceEth: formatAmount(nativeGasBalance),
+    minimumGasReserveWei: minimumNativeGasReserveWei.toString(),
+    minimumGasReserveEth: formatAmount(minimumNativeGasReserveWei),
+    gasReserveSatisfied: nativeGasBalance >= minimumNativeGasReserveWei
   };
 }
 
@@ -274,6 +288,15 @@ export async function sendTokenTransfer(
     const balanceRaw = await account.getTokenBalance(tokenAddress);
     if (balanceRaw < amountRaw) {
       throw new ApiError(400, "Insufficient wallet balance");
+    }
+
+    const nativeBalance = await account.getBalance();
+    const requiredNativeGas = minimumNativeGasReserveWei + transferMaxFee;
+    if (nativeBalance < requiredNativeGas) {
+      throw new ApiError(
+        400,
+        `Insufficient ETH for gas. Keep at least ${formatAmount(minimumNativeGasReserveWei)} ETH reserved, plus network fee headroom.`
+      );
     }
 
     const txResult = await account.transfer({

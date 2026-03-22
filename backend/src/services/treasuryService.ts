@@ -4,7 +4,7 @@ import { formatEther } from "ethers";
 import { db } from "../db/pool.js";
 import { env } from "../config/env.js";
 import { ApiError } from "../utils/errors.js";
-import { getWalletBalance, nativeTransferMaxFee, sendTransaction } from "./walletService.js";
+import { getWalletBalance, minimumGasReserveWei, nativeTransferMaxFee, sendTransaction } from "./walletService.js";
 import { allocateCore } from "./contractService.js";
 import { formatAmount, formatTokenAmount, parseAmount } from "../utils/amounts.js";
 import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
@@ -114,7 +114,10 @@ export async function getTreasuryWalletDetails(companyId: string) {
     balance: balance.balanceEth,
     token_symbol: balance.tokenSymbol,
     chain: wallet.chain,
-    max_withdrawable: balance.tokenSymbol === "ETH" ? formatAmount(maxWithdrawableWei) : balance.balanceEth
+    max_withdrawable: balance.tokenSymbol === "ETH" ? formatAmount(maxWithdrawableWei) : balance.balanceEth,
+    native_gas_balance: balance.nativeGasBalanceEth,
+    native_gas_reserve: formatAmount(minimumGasReserveWei),
+    gas_reserve_satisfied: balance.gasReserveSatisfied
   };
 }
 

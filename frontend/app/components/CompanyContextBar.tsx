@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, type Company } from "../lib/api";
-import { CompanyContext, loadCompanyContext, saveCompanyContext, clearCompanyContext } from "../lib/companyContext";
+import { CompanyContext, clearCompanyContext, loadCompanyContext, saveCompanyContext } from "../lib/companyContext";
+
+function ContextItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="company-context-item">
+      <div className="company-context-label">{label}</div>
+      <div className="company-context-value">{value}</div>
+    </div>
+  );
+}
 
 export default function CompanyContextBar() {
   const [context, setContext] = useState<CompanyContext | null>(null);
@@ -41,47 +50,46 @@ export default function CompanyContextBar() {
   }
 
   return (
-    <div className="card" style={{ padding: 12 }}>
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <div className="stack" style={{ gap: 6 }}>
-          <div className="label">Active Company</div>
-          <div style={{ fontWeight: 600 }}>{context.name ?? "Unnamed Company"}</div>
-          {context.email ? (
-            <>
-              <div className="label">Company Email</div>
-              <div style={{ fontSize: 13 }}>{context.email}</div>
-            </>
-          ) : null}
-          <div className="label">Company ID</div>
-          <div style={{ fontSize: 13 }}>{context.id}</div>
-          {context.treasuryAddress ? (
-            <>
-              <div className="label">Treasury Address</div>
-              <div style={{ fontSize: 13 }}>{context.treasuryAddress}</div>
-            </>
-          ) : null}
+    <section className="card company-context-card">
+      <div className="company-context-header">
+        <div className="company-context-heading">
+          <span className="company-context-kicker">Workspace Context</span>
+          <div className="company-context-title">{context.name ?? "Unnamed Company"}</div>
+          <div className="company-context-subtitle">
+            Context used across routing, treasury actions, payroll execution, and workspace restore.
+          </div>
         </div>
-        <div className="stack" style={{ alignItems: "flex-end" }}>
-          <button className="secondary" onClick={() => copy(context.id)}>
+        <div className="company-context-actions">
+          <button className="btn btn-secondary btn-sm" onClick={() => copy(context.id)}>
             Copy Company ID
           </button>
           {context.treasuryAddress ? (
-            <button className="secondary" onClick={() => copy(context.treasuryAddress)}>
+            <button className="btn btn-secondary btn-sm" onClick={() => copy(context.treasuryAddress)}>
               Copy Treasury Address
             </button>
           ) : null}
-          <button className="secondary" onClick={refresh}>
+          <button className="btn btn-secondary btn-sm" onClick={refresh}>
             Refresh Details
           </button>
-          <button onClick={() => {
-            clearCompanyContext();
-            setContext(null);
-          }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              clearCompanyContext();
+              setContext(null);
+            }}
+          >
             Clear Context
           </button>
         </div>
       </div>
-      {message ? <div className="label">{message}</div> : null}
-    </div>
+
+      <div className="company-context-grid">
+        {context.email ? <ContextItem label="Company Email" value={context.email} /> : null}
+        <ContextItem label="Company ID" value={context.id} />
+        {context.treasuryAddress ? <ContextItem label="Treasury Address" value={context.treasuryAddress} /> : null}
+      </div>
+
+      {message ? <div className="company-context-feedback">{message}</div> : null}
+    </section>
   );
 }

@@ -56,31 +56,105 @@ function Sparkline({ values, color = "#10b981" }: { values: number[]; color?: st
 }
 
 // ── Donut chart ───────────────────────────────────────────────
-function DonutChart({ segments }: { segments: { label: string; value: number; color: string }[] }) {
+type AllocationSegment = { label: string; value: number; color: string };
+
+function DonutChart({ segments, symbol }: { segments: AllocationSegment[]; symbol: string }) {
   const total = segments.reduce((s, x) => s + x.value, 0) || 1;
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const activeSegment = activeIndex !== null ? segments[activeIndex] : null;
   let cum = 0;
-  const r = 40, cx = 50, cy = 50, circ = 2 * Math.PI * r;
+  const r = 40, cx = 52, cy = 52, size = 104, circ = 2 * Math.PI * r;
+
   return (
-    <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
-      <svg width="100" height="100" style={{ flexShrink: 0 }}>
-        {segments.map((seg, i) => {
-          const pct = seg.value / total;
-          const dash = circ * pct, gap = circ - dash;
-          const rot = (cum / total) * 360 - 90;
-          cum += seg.value;
-          return <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={seg.color}
-            strokeWidth="16" strokeDasharray={`${dash} ${gap}`} transform={`rotate(${rot} ${cx} ${cy})`} />;
-        })}
-        <circle cx={cx} cy={cy} r={r - 10} fill="white" />
-      </svg>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-        {segments.map((seg, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 10, height: 10, borderRadius: "50%", background: seg.color }} />
-            <span className="text-sm text-secondary" style={{ flex: 1 }}>{seg.label}</span>
-            <span className="fw-semi font-num text-sm">{((seg.value / total) * 100).toFixed(1)}%</span>
+    <div className="allocation-chart">
+      <div className="allocation-chart-shell">
+        <div className="allocation-chart-stage">
+          <div className={`allocation-hover-card${activeSegment ? " is-visible" : ""}`}>
+            {activeSegment ? (
+              <>
+                <div className="allocation-hover-card-label">{activeSegment.label}</div>
+                <div className="allocation-hover-card-value">{fmt(activeSegment.value, symbol)}</div>
+                <div className="allocation-hover-card-share">
+                  {((activeSegment.value / total) * 100).toFixed(1)}% of treasury allocation
+                </div>
+              </>
+            ) : null}
           </div>
-        ))}
+
+          <div className="allocation-chart-visual">
+            <svg width={size} height={size} className="allocation-chart-svg">
+              <circle cx={cx} cy={cy} r={r} fill="none" className="allocation-chart-track" />
+              {segments.map((seg, i) => {
+                const start = cum;
+                const pct = seg.value / total;
+                const dash = circ * pct;
+                const gap = circ - dash;
+                const rot = (start / total) * 360 - 90;
+                const midAngle = ((start + seg.value / 2) / total) * Math.PI * 2 - Math.PI / 2;
+                const isActive = activeIndex === i;
+                const hoverOffset = isActive ? 8 : 0;
+                const dx = Math.cos(midAngle) * hoverOffset;
+                const dy = Math.sin(midAngle) * hoverOffset;
+                cum += seg.value;
+
+                return (
+                  <g
+                    key={seg.label}
+                    className={`allocation-chart-segment${isActive ? " is-active" : ""}`}
+                    transform={`translate(${dx} ${dy})`}
+                  >
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={r}
+                      fill="none"
+                      stroke={seg.color}
+                      strokeWidth={isActive ? 18 : 16}
+                      strokeLinecap="round"
+                      strokeDasharray={`${dash} ${gap}`}
+                      transform={`rotate(${rot} ${cx} ${cy})`}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${seg.label}: ${fmt(seg.value, symbol)} (${(pct * 100).toFixed(1)}%)`}
+                      onMouseEnter={() => setActiveIndex(i)}
+                      onMouseLeave={() => setActiveIndex((current) => (current === i ? null : current))}
+                      onFocus={() => setActiveIndex(i)}
+                      onBlur={() => setActiveIndex((current) => (current === i ? null : current))}
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+
+            <div className="allocation-chart-center">
+              <div className="allocation-chart-center-label">
+                {activeSegment ? "Highlighted Slice" : "Total Allocated"}
+              </div>
+              <div className="allocation-chart-center-value">
+                {activeSegment ? `${((activeSegment.value / total) * 100).toFixed(1)}%` : fmt(total, symbol)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="allocation-chart-legend">
+          {segments.map((seg, i) => {
+            const percentage = ((seg.value / total) * 100).toFixed(1);
+            const isActive = activeIndex === i;
+            return (
+              <div
+                key={seg.label}
+                className={`allocation-chart-legend-item${isActive ? " is-active" : ""}`}
+                onMouseEnter={() => setActiveIndex(i)}
+                onMouseLeave={() => setActiveIndex((current) => (current === i ? null : current))}
+              >
+                <span className="allocation-chart-legend-swatch" style={{ background: seg.color }} />
+                <span className="text-sm text-secondary" style={{ flex: 1 }}>{seg.label}</span>
+                <span className="fw-semi font-num text-sm">{percentage}%</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -312,7 +386,7 @@ export default function OverviewPage() {
               <div className="stack"><Skeleton h={100} /></div>
             ) : visibleAllocationSegments.length > 0 ? (
               <div className="stack">
-                <DonutChart segments={visibleAllocationSegments} />
+                <DonutChart segments={visibleAllocationSegments} symbol={balanceSymbol} />
                 <div className="stack" style={{ gap: 10 }}>
                   {visibleAllocationSegments.map((segment) => (
                     <div key={segment.label} className="row-between">

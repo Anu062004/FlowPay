@@ -125,15 +125,12 @@ function DonutChart({ segments, symbol }: { segments: AllocationSegment[]; symbo
                 );
               })}
             </svg>
+            <div className="allocation-chart-hole" aria-hidden="true" />
+          </div>
 
-            <div className="allocation-chart-center">
-              <div className="allocation-chart-center-label">
-                {activeSegment ? "Highlighted Slice" : "Total Allocated"}
-              </div>
-              <div className="allocation-chart-center-value">
-                {activeSegment ? `${((activeSegment.value / total) * 100).toFixed(1)}%` : fmt(total, symbol)}
-              </div>
-            </div>
+          <div className="allocation-chart-total">
+            <div className="allocation-chart-total-label">Total Allocation</div>
+            <div className="allocation-chart-total-value">{fmt(total, symbol)}</div>
           </div>
         </div>
 

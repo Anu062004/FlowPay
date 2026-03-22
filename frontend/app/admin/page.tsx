@@ -100,6 +100,30 @@ const TASK_TYPES = [
   "support_ticket",
 ];
 
+const LOG_STAGE_OPTIONS = [
+  { value: "all", label: "All stages" },
+  { value: "workflow", label: "Workflow" },
+  { value: "decision", label: "Decision" },
+  { value: "policy_validation", label: "Policy validation" },
+  { value: "wdk_execution", label: "WDK execution" },
+  { value: "guardrail", label: "Guardrail" },
+];
+
+const LOG_POLICY_OPTIONS = [
+  { value: "all", label: "All policy states" },
+  { value: "allow", label: "Allow" },
+  { value: "review", label: "Review" },
+  { value: "block", label: "Block" },
+  { value: "none", label: "No verdict" },
+];
+
+const LOG_LIMIT_OPTIONS = [
+  { value: "6", label: "6 events" },
+  { value: "12", label: "12 events" },
+  { value: "24", label: "24 events" },
+  { value: "all", label: "All events" },
+];
+
 const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -113,6 +137,7 @@ const Icons = {
   check: "M5 13l4 4L19 7",
   close: "M6 18L18 6M6 6l12 12",
   mail: "M4 4h16v16H4z M22 6l-10 7L2 6",
+  chevronDown: "M6 9l6 6 6-6",
 };
 
 function Badge({ variant, children }: { variant: string; children: React.ReactNode }) {
@@ -126,6 +151,14 @@ function formatDate(value?: string | null) {
   return date.toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+function formatJsonBlock(value: unknown) {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
 export default function AdminControlPage() {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
@@ -136,6 +169,9 @@ export default function AdminControlPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("pending");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [logStageFilter, setLogStageFilter] = useState("all");
+  const [logPolicyFilter, setLogPolicyFilter] = useState("all");
+  const [logLimit, setLogLimit] = useState("12");
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [strategyRunning, setStrategyRunning] = useState(false);
   const [demoRunning, setDemoRunning] = useState(false);
@@ -162,6 +198,20 @@ export default function AdminControlPage() {
   const decisionCount = useMemo(() => logs.filter(log => log.stage === "decision").length, [logs]);
   const policyValidationCount = useMemo(() => logs.filter(log => log.stage === "policy_validation").length, [logs]);
   const executionCount = useMemo(() => logs.filter(log => log.stage === "wdk_execution").length, [logs]);
+  const filteredLogs = useMemo(() => {
+    return logs.filter((log) => {
+      const stageMatches = logStageFilter === "all" || (log.stage ?? "workflow") === logStageFilter;
+      const policyStatus = log.policy_result?.status ?? "none";
+      const policyMatches = logPolicyFilter === "all" || policyStatus === logPolicyFilter;
+      return stageMatches && policyMatches;
+    });
+  }, [logs, logPolicyFilter, logStageFilter]);
+  const visibleLogs = useMemo(() => {
+    if (logLimit === "all") {
+      return filteredLogs;
+    }
+    return filteredLogs.slice(0, Number(logLimit));
+  }, [filteredLogs, logLimit]);
   const recentWorkflows = useMemo(() => {
     const grouped = new Map<string, { id: string; name: string; stageCount: number; lastSeen: string; status: string }>();
     for (const log of logs) {
@@ -847,61 +897,151 @@ export default function AdminControlPage() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="card-header">
+      <div className="card agent-log-card">
+        <div className="card-header agent-log-header">
           <div>
             <div className="card-title">Agent Activity Logs</div>
             <div className="card-subtitle">Decision to policy validation to WDK execution audit trail.</div>
           </div>
+          <div className="agent-log-controls">
+            <label className="agent-log-control">
+              <span>Stage</span>
+              <select
+                className="form-select"
+                value={logStageFilter}
+                onChange={(e) => setLogStageFilter(e.target.value)}
+              >
+                {LOG_STAGE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="agent-log-control">
+              <span>Policy</span>
+              <select
+                className="form-select"
+                value={logPolicyFilter}
+                onChange={(e) => setLogPolicyFilter(e.target.value)}
+              >
+                {LOG_POLICY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="agent-log-control">
+              <span>View</span>
+              <select
+                className="form-select"
+                value={logLimit}
+                onChange={(e) => setLogLimit(e.target.value)}
+              >
+                {LOG_LIMIT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
-        <div className="data-table-wrapper" style={{ border: "none", borderRadius: 0 }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Workflow</th>
-                <th>Stage</th>
-                <th>Agent</th>
-                <th>Policy</th>
-                <th>Action</th>
-                <th>Rationale</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={7}>Loading...</td></tr>
-              ) : logs.length === 0 ? (
-                <tr><td colSpan={7}>No agent logs found.</td></tr>
-              ) : logs.map((log) => (
-                <tr key={log.id}>
-                  <td className="text-xs">{formatDate(log.timestamp)}</td>
-                  <td className="text-xs" style={{ maxWidth: 180 }}>
-                    <div>{log.workflow_name ?? "general"}</div>
-                    <div className="text-secondary">{log.workflow_id ?? "N/A"}</div>
-                  </td>
-                  <td className="text-xs">
-                    <div><Badge variant={STAGE_BADGE[log.stage ?? ""] ?? "neutral"}>{log.stage ?? "general"}</Badge></div>
-                    {log.execution_status ? <div className="text-secondary mt-1">{log.execution_status}</div> : null}
-                  </td>
-                  <td className="text-xs">{log.agent_name}</td>
-                  <td className="text-xs">
-                    {log.policy_result?.status ? (
-                      <>
-                        <div><Badge variant={POLICY_BADGE[log.policy_result.status] ?? "neutral"}>{log.policy_result.status}</Badge></div>
-                        {log.policy_result.reasons?.[0] ? (
-                          <div className="text-secondary mt-1" style={{ maxWidth: 220 }}>{log.policy_result.reasons[0]}</div>
+
+        <div className="card-body stack-sm">
+          <div className="agent-log-summary-bar">
+            <div className="agent-log-summary-chip">
+              <span className="agent-log-summary-label">Showing</span>
+              <span className="agent-log-summary-value font-num">{visibleLogs.length}</span>
+            </div>
+            <div className="agent-log-summary-chip">
+              <span className="agent-log-summary-label">Filtered from</span>
+              <span className="agent-log-summary-value font-num">{logs.length}</span>
+            </div>
+            <div className="agent-log-summary-chip">
+              <span className="agent-log-summary-label">Latest Event</span>
+              <span className="agent-log-summary-value">{formatDate(lastAgentLog)}</span>
+            </div>
+            <div className="agent-log-summary-chip">
+              <span className="agent-log-summary-label">Policy Reviews</span>
+              <span className="agent-log-summary-value font-num">{policyReviewCount}</span>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="agent-log-empty">Loading agent activity...</div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="agent-log-empty">No agent activity matches the current filters.</div>
+          ) : (
+            <div className="agent-log-list">
+              {visibleLogs.map((log) => {
+                const policyStatus = log.policy_result?.status;
+                const workflowLabel = log.workflow_name ?? "General activity";
+                const workflowId = log.workflow_id ?? "No workflow id";
+                const stageLabel = log.stage ?? "workflow";
+
+                return (
+                  <details key={log.id} className="agent-log-entry">
+                    <summary className="agent-log-entry-summary">
+                      <div className="agent-log-main">
+                        <div className="agent-log-topline">
+                          <span className="text-xs text-secondary">{formatDate(log.timestamp)}</span>
+                          <Badge variant={STAGE_BADGE[stageLabel] ?? "neutral"}>{stageLabel}</Badge>
+                          <Badge variant="info">{log.agent_name}</Badge>
+                          {policyStatus ? (
+                            <Badge variant={POLICY_BADGE[policyStatus] ?? "neutral"}>{policyStatus}</Badge>
+                          ) : (
+                            <Badge variant="neutral">no policy</Badge>
+                          )}
+                        </div>
+                        <div className="agent-log-action">{log.action_taken}</div>
+                        <div className="agent-log-meta">
+                          <span>{workflowLabel}</span>
+                          <span>{workflowId}</span>
+                          {log.source ? <span>{log.source}</span> : null}
+                          {log.execution_status ? <span>{log.execution_status}</span> : null}
+                        </div>
+                      </div>
+                      <span className="agent-log-expand">
+                        <span>Details</span>
+                        <span className="agent-log-expand-icon"><Icon d={Icons.chevronDown} size={14} /></span>
+                      </span>
+                    </summary>
+
+                    <div className="agent-log-detail-grid">
+                      <div className="agent-log-detail-card">
+                        <div className="agent-log-detail-label">Rationale</div>
+                        <p className="text-sm text-secondary">{log.rationale || "No rationale recorded."}</p>
+                      </div>
+
+                      <div className="agent-log-detail-card">
+                        <div className="agent-log-detail-label">Policy Outcome</div>
+                        <p className="text-sm text-secondary">
+                          {policyStatus ? `Result: ${policyStatus}` : "No policy verdict recorded for this step."}
+                        </p>
+                        {log.policy_result?.reasons?.length ? (
+                          <div className="agent-log-reason-list">
+                            {log.policy_result.reasons.map((reason) => (
+                              <div key={reason} className="agent-log-reason-item">{reason}</div>
+                            ))}
+                          </div>
                         ) : null}
-                      </>
-                    ) : (
-                      <span className="text-secondary">N/A</span>
-                    )}
-                  </td>
-                  <td className="text-xs" style={{ maxWidth: 220 }}>{log.action_taken}</td>
-                  <td className="text-xs" style={{ maxWidth: 420 }}>{log.rationale}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </div>
+
+                      {log.decision ? (
+                        <div className="agent-log-detail-card">
+                          <div className="agent-log-detail-label">Decision Payload</div>
+                          <pre className="agent-log-json">{formatJsonBlock(log.decision)}</pre>
+                        </div>
+                      ) : null}
+
+                      {log.metadata ? (
+                        <div className="agent-log-detail-card">
+                          <div className="agent-log-detail-label">Execution Metadata</div>
+                          <pre className="agent-log-json">{formatJsonBlock(log.metadata)}</pre>
+                        </div>
+                      ) : null}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -53,7 +53,7 @@ const employerNavItems = [
   { label: "Lending", href: "/lending", icon: Icons.lending },
   { label: "Investments", href: "/investments", icon: Icons.investments },
   { label: "Transactions", href: "/transactions", icon: Icons.transactions },
-  { label: "Admin Control", href: "/admin", icon: Icons.admin },
+  { label: "OpenClaw Command Deck", href: "/openclaw-command-deck", icon: Icons.admin },
   { label: "Settings", href: "/settings", icon: Icons.settings }
 ];
 
@@ -74,6 +74,7 @@ const EMPLOYER_WORKSPACE_PATHS = [
   "/lending",
   "/investments",
   "/transactions",
+  "/openclaw-command-deck",
   "/settings",
   "/admin"
 ];
@@ -107,7 +108,8 @@ function getTitle(path: string): { section: string; page: string } {
     "/lending": "Lending",
     "/investments": "Investments",
     "/transactions": "Transactions",
-    "/admin": "Admin Control",
+    "/openclaw-command-deck": "OpenClaw Command Deck",
+    "/admin": "OpenClaw Command Deck",
     "/settings": "Settings",
     "/employee/overview": "My Account",
     "/employee/wallet": "My Wallet",

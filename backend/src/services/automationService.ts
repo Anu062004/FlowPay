@@ -77,6 +77,7 @@ async function sendPayrollBalanceAlertIfNeeded(input: {
   nextPayrollAt: string;
   payrollMonthLabel: string;
   hoursToPayroll: number;
+  activeEmployees: number;
   dueEmployees: number;
   requiredPayrollAmount: number;
   treasuryBalance: number;
@@ -95,6 +96,7 @@ async function sendPayrollBalanceAlertIfNeeded(input: {
     nextPayrollAt: input.nextPayrollAt,
     payrollMonthLabel: input.payrollMonthLabel,
     hoursToPayroll: parseFloat(input.hoursToPayroll.toFixed(2)),
+    activeEmployees: input.activeEmployees,
     dueEmployees: input.dueEmployees,
     requiredPayrollAmount: parseFloat(input.requiredPayrollAmount.toFixed(6)),
     treasuryBalance: parseFloat(input.treasuryBalance.toFixed(6)),
@@ -123,6 +125,8 @@ async function sendPayrollBalanceAlertIfNeeded(input: {
     nextPayrollAt: input.nextPayrollAt,
     payrollMonthLabel: input.payrollMonthLabel,
     hoursToPayroll: input.hoursToPayroll,
+    activeEmployees: input.activeEmployees,
+    dueEmployees: input.dueEmployees,
     requiredPayrollAmount: input.requiredPayrollAmount,
     treasuryBalance: input.treasuryBalance,
     shortfall: input.shortfall,
@@ -160,6 +164,7 @@ async function runFinanceAutomation(companyId?: string): Promise<Record<string, 
   const payrollLookahead = parseIntSafe(env.PAYROLL_PREP_LOOKAHEAD_HOURS, 72);
   const runHourLocal = parseIntSafe(env.PAYROLL_AUTOMATION_LOCAL_HOUR, 9);
   const runMinuteLocal = parseIntSafe(env.PAYROLL_AUTOMATION_LOCAL_MINUTE, 0);
+  const treasuryCurrency = env.TREASURY_TOKEN_SYMBOL?.trim() || "ETH";
 
   for (const company of companies) {
     processed += 1;
@@ -252,12 +257,14 @@ async function runFinanceAutomation(companyId?: string): Promise<Record<string, 
       const dueEmployees = nextPayroll
         ? await getDuePayrollEmployees(company.id, nextPayroll.payrollMonthKey)
         : [];
+      const activePayrollAmount = toNumber(employeeStatsResult.rows[0]?.total_salary);
       const duePayrollAmount = dueEmployees.reduce(
         (sum, employee) => sum + parseFloat(employee.salary),
         0
       );
+      const requiredPayrollAmount = Math.max(activePayrollAmount, duePayrollAmount);
       const treasuryBalance = treasury ? toNumber((treasury as any).balance) : 0;
-      const shortfall = Math.max(duePayrollAmount - treasuryBalance, 0);
+      const shortfall = Math.max(requiredPayrollAmount - treasuryBalance, 0);
 
       const payrollPrepResult = await createOpsTaskIfNotRecent({
         companyId: company.id,
@@ -279,17 +286,18 @@ async function runFinanceAutomation(companyId?: string): Promise<Record<string, 
         createdTasks.payroll_prep = (createdTasks.payroll_prep ?? 0) + 1;
       }
 
-      if (duePayrollAmount > 0 && shortfall > 0 && nextPayroll) {
+      if (requiredPayrollAmount > 0 && shortfall > 0 && nextPayroll) {
         const alertCreated = await sendPayrollBalanceAlertIfNeeded({
           company,
           nextPayrollAt: nextPayroll.runAt.toISOString(),
           payrollMonthLabel: nextPayroll.payrollMonthLabel,
           hoursToPayroll,
+          activeEmployees: toNumber(employeeStatsResult.rows[0]?.active_employees),
           dueEmployees: dueEmployees.length,
-          requiredPayrollAmount: duePayrollAmount,
+          requiredPayrollAmount,
           treasuryBalance,
           shortfall,
-          currency: env.TREASURY_TOKEN_SYMBOL ?? "ETH"
+          currency: treasuryCurrency
         });
         if (alertCreated) {
           createdTasks.payroll_balance_alert = (createdTasks.payroll_balance_alert ?? 0) + 1;

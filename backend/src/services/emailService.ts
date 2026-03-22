@@ -308,6 +308,8 @@ export async function sendCompanyPayrollBalanceAlert(input: {
   nextPayrollAt: string;
   payrollMonthLabel: string;
   hoursToPayroll: number;
+  activeEmployees: number;
+  dueEmployees: number;
   requiredPayrollAmount: number;
   treasuryBalance: number;
   shortfall: number;
@@ -323,6 +325,8 @@ export async function sendCompanyPayrollBalanceAlert(input: {
       `Payroll month: ${input.payrollMonthLabel}`,
       `Scheduled payroll time: ${input.nextPayrollAt}`,
       `Hours until payroll: ${input.hoursToPayroll.toFixed(2)}`,
+      `Active employees: ${input.activeEmployees}`,
+      `Employees still unpaid this payroll period: ${input.dueEmployees}`,
       `Required payroll funding: ${input.requiredPayrollAmount.toFixed(6)} ${input.currency}`,
       `Current treasury balance: ${input.treasuryBalance.toFixed(6)} ${input.currency}`,
       `Funding shortfall: ${input.shortfall.toFixed(6)} ${input.currency}`,
@@ -336,6 +340,8 @@ export async function sendCompanyPayrollBalanceAlert(input: {
       nextPayrollAt: input.nextPayrollAt,
       payrollMonthLabel: input.payrollMonthLabel,
       hoursToPayroll: input.hoursToPayroll,
+      activeEmployees: input.activeEmployees,
+      dueEmployees: input.dueEmployees,
       requiredPayrollAmount: input.requiredPayrollAmount,
       treasuryBalance: input.treasuryBalance,
       shortfall: input.shortfall,

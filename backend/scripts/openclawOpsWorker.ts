@@ -428,6 +428,19 @@ function formatTaskEmail(task: OpsTask) {
     lines.push(`Active employees: ${payload.activeEmployees ?? ""}`);
     lines.push(`Total salary: ${payload.totalSalary ?? ""}`);
     lines.push(`Treasury balance: ${payload.treasuryBalance ?? ""}`);
+  } else if (task.type === "payroll_balance_alert") {
+    lines.push(`Payroll funding alert triggered.`);
+    lines.push(`Company: ${payload.companyName ?? payload.companyId ?? ""}`);
+    lines.push(`Payroll month: ${payload.payrollMonthLabel ?? ""}`);
+    lines.push(`Scheduled payroll time: ${payload.nextPayrollAt ?? ""}`);
+    lines.push(`Hours to payroll: ${payload.hoursToPayroll ?? ""}`);
+    lines.push(`Active employees: ${payload.activeEmployees ?? ""}`);
+    lines.push(`Unpaid employees this period: ${payload.dueEmployees ?? ""}`);
+    lines.push(`Required payroll funding: ${payload.requiredPayrollAmount ?? ""} ${payload.currency ?? ""}`.trim());
+    lines.push(`Treasury balance: ${payload.treasuryBalance ?? ""} ${payload.currency ?? ""}`.trim());
+    lines.push(`Shortfall: ${payload.shortfall ?? ""} ${payload.currency ?? ""}`.trim());
+    lines.push("");
+    lines.push("Please fund the treasury before the scheduled payroll run to avoid missed salary disbursements.");
   } else if (task.type === "finance_snapshot") {
     lines.push(`Daily finance snapshot generated.`);
     lines.push(`Company: ${payload.companyName ?? payload.companyId ?? ""}`);

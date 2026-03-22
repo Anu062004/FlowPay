@@ -7,7 +7,7 @@ import type {
   TradingAgentsDecision
 } from "../clients/tradingAgentsClient.js";
 import { sendContractTransaction } from "./walletService.js";
-import { withRpcFailover } from "./rpcService.js";
+import { withRpcFailoverForChain } from "./rpcService.js";
 import { formatTokenAmount, parseTokenAmount } from "../utils/amounts.js";
 
 const ERC20_ABI = [
@@ -100,6 +100,10 @@ function sameAsset(a: AssetConfig, b: AssetConfig) {
   return a.address.toLowerCase() === b.address.toLowerCase();
 }
 
+function getExecutionChain() {
+  return (env.TREASURY_TOKEN_BLOCKCHAIN ?? "ethereum").trim().toLowerCase();
+}
+
 function getTreasuryAsset(): AssetConfig {
   return {
     address: requireAddress(
@@ -183,7 +187,7 @@ async function getCompanyIdForWallet(walletId: string) {
 }
 
 async function getTokenBalanceRaw(tokenAddress: string, walletAddress: string) {
-  return withRpcFailover(`erc20 balanceOf ${tokenAddress}`, async (provider) => {
+  return withRpcFailoverForChain(getExecutionChain(), `erc20 balanceOf ${tokenAddress}`, async (provider) => {
     const token = new Contract(tokenAddress, ERC20_ABI, provider);
     return (await token.balanceOf(walletAddress)) as bigint;
   });
@@ -196,10 +200,14 @@ async function ensureAllowance(params: {
   spender: string;
   amountRaw: bigint;
 }) {
-  const currentAllowance = await withRpcFailover("erc20 allowance", async (provider) => {
-    const token = new Contract(params.token.address, ERC20_ABI, provider);
-    return (await token.allowance(params.walletAddress, params.spender)) as bigint;
-  });
+  const currentAllowance = await withRpcFailoverForChain(
+    getExecutionChain(),
+    "erc20 allowance",
+    async (provider) => {
+      const token = new Contract(params.token.address, ERC20_ABI, provider);
+      return (await token.allowance(params.walletAddress, params.spender)) as bigint;
+    }
+  );
 
   if (currentAllowance >= params.amountRaw) {
     return;
@@ -264,7 +272,7 @@ async function quoteStableSwap(params: {
   fee: number;
   amountInRaw: bigint;
 }) {
-  return withRpcFailover("stable swap quote", async (provider) => {
+  return withRpcFailoverForChain(getExecutionChain(), "stable swap quote", async (provider) => {
     const quoter = new Contract(params.quoterAddress, V3_QUOTER_ABI, provider);
     return (await quoter.quoteExactInputSingle(
       params.tokenIn.address,
@@ -477,7 +485,7 @@ async function executeAllocation(params: {
 }
 
 async function getYearnWithdrawableAssets(vaultAddress: string, walletAddress: string) {
-  return withRpcFailover("yearn maxWithdraw", async (provider) => {
+  return withRpcFailoverForChain(getExecutionChain(), "yearn maxWithdraw", async (provider) => {
     const vault = new Contract(vaultAddress, ERC4626_ABI, provider);
     return (await vault.maxWithdraw(walletAddress)) as bigint;
   });

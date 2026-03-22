@@ -2,7 +2,7 @@ import { ethers } from "ethers";
 import { env } from "../config/env.js";
 import { sendAdminTransaction } from "./wdkAdmin.js";
 import { formatAmount, parseAmount } from "../utils/amounts.js";
-import { getRpcProvider } from "./rpcService.js";
+import { getContractRpcProvider } from "./rpcService.js";
 
 const CORE_ABI = [
   "function initializeEmployee(address employee, uint256 monthlySalary, uint8 employmentType) external",
@@ -26,11 +26,11 @@ const LOAN_ABI = [
 ];
 
 function getCoreContract() {
-  return new ethers.Contract(env.CORE_CONTRACT_ADDRESS, CORE_ABI, getRpcProvider());
+  return new ethers.Contract(env.CORE_CONTRACT_ADDRESS, CORE_ABI, getContractRpcProvider());
 }
 
 function getLoanContract() {
-  return new ethers.Contract(env.LOAN_CONTRACT_ADDRESS, LOAN_ABI, getRpcProvider());
+  return new ethers.Contract(env.LOAN_CONTRACT_ADDRESS, LOAN_ABI, getContractRpcProvider());
 }
 
 function parseMonthlySalaryEth(monthlySalaryEth: string | number) {
@@ -211,7 +211,7 @@ export async function issueContractLoan(
     [employeeAddress, amountWei, duration]
   );
 
-  const receipt = await getRpcProvider().getTransactionReceipt(txHash);
+  const receipt = await getContractRpcProvider().getTransactionReceipt(txHash);
   if (!receipt) {
     throw new Error("Loan issuance receipt is unavailable");
   }

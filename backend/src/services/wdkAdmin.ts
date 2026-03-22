@@ -3,14 +3,18 @@ import WalletManagerEvm, { WalletAccountEvm } from "@tetherto/wdk-wallet-evm";
 import { ethers } from "ethers";
 import { env } from "../config/env.js";
 import { decryptMnemonicWithPasskey } from "../crypto/crypto.js";
-import { getRoundRobinRpcUrl, getRpcProvider, withRpcFailover } from "./rpcService.js";
+import {
+  getContractRoundRobinRpcUrl,
+  getContractRpcProvider,
+  withContractRpcFailover
+} from "./rpcService.js";
 import { withRpcRetry } from "./rpcRetryService.js";
 
 const transferMaxFee = BigInt(env.WDK_TRANSFER_MAX_FEE);
 const adminPrivateKey = env.ADMIN_PRIVATE_KEY?.trim() || null;
 
 export function getAdminProvider() {
-  return getRpcProvider();
+  return getContractRpcProvider();
 }
 
 export function hasAdminPrivateKey() {
@@ -21,7 +25,7 @@ export function getAdminSigner() {
   if (!adminPrivateKey) {
     throw new Error("ADMIN_PRIVATE_KEY is not configured");
   }
-  return new ethers.Wallet(adminPrivateKey, getRpcProvider(getRoundRobinRpcUrl()));
+  return new ethers.Wallet(adminPrivateKey, getContractRpcProvider(getContractRoundRobinRpcUrl()));
 }
 
 export async function withAdminContext<T>(
@@ -31,7 +35,7 @@ export async function withAdminContext<T>(
     throw new Error("WDK admin context is unavailable when ADMIN_PRIVATE_KEY is configured. Use the signer-based admin helpers instead.");
   }
 
-  const rpcUrl = getRoundRobinRpcUrl();
+  const rpcUrl = getContractRoundRobinRpcUrl();
   const seedPayload = env.ADMIN_SEED_PAYLOAD?.trim();
   if (!seedPayload) {
     throw new Error("ADMIN_SEED_PAYLOAD is not configured. Set ADMIN_PRIVATE_KEY or provide a valid ADMIN_SEED_PAYLOAD.");
@@ -70,7 +74,7 @@ export async function sendAdminTransaction(
   const data = iface.encodeFunctionData(method, args);
 
   if (adminPrivateKey) {
-    const txHash = await withRpcFailover("admin signer sendTransaction", async (provider) => {
+    const txHash = await withContractRpcFailover("admin signer sendTransaction", async (provider) => {
       const signer = new ethers.Wallet(adminPrivateKey, provider);
       const tx = await withRpcRetry("admin signer sendTransaction", () =>
         signer.sendTransaction({
@@ -81,7 +85,7 @@ export async function sendAdminTransaction(
       );
       return tx.hash;
     });
-    const receipt = await withRpcFailover(`admin signer waitForTransaction ${txHash}`, (provider) =>
+    const receipt = await withContractRpcFailover(`admin signer waitForTransaction ${txHash}`, (provider) =>
       provider.waitForTransaction(txHash)
     );
     if (!receipt) {
@@ -99,7 +103,7 @@ export async function sendAdminTransaction(
     return result.hash;
   });
 
-  const receipt = await withRpcFailover(`provider waitForTransaction ${txHash}`, (provider) =>
+  const receipt = await withContractRpcFailover(`provider waitForTransaction ${txHash}`, (provider) =>
     provider.waitForTransaction(txHash)
   );
   if (!receipt) {

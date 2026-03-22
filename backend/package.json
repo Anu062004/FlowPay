@@ -13,6 +13,7 @@
     "market:top": "tsx scripts/marketTopProbe.ts",
     "admin:encrypt": "tsx scripts/encryptAdminSeed.ts",
     "ops:worker": "tsx scripts/openclawOpsWorker.ts",
+    "ops:verify:trading-agents-ec2": "tsx scripts/verifyTradingAgentsEc2.ts",
     "automation:run": "tsx scripts/runAutomation.ts",
     "zk:compile": "node -e \"require('fs').mkdirSync('circuits/build', { recursive: true })\" && npx circom2 circuits/ScoreTierProof.circom --r1cs --sym -o . && copy /Y circuits\\ScoreTierProof.r1cs circuits\\build\\ScoreTierProof.r1cs && copy /Y circuits\\ScoreTierProof.sym circuits\\build\\ScoreTierProof.sym",
     "zk:compile:wasm": "node scripts/compileScoreTierWasm.js",

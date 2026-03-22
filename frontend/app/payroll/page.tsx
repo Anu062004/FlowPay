@@ -36,7 +36,7 @@ function Skeleton({ h = 18 }: { h?: number }) {
 }
 
 function fmtEth(value: string | number | null | undefined) {
-  return formatEth(value, 6, "ETH");
+  return formatEth(value, 6, "USDT");
 }
 
 function getEmployeePayrollStatus(employee: {
@@ -159,7 +159,7 @@ export default function PayrollPage() {
       <div className="page-header-row">
         <div className="page-header">
           <h1 className="page-title">Payroll</h1>
-          <p className="page-subtitle">Automated salary disbursement and payroll history in ETH.</p>
+          <p className="page-subtitle">Automated salary disbursement and payroll history in USDT.</p>
         </div>
         <div className="row">
           <button className="btn btn-primary" onClick={() => setShowConfirm(true)} disabled={unpaidEmployees.length === 0}>

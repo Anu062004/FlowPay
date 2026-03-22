@@ -16,7 +16,7 @@ const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
 function fmt(val: string | number | null | undefined): string {
   if (val === null || val === undefined) return "--";
   const n = parseFloat(String(val));
-  return isNaN(n) ? "--" : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ETH`;
+  return isNaN(n) ? "--" : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USDT`;
 }
 
 function Badge({ variant, children }: { variant: string; children: React.ReactNode }) {
@@ -164,7 +164,7 @@ export default function EmployeeOverviewPage() {
                 <tr>
                   <th>Date</th>
                   <th>Description</th>
-                  <th className="right">Amount (ETH)</th>
+                  <th className="right">Amount (USDT)</th>
                 </tr>
               </thead>
               <tbody>

@@ -682,7 +682,7 @@ export default function SettingsPage() {
                         onChange={(e) => updatePayroll({ currency: e.target.value })}
                       >
                         <option>USDC</option>
-                        <option>Native ETH</option>
+                        <option>USDT on Ethereum</option>
                       </select>
                     </div>
                   </div>
@@ -766,7 +766,7 @@ export default function SettingsPage() {
                   <div className="settings-callout settings-callout-highlight">
                     <div className="settings-callout-title">Runtime note</div>
                     <div className="settings-callout-copy">
-                      This prototype runs on ETH Sepolia today. The OpenClaw orchestration path, FlowPay policy engine,
+                      Primary treasury settlement now runs on USDT on Ethereum. The OpenClaw orchestration path, FlowPay policy engine,
                       and WDK execution layer are kept visible here so the settings surface mirrors the actual control
                       plane.
                     </div>

@@ -17,7 +17,7 @@ const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
 );
 
 function fmt(val: string | number | null | undefined, symbol?: string): string {
-  return formatEth(val, 6, symbol ?? "ETH");
+  return formatEth(val, 6, symbol ?? "USDT");
 }
 
 function Badge({ variant, children }: { variant: string; children: React.ReactNode }) {
@@ -104,7 +104,7 @@ export default function TreasuryPage() {
 
   async function handleContinue() {
     if (!isEvmAddress(trimmedDest)) {
-      setActionError("Enter a valid Sepolia/EVM wallet address.");
+      setActionError("Enter a valid Ethereum wallet address.");
       return;
     }
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
@@ -176,7 +176,7 @@ export default function TreasuryPage() {
 
       {/* Wallet card */}
       <div className="wallet-card">
-        <div className="wallet-card-label">Treasury Wallet · Ethereum Sepolia</div>
+        <div className="wallet-card-label">Treasury Wallet · Ethereum</div>
         {treasury.loading ? (
           <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 32, fontWeight: 700 }}>Loading…</div>
         ) : (
@@ -221,7 +221,7 @@ export default function TreasuryPage() {
           <div className="card-header">
             <div>
               <div className="card-title">Wallet Address</div>
-              <div className="card-subtitle">Use this address to receive funds on Ethereum Sepolia</div>
+              <div className="card-subtitle">Use this address to receive funds on Ethereum</div>
             </div>
             <Badge variant="success">Active</Badge>
           </div>

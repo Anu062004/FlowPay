@@ -1,7 +1,7 @@
 export function formatEth(
   value: string | number | null | undefined,
   maxDecimals = 6,
-  symbol = "ETH"
+  symbol = "USDT"
 ) {
   if (value === null || value === undefined) return "--";
   const n = typeof value === "string" ? parseFloat(value) : value;

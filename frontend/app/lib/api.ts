@@ -208,6 +208,49 @@ export type PayrollHistoryEntry = {
   employee_count: string;
 };
 
+export type TradingAgentsAllocationEntry = {
+  protocolKey: string;
+  protocol: string;
+  action: "deposit" | "swap_to_pt" | "supply" | null;
+  percent: number;
+  amount_usdc: number;
+};
+
+export type TradingAgentsOverview = {
+  configured: boolean;
+  reachable: boolean;
+  url: string | null;
+  timeout_ms: number;
+  enabled_protocols: string[];
+  executable_protocols: string[];
+  health: Record<string, unknown> | null;
+  healthError: string | null;
+  latestDecision: {
+    timestamp: string;
+    action: string | null;
+    confidence: number | null;
+    model_used: string | null;
+    reasoning: string;
+    execution_status: string | null;
+    allocation: TradingAgentsAllocationEntry[];
+  } | null;
+};
+
+export type InvestmentRunResult = {
+  action: "DEPOSIT" | "REBALANCE" | "HOLD" | "WITHDRAW";
+  confidence: number;
+  reasoning: string;
+  invested_amount: number;
+  txHashes: string[];
+  allocation: Record<string, {
+    percent: number;
+    amount_usdc: number;
+    protocol: string;
+    action: "deposit" | "swap_to_pt" | "supply";
+  }>;
+  policy?: AgentPolicyResult;
+};
+
 export type PayrollRunResult = {
   processed: number;
   payrollMonth: string;
@@ -445,6 +488,12 @@ export const fetchTransactions = (
 
 export const fetchMyTransactions = (employeeId: string) =>
   apiFetch<{ transactions: Transaction[] }>(`/transactions/me/${employeeId}`);
+
+export const runInvestment = (companyId: string) =>
+  apiFetch<InvestmentRunResult>("/investments/run", {
+    method: "POST",
+    body: JSON.stringify({ companyId }),
+  });
 
 // â”€â”€ Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 

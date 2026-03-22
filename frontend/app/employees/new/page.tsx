@@ -65,7 +65,7 @@ export default function EmployeeAddPage() {
         <input value={form.fullName} onChange={(e) => updateField("fullName", e.target.value)} required />
         <label className="label">Email</label>
         <input value={form.email} onChange={(e) => updateField("email", e.target.value)} required />
-        <label className="label">Monthly Salary (ETH)</label>
+        <label className="label">Monthly Salary (USDT)</label>
         <input value={form.salary} onChange={(e) => updateField("salary", e.target.value)} required />
         <label className="label">Credit Score</label>
         <input value={form.creditScore} onChange={(e) => updateField("creditScore", e.target.value)} />

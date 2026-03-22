@@ -3,12 +3,20 @@ import { asyncHandler } from "../utils/errors.js";
 import { db } from "../db/pool.js";
 import { env } from "../config/env.js";
 import { uuidQueryParam } from "../utils/validation.js";
-import { runInvestment } from "../services/investmentService.js";
+import { getTradingAgentsOverview, runInvestment } from "../services/investmentService.js";
 import { getEthPrice, getTrackedMarketBoard } from "../services/priceService.js";
 import { z } from "zod";
 import { assertCompanyScope, requireCompanySession } from "../middleware/auth.js";
 
 const router = Router();
+
+function getExecutionTokenSymbol() {
+  return (
+    env.INVESTMENT_EXECUTION_TOKEN_SYMBOL ??
+    env.TREASURY_TOKEN_SYMBOL ??
+    "USDT"
+  ).trim().toUpperCase();
+}
 
 // ── GET /investments?companyId= ───────────────────────────────
 // Summary + transaction history for the company's investment activity
@@ -77,13 +85,23 @@ router.get(
     let market: { asset: string; price: number; change_pct: number; source: string } | null = null;
     let marketBoard: Awaited<ReturnType<typeof getTrackedMarketBoard>> | null = null;
     try {
-      const price = await getEthPrice();
-      market = {
-        asset: "ETH",
-        price: price.price,
-        change_pct: price.changePct,
-        source: price.source
-      };
+      const executionTokenSymbol = getExecutionTokenSymbol();
+      if (executionTokenSymbol === "USDT" || executionTokenSymbol === "USDC") {
+        market = {
+          asset: executionTokenSymbol,
+          price: 1,
+          change_pct: 0,
+          source: "stable-peg"
+        };
+      } else {
+        const price = await getEthPrice();
+        market = {
+          asset: "ETH",
+          price: price.price,
+          change_pct: price.changePct,
+          source: price.source
+        };
+      }
     } catch {
       market = null;
     }
@@ -94,6 +112,8 @@ router.get(
       marketBoard = null;
     }
 
+    const tradingAgents = await getTradingAgentsOverview(companyId);
+
     res.status(200).json({
       allocation,
       positions: positionsResult.rows,
@@ -103,12 +123,10 @@ router.get(
         investment_pool: allocation?.investment_pool ?? "0",
         transaction_count: txResult.rows.length,
       },
-      execution_token_symbol:
-        env.INVESTMENT_EXECUTION_TOKEN_SYMBOL ??
-        env.TREASURY_TOKEN_SYMBOL ??
-        "USDT",
+      execution_token_symbol: getExecutionTokenSymbol(),
       market,
-      marketBoard
+      marketBoard,
+      trading_agents: tradingAgents
     });
   })
 );

@@ -25,7 +25,7 @@ function Badge({ variant, children }: { variant: string; children: React.ReactNo
 function fmt(val: string | number | null | undefined): string {
   if (val === null || val === undefined) return "--";
   const n = parseFloat(String(val));
-  return isNaN(n) ? "--" : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ETH`;
+  return isNaN(n) ? "--" : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USDT`;
 }
 
 function Skeleton() {

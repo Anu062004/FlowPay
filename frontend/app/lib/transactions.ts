@@ -4,7 +4,7 @@ type TransactionLike = Pick<Transaction, "type" | "tx_hash">;
 
 export type TransactionSettlementKind = "confirmed" | "recorded" | "pending";
 
-const DEFAULT_TX_EXPLORER_BASE_URL = "https://sepolia.etherscan.io/tx";
+const DEFAULT_TX_EXPLORER_BASE_URL = "https://etherscan.io/tx";
 
 export function getTransactionExplorerUrl(txHash: string) {
   const baseUrl =

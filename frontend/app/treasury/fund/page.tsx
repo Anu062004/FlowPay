@@ -44,7 +44,7 @@ export default function TreasuryFundPage() {
     <div className="stack">
       <PageHeader
         title="Treasury Funding"
-        subtitle="Send ETH from an external wallet to fund the company treasury."
+        subtitle="Send USDT on Ethereum to fund the company treasury."
       />
       <div className="card stack">
         <label className="label">Company ID</label>
@@ -67,11 +67,11 @@ export default function TreasuryFundPage() {
             </button>
           </div>
           <div className="notice">
-            Send ETH on Sepolia to this address. Balance updates after onchain confirmation.
+            Send USDT on Ethereum to this address. Balance updates after onchain confirmation.
           </div>
           <div className="row">
             <div>
-              <div className="label">Current Balance (ETH)</div>
+              <div className="label">Current Balance</div>
               <div style={{ fontWeight: 600 }}>{treasury.balanceEth}</div>
             </div>
             <button onClick={loadTreasury}>Refresh Balance</button>

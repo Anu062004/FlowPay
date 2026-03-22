@@ -1,6 +1,6 @@
 import { env } from "../config/env.js";
 import { Contract, isAddress } from "ethers";
-import { withRpcFailover } from "./rpcService.js";
+import { withRpcFailoverForChain } from "./rpcService.js";
 
 const baseUrl = env.WDK_INDEXER_BASE_URL.replace(/\/+$/, "");
 const INDEXER_MAX_ATTEMPTS = 3;
@@ -73,10 +73,14 @@ async function getTokenBalanceViaRpc(params: {
     throw new Error("RPC token balance fallback is unavailable for this blockchain/token");
   }
 
-  const balance = await withRpcFailover("indexer rpc token balance fallback", async (provider) => {
-    const token = new Contract(tokenAddress, ERC20_ABI, provider);
-    return (await token.balanceOf(params.address)) as bigint;
-  });
+  const balance = await withRpcFailoverForChain(
+    params.blockchain,
+    "indexer rpc token balance fallback",
+    async (provider) => {
+      const token = new Contract(tokenAddress, ERC20_ABI, provider);
+      return (await token.balanceOf(params.address)) as bigint;
+    }
+  );
   return { amount: balance.toString(), source: "rpc_fallback" };
 }
 

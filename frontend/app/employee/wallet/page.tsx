@@ -12,10 +12,10 @@ const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   </svg>
 );
 
-function fmtEth(val: string | number | null | undefined): string {
+function fmtAmount(val: string | number | null | undefined, symbol = "USDT"): string {
   if (val === null || val === undefined) return "--";
   const n = parseFloat(String(val));
-  return isNaN(n) ? "--" : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ETH`;
+  return isNaN(n) ? "--" : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ${symbol}`;
 }
 
 function Skeleton({ h = 20 }: { h?: number }) {
@@ -65,6 +65,7 @@ export default function EmployeeWalletPage() {
   const lastSalary = txList.find((t) => t.type === "payroll");
   const walletAddress = walletHook.data?.wallet_address ?? null;
   const balance = parseFloat(walletHook.data?.balance ?? "0");
+  const tokenSymbol = walletHook.data?.token_symbol ?? "USDT";
   const maxWithdrawable = parseFloat(walletHook.data?.max_withdrawable ?? "0");
 
   const trimmedDest = dest.trim();
@@ -81,7 +82,7 @@ export default function EmployeeWalletPage() {
 
   async function handleContinue() {
     if (!isEvmAddress(trimmedDest)) {
-      setActionError("Enter a valid Sepolia/EVM wallet address.");
+      setActionError("Enter a valid Ethereum wallet address.");
       return;
     }
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
@@ -89,7 +90,7 @@ export default function EmployeeWalletPage() {
       return;
     }
     if (numericAmount > maxWithdrawable) {
-      setActionError(`Amount exceeds your max withdrawable balance of ${fmtEth(maxWithdrawable)}.`);
+      setActionError(`Amount exceeds your max withdrawable balance of ${fmtAmount(maxWithdrawable, tokenSymbol)}.`);
       return;
     }
     setActionError(null);
@@ -110,7 +111,7 @@ export default function EmployeeWalletPage() {
         amount: numericAmount
       });
       setActionMessage(
-        `Withdrawal submitted. Sent ${fmtEth(result.amount)} to ${result.to.slice(0, 10)}...${result.to.slice(-6)}${result.txHash ? ` (tx ${result.txHash.slice(0, 12)}...).` : "."}`
+        `Withdrawal submitted. Sent ${fmtAmount(result.amount, result.token_symbol ?? tokenSymbol)} to ${result.to.slice(0, 10)}...${result.to.slice(-6)}${result.txHash ? ` (tx ${result.txHash.slice(0, 12)}...).` : "."}`
       );
       setDest("");
       setAmount("");
@@ -136,7 +137,7 @@ export default function EmployeeWalletPage() {
     <div className="stack-xl">
       <div className="page-header">
         <h1 className="page-title">My Wallet</h1>
-        <p className="page-subtitle">Personal Ethereum Sepolia wallet{ctx.fullName ? ` · ${ctx.fullName}` : ""}</p>
+        <p className="page-subtitle">Personal Ethereum wallet{ctx.fullName ? ` · ${ctx.fullName}` : ""}</p>
       </div>
 
       {actionMessage ? (
@@ -156,11 +157,11 @@ export default function EmployeeWalletPage() {
       ) : null}
 
       <div className="wallet-card">
-        <div className="wallet-card-label">Personal Wallet · {walletHook.data?.chain ?? "sepolia"}</div>
+        <div className="wallet-card-label">Personal Wallet · {walletHook.data?.chain ?? "ethereum"}</div>
         {walletHook.loading ? (
           <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 32, fontWeight: 700 }}>Loading…</div>
         ) : (
-          <div className="wallet-card-balance">{fmtEth(walletHook.data?.balance)}</div>
+          <div className="wallet-card-balance">{fmtAmount(walletHook.data?.balance, tokenSymbol)}</div>
         )}
         <div className="wallet-card-sub">
           {walletAddress ? (
@@ -187,9 +188,9 @@ export default function EmployeeWalletPage() {
 
       <div className="grid-3">
         {[
-          { label: "Wallet Balance", value: walletHook.loading ? "--" : fmtEth(balance), sub: "Live on-chain balance" },
-          { label: "Max Withdrawable", value: walletHook.loading ? "--" : fmtEth(maxWithdrawable), sub: "Gas reserve kept aside" },
-          { label: "Last Salary", value: txHook.loading ? "--" : (lastSalary ? fmtEth(lastSalary.amount) : "--"), sub: "Most recent payroll credit" },
+          { label: "Wallet Balance", value: walletHook.loading ? "--" : fmtAmount(balance, tokenSymbol), sub: "Live on-chain balance" },
+          { label: "Max Withdrawable", value: walletHook.loading ? "--" : fmtAmount(maxWithdrawable, tokenSymbol), sub: "Gas reserve kept aside" },
+          { label: "Last Salary", value: txHook.loading ? "--" : (lastSalary ? fmtAmount(lastSalary.amount, lastSalary.token_symbol ?? tokenSymbol) : "--"), sub: "Most recent payroll credit" },
         ].map((s, i) => (
           <div key={i} className="metric-card">
             <div className="metric-card-label">{s.label}</div>
@@ -203,9 +204,9 @@ export default function EmployeeWalletPage() {
 
       <div className="grid-3">
         {[
-          { label: "Salary Received", value: txHook.loading ? "--" : fmtEth(totalSalary) },
-          { label: "Loan Proceeds", value: txHook.loading ? "--" : fmtEth(totalLoanProceeds) },
-          { label: "Total Outflows", value: txHook.loading ? "--" : fmtEth(totalOutflows) },
+          { label: "Salary Received", value: txHook.loading ? "--" : fmtAmount(totalSalary, tokenSymbol) },
+          { label: "Loan Proceeds", value: txHook.loading ? "--" : fmtAmount(totalLoanProceeds, tokenSymbol) },
+          { label: "Total Outflows", value: txHook.loading ? "--" : fmtAmount(totalOutflows, tokenSymbol) },
         ].map((s, i) => (
           <div key={i} className="metric-card">
             <div className="metric-card-label">{s.label}</div>
@@ -235,10 +236,10 @@ export default function EmployeeWalletPage() {
                     value={dest}
                     onChange={e => setDest(e.target.value)}
                   />
-                  <span className="form-hint">Must be a valid Ethereum Sepolia address.</span>
+                  <span className="form-hint">Must be a valid Ethereum address.</span>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Amount (ETH)</label>
+                  <label className="form-label">Amount ({tokenSymbol})</label>
                   <input
                     className="form-input"
                     type="number"
@@ -247,7 +248,7 @@ export default function EmployeeWalletPage() {
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
                   />
-                  <span className="form-hint">Available to send: {fmtEth(maxWithdrawable)}. A small amount stays reserved for network gas.</span>
+                  <span className="form-hint">Available to send: {fmtAmount(maxWithdrawable, tokenSymbol)}. A small amount stays reserved for network gas.</span>
                 </div>
                 <div className="alert alert-warning">
                   <span className="alert-icon"><Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} /></span>
@@ -277,9 +278,9 @@ export default function EmployeeWalletPage() {
             <div className="modal-body">
               <div className="stack">
                 {[
-                  ["Amount", fmtEth(numericAmount)],
-                  ["Wallet Balance", fmtEth(balance)],
-                  ["Max Withdrawable", fmtEth(maxWithdrawable)],
+                  ["Amount", fmtAmount(numericAmount, tokenSymbol)],
+                  ["Wallet Balance", fmtAmount(balance, tokenSymbol)],
+                  ["Max Withdrawable", fmtAmount(maxWithdrawable, tokenSymbol)],
                   ["To", `${trimmedDest.slice(0, 12)}...${trimmedDest.slice(-8)}`],
                 ].map(([k, v], i) => (
                   <div key={i} className="row-between" style={{

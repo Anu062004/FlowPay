@@ -5,6 +5,7 @@ import { logAgentAction } from "./agentLogService.js";
 import {
   analyzeInvestmentAllocation,
   checkTradingAgentsHealth,
+  type TradingAgentsAllocationAction,
   type TradingAgentsAllocationItem,
   type TradingAgentsDecision
 } from "../clients/tradingAgentsClient.js";
@@ -25,6 +26,57 @@ type AggregatedPolicyResult = AgentPolicyResult & {
   }>;
 };
 
+type LatestInvestmentDecision = {
+  timestamp: string;
+  action: string | null;
+  confidence: number | null;
+  model_used: string | null;
+  reasoning: string;
+  execution_status: string | null;
+  allocation: Array<{
+    protocolKey: string;
+    protocol: string;
+    action: TradingAgentsAllocationAction | null;
+    percent: number;
+    amount_usdc: number;
+  }>;
+};
+
+function parseFloatSafe(value: unknown) {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? parseFloat(value)
+        : NaN;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseLoggedAllocation(
+  allocation: unknown
+): LatestInvestmentDecision["allocation"] {
+  if (!allocation || typeof allocation !== "object") {
+    return [];
+  }
+
+  return Object.entries(allocation as Record<string, Record<string, unknown>>)
+    .map(([protocolKey, item]) => {
+      const action: TradingAgentsAllocationAction | null =
+        item.action === "deposit" || item.action === "swap_to_pt" || item.action === "supply"
+          ? item.action
+          : null;
+
+      return {
+        protocolKey,
+        protocol: typeof item.protocol === "string" ? item.protocol : protocolKey,
+        action,
+        percent: parseFloatSafe(item.percent),
+        amount_usdc: parseFloatSafe(item.amount_usdc)
+      };
+    })
+    .filter((item) => item.percent > 0 || item.amount_usdc > 0);
+}
+
 function round(value: number) {
   if (!Number.isFinite(value)) {
     return 0;
@@ -42,6 +94,10 @@ function getExecutionTokenSymbol() {
     env.TREASURY_TOKEN_SYMBOL ??
     "USDT"
   ).trim().toUpperCase();
+}
+
+export function getEnabledInvestmentProtocols() {
+  return Array.from(parseEnabledProtocols());
 }
 
 function ensureStableTreasuryConfig() {
@@ -101,6 +157,66 @@ function getExecutableProtocols() {
   }
 
   return executable;
+}
+
+export function getExecutableInvestmentProtocols() {
+  return Array.from(getExecutableProtocols());
+}
+
+export async function getTradingAgentsOverview(companyId: string) {
+  const configured = Boolean(env.TRADING_AGENTS_URL?.trim() && env.TRADING_AGENTS_SECRET?.trim());
+  let reachable = false;
+  let health: Record<string, unknown> | null = null;
+  let healthError: string | null = null;
+
+  if (configured) {
+    try {
+      health = await checkTradingAgentsHealth();
+      reachable = true;
+    } catch (error) {
+      healthError = error instanceof Error ? error.message : "TradingAgents health check failed";
+    }
+  }
+
+  const result = await db.query(
+    `SELECT timestamp, decision, rationale, execution_status
+     FROM agent_logs
+     WHERE company_id = $1
+       AND agent_name = 'TradingAgentsDecisionEngine'
+     ORDER BY timestamp DESC
+     LIMIT 1`,
+    [companyId]
+  );
+
+  const row = result.rows[0] ?? null;
+  const latestDecision: LatestInvestmentDecision | null = row
+    ? {
+        timestamp: row.timestamp,
+        action: typeof row.decision?.action === "string" ? row.decision.action : null,
+        confidence:
+          typeof row.decision?.confidence === "number"
+            ? row.decision.confidence
+            : typeof row.decision?.confidence === "string"
+              ? parseFloatSafe(row.decision.confidence)
+              : null,
+        model_used: typeof row.decision?.model_used === "string" ? row.decision.model_used : null,
+        reasoning: typeof row.rationale === "string" ? row.rationale : "",
+        execution_status: typeof row.execution_status === "string" ? row.execution_status : null,
+        allocation: parseLoggedAllocation(row.decision?.allocation)
+      }
+    : null;
+
+  return {
+    configured,
+    reachable,
+    url: env.TRADING_AGENTS_URL?.trim() || null,
+    timeout_ms: parseInt(env.TRADING_AGENTS_TIMEOUT_MS, 10),
+    enabled_protocols: getEnabledInvestmentProtocols(),
+    executable_protocols: getExecutableInvestmentProtocols(),
+    health,
+    healthError,
+    latestDecision
+  };
 }
 
 function buildFallbackAllocation(totalAmount: number): Record<string, TradingAgentsAllocationItem> {

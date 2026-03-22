@@ -5,7 +5,9 @@
   "scripts": {
     "build": "hardhat compile",
     "deploy": "hardhat run scripts/deploy.ts --network sepolia",
-    "deploy:all": "hardhat run scripts/deployAll.ts --network sepolia"
+    "deploy:all": "hardhat run scripts/deployAll.ts --network sepolia",
+    "deploy:mainnet": "hardhat run scripts/deploy.ts --network mainnet",
+    "deploy:all:mainnet": "hardhat run scripts/deployAll.ts --network mainnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

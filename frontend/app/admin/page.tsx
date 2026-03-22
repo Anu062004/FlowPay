@@ -306,7 +306,7 @@ export default function AdminControlPage() {
     },
     {
       label: "WDK Execution",
-      description: "Approved actions execute through the wallet layer and settle on Sepolia ETH.",
+      description: "Approved actions execute through the wallet layer and settle on Ethereum stablecoin rails.",
       value: executionCount,
       badge: "success",
     },
@@ -500,7 +500,7 @@ export default function AdminControlPage() {
             </div>
             <div className="admin-context-chip">
               <div className="admin-context-label">Settlement Rail</div>
-              <div className="admin-context-value">Sepolia ETH</div>
+              <div className="admin-context-value">Ethereum USDT</div>
             </div>
             <div className="admin-context-chip">
               <div className="admin-context-label">Last Agent Event</div>
@@ -804,7 +804,7 @@ export default function AdminControlPage() {
             </div>
             <div className="admin-note-card">
               <div className="fw-medium text-sm">4. On-chain settlement</div>
-              <div className="text-xs text-secondary mt-1">ETH on Sepolia is used for the prototype today; the same control path can later switch to production asset rails.</div>
+              <div className="text-xs text-secondary mt-1">Primary settlement now runs on Ethereum stablecoin rails, while any legacy contract sync can remain isolated until mainnet contract addresses are supplied.</div>
             </div>
           </div>
         </div>

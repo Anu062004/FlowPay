@@ -19,7 +19,7 @@ function Badge({ variant, children }: { variant: string; children: React.ReactNo
 function fmt(val: string | number | null | undefined): string {
   if (val === null || val === undefined) return "--";
   const n = parseFloat(String(val));
-  return isNaN(n) ? "--" : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ETH`;
+  return isNaN(n) ? "--" : `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USDT`;
 }
 
 function Skeleton({ h = 20 }: { h?: number }) {
@@ -377,7 +377,7 @@ export default function EmployeeLoansPage() {
                   <span className="fw-semi font-num text-sm">{fmt(profile.data?.salary)}</span>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Requested Amount (ETH)</label>
+                  <label className="form-label">Requested Amount (USDT)</label>
                   <input
                     className="form-input"
                     type="number"
@@ -428,7 +428,7 @@ export default function EmployeeLoansPage() {
                 </div>
                 <div className="alert alert-warning">
                   <span className="alert-icon"><Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} /></span>
-                  <span>Funds are debited from your employee wallet. Keep enough ETH for the repayment amount and network gas.</span>
+                  <span>Funds are debited from your employee wallet. Keep enough USDT for the repayment amount and enough native ETH for network gas.</span>
                 </div>
               </div>
             </div>

@@ -30,6 +30,7 @@ import {
   type PayrollHistoryEntry,
   type TreasuryBalance,
   type TreasuryAllocationSnapshot,
+  type TradingAgentsOverview,
 } from "./api";
 import { loadCompanyContext, loadEmployeeContext } from "./companyContext";
 
@@ -247,6 +248,7 @@ export type InvestmentData = {
     marketCap: number;
     volume24h: number;
   }[];
+  trading_agents?: TradingAgentsOverview;
 };
 
 export function useInvestments() {

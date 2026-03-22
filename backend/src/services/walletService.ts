@@ -15,7 +15,11 @@ import type { PoolClient } from "pg";
 import { startDepositWatcher } from "./depositWatcher.js";
 import { generateSeedPhrase } from "../utils/seed.js";
 import { getTokenBalance as getIndexedTokenBalance } from "./indexerService.js";
-import { getRoundRobinRpcUrl, withRpcFailover } from "./rpcService.js";
+import {
+  getRoundRobinRpcUrlForChain,
+  withRpcFailover,
+  withRpcFailoverForChain
+} from "./rpcService.js";
 
 const transferMaxFee = BigInt(env.WDK_TRANSFER_MAX_FEE);
 const minimumNativeGasReserveWei = parseAmount(env.MIN_NATIVE_GAS_RESERVE_ETH);
@@ -66,14 +70,13 @@ function mapWalletDecryptError(error: unknown): ApiError | null {
 }
 
 function buildWdk(seedPhrase: string) {
-  const rpcUrl = getRoundRobinRpcUrl();
   const wdk = new WDK(seedPhrase);
   wdk.registerWallet("ethereum", WalletManagerEvm, {
-    provider: rpcUrl,
+    provider: getRoundRobinRpcUrlForChain("ethereum"),
     transferMaxFee
   });
   wdk.registerWallet("sepolia", WalletManagerEvm, {
-    provider: rpcUrl,
+    provider: getRoundRobinRpcUrlForChain("sepolia"),
     transferMaxFee
   });
   if (env.TON_RPC_URL) {
@@ -191,8 +194,11 @@ export async function createEmployeeWallet(employeeId: string, client?: PoolClie
 
 export async function getWalletBalance(walletId: string) {
   const wallet = await getWalletRecord(walletId);
-  const nativeGasBalance = await withRpcFailover("wallet native gas balance", async (provider) =>
-    provider.getBalance(wallet.wallet_address)
+  const chain = requireSupportedEvmChain(wallet.chain, "native");
+  const nativeGasBalance = await withRpcFailoverForChain(
+    chain,
+    "wallet native gas balance",
+    async (provider) => provider.getBalance(wallet.wallet_address)
   );
 
   if (env.TREASURY_TOKEN_ADDRESS && env.TREASURY_TOKEN_SYMBOL) {
@@ -240,7 +246,8 @@ export async function getWalletBalance(walletId: string) {
 
 export async function getTokenBalance(walletId: string, tokenAddress: string, decimals = 18) {
   const wallet = await getWalletRecord(walletId);
-  const balance = await withRpcFailover("wallet token balance", async (provider) => {
+  const chain = requireSupportedEvmChain(wallet.chain, "token");
+  const balance = await withRpcFailoverForChain(chain, "wallet token balance", async (provider) => {
     const token = new Contract(tokenAddress, ERC20_ABI, provider);
     return (await token.balanceOf(wallet.wallet_address)) as bigint;
   });
@@ -496,8 +503,10 @@ export async function sendContractTransaction(params: {
       throw new ApiError(500, "Contract transaction did not return a transaction hash");
     }
 
-    const receipt = await withRpcFailover(`wallet waitForTransaction ${txHash}`, (provider) =>
-      provider.waitForTransaction(txHash)
+    const receipt = await withRpcFailoverForChain(
+      chain,
+      `wallet waitForTransaction ${txHash}`,
+      (provider) => provider.waitForTransaction(txHash)
     );
     if (!receipt) {
       throw new ApiError(500, "Contract transaction receipt is empty");

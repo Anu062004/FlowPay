@@ -63,7 +63,7 @@ function DonutChart({ segments, symbol }: { segments: AllocationSegment[]; symbo
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const activeSegment = activeIndex !== null ? segments[activeIndex] : null;
   let cum = 0;
-  const r = 40, cx = 52, cy = 52, size = 104, circ = 2 * Math.PI * r;
+  const r = 50, cx = 66, cy = 66, size = 132, circ = 2 * Math.PI * r;
 
   return (
     <div className="allocation-chart">
@@ -92,7 +92,7 @@ function DonutChart({ segments, symbol }: { segments: AllocationSegment[]; symbo
                 const rot = (start / total) * 360 - 90;
                 const midAngle = ((start + seg.value / 2) / total) * Math.PI * 2 - Math.PI / 2;
                 const isActive = activeIndex === i;
-                const hoverOffset = isActive ? 8 : 0;
+                const hoverOffset = isActive ? 10 : 0;
                 const dx = Math.cos(midAngle) * hoverOffset;
                 const dy = Math.sin(midAngle) * hoverOffset;
                 cum += seg.value;
@@ -109,7 +109,7 @@ function DonutChart({ segments, symbol }: { segments: AllocationSegment[]; symbo
                       r={r}
                       fill="none"
                       stroke={seg.color}
-                      strokeWidth={isActive ? 18 : 16}
+                      strokeWidth={isActive ? 20 : 18}
                       strokeLinecap="round"
                       strokeDasharray={`${dash} ${gap}`}
                       transform={`rotate(${rot} ${cx} ${cy})`}
@@ -149,8 +149,8 @@ function DonutChart({ segments, symbol }: { segments: AllocationSegment[]; symbo
                 onMouseLeave={() => setActiveIndex((current) => (current === i ? null : current))}
               >
                 <span className="allocation-chart-legend-swatch" style={{ background: seg.color }} />
-                <span className="text-sm text-secondary" style={{ flex: 1 }}>{seg.label}</span>
-                <span className="fw-semi font-num text-sm">{percentage}%</span>
+                <span className="allocation-chart-legend-label">{seg.label}</span>
+                <span className="allocation-chart-legend-value">{percentage}%</span>
               </div>
             );
           })}

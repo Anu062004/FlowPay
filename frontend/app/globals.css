@@ -1537,14 +1537,14 @@ button, input, select, textarea {
 
 .allocation-chart-stage {
   position: relative;
-  padding-top: 56px;
+  padding-top: 60px;
   flex-shrink: 0;
 }
 
 .allocation-chart-visual {
   position: relative;
-  width: 104px;
-  height: 104px;
+  width: 132px;
+  height: 132px;
   display: grid;
   place-items: center;
 }
@@ -1555,7 +1555,7 @@ button, input, select, textarea {
 
 .allocation-chart-track {
   stroke: rgba(148, 163, 184, 0.18);
-  stroke-width: 16;
+  stroke-width: 18;
 }
 
 .allocation-chart-segment {
@@ -1582,7 +1582,7 @@ button, input, select, textarea {
   justify-content: center;
   text-align: center;
   pointer-events: none;
-  padding: 0 12px;
+  padding: 0 16px;
 }
 
 .allocation-chart-center-label {
@@ -1605,8 +1605,8 @@ button, input, select, textarea {
   position: absolute;
   top: 0;
   left: 50%;
-  min-width: 188px;
-  padding: 12px 14px;
+  min-width: 198px;
+  padding: 12px 15px;
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   background:
@@ -1674,6 +1674,20 @@ button, input, select, textarea {
   border: 1px solid transparent;
   background: rgba(248, 250, 252, 0.72);
   transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.allocation-chart-legend-label {
+  flex: 1;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.allocation-chart-legend-value {
+  font-size: 12px;
+  font-weight: var(--fw-semi);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
 }
 
 .allocation-chart-legend-item.is-active {

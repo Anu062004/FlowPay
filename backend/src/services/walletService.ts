@@ -25,6 +25,14 @@ export const nativeTransferMaxFee = transferMaxFee;
 export const minimumGasReserveWei = minimumNativeGasReserveWei;
 const ERC20_ABI = ["function balanceOf(address owner) view returns (uint256)"];
 
+type LedgerTransactionType =
+  | "payroll"
+  | "loan_disbursement"
+  | "investment"
+  | "treasury_allocation"
+  | "emi_repayment"
+  | "withdrawal";
+
 type Queryable = {
   query: (text: string, params?: unknown[]) => Promise<any>;
 };
@@ -119,7 +127,7 @@ async function insertTransactionRecord(params: {
 
 async function mirrorEmployeeLedgerEntry(params: {
   recipientWalletId?: string | null;
-  type: "payroll" | "loan_disbursement" | "investment" | "treasury_allocation" | "emi_repayment" | "withdrawal";
+  type: LedgerTransactionType;
   amount: string;
   txHash: string | null;
   tokenSymbol: string;
@@ -199,7 +207,6 @@ export async function getWalletBalance(walletId: string) {
     const indexedAmount = indexed?.amount ?? "0";
     let amountRaw = 0n;
     if (typeof indexedAmount === "string") {
-      // Indexer may return decimal strings (for example "0.0"), so parse via token decimals.
       amountRaw = parseTokenAmount(indexedAmount, decimals);
     } else {
       amountRaw = BigInt(indexedAmount);
@@ -250,7 +257,7 @@ export async function sendTokenTransfer(
   tokenAddress: string,
   amount: string | number,
   decimals: number,
-  type: "payroll" | "loan_disbursement" | "investment" | "treasury_allocation" | "emi_repayment" | "withdrawal",
+  type: LedgerTransactionType,
   tokenSymbol: string,
   recipientWalletId?: string | null
 ) {
@@ -339,7 +346,7 @@ export async function sendTransaction(
   fromWalletId: string,
   toAddress: string,
   amountEth: string | number,
-  type: "payroll" | "loan_disbursement" | "investment" | "treasury_allocation" | "emi_repayment" | "withdrawal",
+  type: LedgerTransactionType,
   recipientWalletId?: string | null
 ) {
   if (env.TREASURY_TOKEN_ADDRESS && env.TREASURY_TOKEN_SYMBOL) {
@@ -420,6 +427,96 @@ export async function sendTransaction(
       amountEth: amountEth.toString(),
       from: await account.getAddress(),
       to: toAddress
+    };
+  } finally {
+    seedPhrase = "";
+    account.dispose();
+  }
+}
+
+export async function sendContractTransaction(params: {
+  fromWalletId: string;
+  toAddress: string;
+  data: string;
+  valueWei?: bigint;
+  amount?: string | number;
+  type?: LedgerTransactionType;
+  tokenSymbol?: string;
+  recordTransaction?: boolean;
+}) {
+  const wallet = await getWalletRecord(params.fromWalletId);
+  const chain = requireSupportedEvmChain(wallet.chain, "native");
+  const amount = params.amount ?? 0;
+  const amountNum = parseFloat(amount.toString());
+  const maxTx = parseFloat(env.MAX_TX_AMOUNT);
+  if (params.recordTransaction !== false && amountNum > maxTx) {
+    throw new ApiError(400, `Transfer exceeds max transaction limit (${maxTx})`);
+  }
+
+  let seedPhrase = "";
+  try {
+    seedPhrase = decryptSecret(wallet.encrypted_seed);
+  } catch (error) {
+    const mapped = mapWalletDecryptError(error);
+    if (mapped) {
+      throw mapped;
+    }
+    throw error;
+  }
+
+  const wdk = buildWdk(seedPhrase);
+  let account: WalletAccountEvm;
+  try {
+    account = (await wdk.getAccount(chain, 0)) as unknown as WalletAccountEvm;
+  } catch (error) {
+    const mapped = mapWalletDecryptError(error);
+    if (mapped) {
+      throw mapped;
+    }
+    throw error;
+  }
+
+  try {
+    const nativeBalance = await account.getBalance();
+    const requiredNativeGas = minimumNativeGasReserveWei + transferMaxFee;
+    if (nativeBalance < requiredNativeGas) {
+      throw new ApiError(
+        400,
+        `Insufficient ETH for gas. Keep at least ${formatAmount(minimumNativeGasReserveWei)} ETH reserved, plus network fee headroom.`
+      );
+    }
+
+    const txResult = await account.sendTransaction({
+      to: params.toAddress,
+      data: params.data,
+      value: params.valueWei ?? 0n
+    });
+    const txHash = txResult?.hash ?? null;
+    if (!txHash) {
+      throw new ApiError(500, "Contract transaction did not return a transaction hash");
+    }
+
+    const receipt = await withRpcFailover(`wallet waitForTransaction ${txHash}`, (provider) =>
+      provider.waitForTransaction(txHash)
+    );
+    if (!receipt) {
+      throw new ApiError(500, "Contract transaction receipt is empty");
+    }
+
+    if (params.recordTransaction !== false) {
+      await insertTransactionRecord({
+        walletId: wallet.id,
+        type: params.type ?? "investment",
+        amount: amount.toString(),
+        txHash,
+        tokenSymbol: params.tokenSymbol ?? env.TREASURY_TOKEN_SYMBOL ?? "ETH"
+      });
+    }
+
+    return {
+      txHash,
+      from: await account.getAddress(),
+      to: params.toAddress
     };
   } finally {
     seedPhrase = "";

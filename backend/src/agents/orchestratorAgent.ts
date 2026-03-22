@@ -1,19 +1,13 @@
 import { randomUUID } from "crypto";
 import { db } from "../db/pool.js";
+import { env } from "../config/env.js";
 import { logAgentAction, type AgentLogContext } from "../services/agentLogService.js";
-import { withdrawFromAave } from "../services/aaveService.js";
-import { getEthPrice } from "../services/priceService.js";
+import { closeActiveInvestmentPositions } from "../services/investmentExecutionService.js";
 import { allocateTreasury, getTreasuryBalance } from "../services/treasuryService.js";
 import { runInvestment } from "../services/investmentService.js";
 import { createOpsTask } from "../services/opsService.js";
 import { getCompanySettings } from "../services/settingsService.js";
 import { getNextPayrollRun } from "../utils/payrollSchedule.js";
-
-type ActivePosition = {
-  id: string;
-  amount_deposited: string;
-  entry_price: string | null;
-};
 
 type OrchestratorRunOptions = {
   companyId?: string;
@@ -30,137 +24,33 @@ async function getMonthlyPayroll(companyId: string): Promise<number> {
   return parseFloat(result.rows[0].monthly_payroll);
 }
 
-async function getActivePositions(companyId: string): Promise<ActivePosition[]> {
-  const result = await db.query(
-    "SELECT id, amount_deposited, entry_price FROM investment_positions WHERE company_id = $1 AND status = 'active' ORDER BY opened_at ASC",
-    [companyId]
-  );
-  return result.rows as ActivePosition[];
-}
-
-async function withdrawFromPositions(
-  companyId: string,
-  amountEth: number,
-  auditContext: AgentLogContext = {}
-): Promise<number> {
-  if (amountEth <= 0) {
-    return 0;
-  }
-
-  const positions = await getActivePositions(companyId);
-  let remaining = amountEth;
-  let withdrawn = 0;
-
-  for (const position of positions) {
-    if (remaining <= 0) {
-      break;
-    }
-
-    const positionAmount = parseFloat(position.amount_deposited);
-    if (positionAmount <= 0) {
-      continue;
-    }
-
-    const toWithdraw = Math.min(positionAmount, remaining);
-    try {
-      const txHash = await withdrawFromAave(companyId, toWithdraw);
-      await db.query(
-        "UPDATE investment_positions SET status = 'closed', closed_at = now() WHERE id = $1",
-        [position.id]
-      );
-      await logAgentAction(
-        "GUARDIAN",
-        { companyId, positionId: position.id, amount: toWithdraw, txHash },
-        { action: "WITHDRAWAL_SUCCESS" },
-        `Successfully withdrew ${toWithdraw.toFixed(6)} ETH for position ${position.id}.`,
-        "WITHDRAWAL_SUCCESS",
-        companyId,
-        {
-          ...auditContext,
-          stage: "wdk_execution",
-          executionStatus: "success"
-        }
-      );
-      withdrawn += toWithdraw;
-      remaining -= toWithdraw;
-    } catch (error) {
-      await db.query(
-        "UPDATE investment_positions SET status = 'sync_failed' WHERE id = $1",
-        [position.id]
-      );
-      const errorMessage = error instanceof Error ? error.message : "Unknown withdrawal error";
-      await logAgentAction(
-        "GUARDIAN",
-        { companyId, positionId: position.id, amount: toWithdraw },
-        { action: "WITHDRAWAL_FAILED" },
-        errorMessage,
-        "WITHDRAWAL_FAILED",
-        companyId,
-        {
-          ...auditContext,
-          stage: "wdk_execution",
-          executionStatus: "failed"
-        }
-      );
-    }
-  }
-
-  return withdrawn;
-}
-
-async function withdrawAllPositions(
+async function unwindInvestmentPositions(
   companyId: string,
   auditContext: AgentLogContext = {}
 ): Promise<number> {
-  const positions = await getActivePositions(companyId);
+  const positions = await closeActiveInvestmentPositions(companyId);
   let total = 0;
 
   for (const position of positions) {
-    const amount = parseFloat(position.amount_deposited);
-    if (amount <= 0) {
-      continue;
-    }
-
-    try {
-      const txHash = await withdrawFromAave(companyId, amount);
-      await db.query(
-        "UPDATE investment_positions SET status = 'closed', closed_at = now() WHERE id = $1",
-        [position.id]
-      );
-      await logAgentAction(
-        "GUARDIAN",
-        { companyId, positionId: position.id, amount, txHash },
-        { action: "WITHDRAWAL_SUCCESS" },
-        `Successfully withdrew ${amount.toFixed(6)} ETH for position ${position.id}.`,
-        "WITHDRAWAL_SUCCESS",
+    total += position.amount;
+    await logAgentAction(
+      "GUARDIAN",
+      {
         companyId,
-        {
-          ...auditContext,
-          stage: "wdk_execution",
-          executionStatus: "success"
-        }
-      );
-      total += amount;
-    } catch (error) {
-      await db.query(
-        "UPDATE investment_positions SET status = 'sync_failed' WHERE id = $1",
-        [position.id]
-      );
-      const errorMessage = error instanceof Error ? error.message : "Unknown withdrawal error";
-      await logAgentAction(
-        "GUARDIAN",
-        { companyId, positionId: position.id, amount },
-        { action: "WITHDRAWAL_FAILED" },
-        errorMessage,
-        "WITHDRAWAL_FAILED",
-        companyId,
-        {
-          ...auditContext,
-          stage: "wdk_execution",
-          executionStatus: "failed"
-        }
-      );
-    }
+        protocol: position.protocolKey,
+        amount: position.amount,
+        txHash: position.txHash
+      },
+      { action: "WITHDRAWAL_SUCCESS" },
+      `Closed ${position.protocolKey} position for ${position.amount.toFixed(6)} ${position.assetSymbol}.`,
+      "WITHDRAWAL_SUCCESS",
+      companyId,
+      {
+        ...auditContext,
+        stage: "wdk_execution",
+        executionStatus: "success"
+      }
+    );
   }
 
   return total;
@@ -170,7 +60,6 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
   const companies = options.companyId
     ? await db.query("SELECT id FROM companies WHERE id = $1", [options.companyId])
     : await db.query("SELECT id FROM companies");
-  const market = await getEthPrice();
   const results: Array<{ companyId: string; workflowId: string; status: string }> = [];
 
   for (const company of companies.rows) {
@@ -185,9 +74,9 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
     try {
       await logAgentAction(
         "OpenClawOrchestrator",
-        { companyId, market },
+        { companyId },
         { mode: "strategy" },
-        "Evaluating treasury, payroll coverage, lending guardrails, and Aave posture.",
+        "Evaluating treasury, payroll coverage, lending guardrails, and TradingAgents investment posture.",
         "Strategy loop started.",
         companyId,
         {
@@ -198,7 +87,7 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
       );
 
       const initialBalance = await getTreasuryBalance(companyId);
-      let balanceEth = parseFloat(initialBalance.balance);
+      let balance = parseFloat(initialBalance.balance);
       const monthlyPayroll = await getMonthlyPayroll(companyId);
       const settings = await getCompanySettings(companyId);
       const nextPayroll = getNextPayrollRun({
@@ -206,42 +95,17 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
         companyTimeZone: settings.profile.timeZone
       });
 
-      if (balanceEth < monthlyPayroll * 1.5) {
-        const needed = monthlyPayroll * 1.5 - balanceEth;
-        const withdrawn = await withdrawFromPositions(companyId, needed, auditContext);
+      if (balance < monthlyPayroll * 1.5) {
+        const withdrawn = await unwindInvestmentPositions(companyId, auditContext);
         if (withdrawn > 0) {
           const refreshedBalance = await getTreasuryBalance(companyId);
-          balanceEth = parseFloat(refreshedBalance.balance);
+          balance = parseFloat(refreshedBalance.balance);
           await logAgentAction(
             "GUARDIAN",
-            { balanceEth, monthlyPayroll },
-            { action: "EMERGENCY_WITHDRAWAL", withdrawn_eth: withdrawn },
-            `Treasury below 1.5x payroll threshold. Withdrew ${withdrawn.toFixed(6)} ETH from Aave.`,
-            `EMERGENCY_WITHDRAWAL executed for ${withdrawn.toFixed(6)} ETH.`,
-            companyId,
-            {
-              ...auditContext,
-              stage: "guardrail",
-              executionStatus: "success"
-            }
-          );
-        }
-      }
-
-      const avgEntryPriceResult = await db.query(
-        "SELECT AVG(entry_price) AS avg_entry_price FROM investment_positions WHERE company_id = $1 AND status = 'active' AND entry_price IS NOT NULL",
-        [companyId]
-      );
-      const avgEntryPrice = parseFloat(avgEntryPriceResult.rows[0].avg_entry_price ?? "0");
-      if (avgEntryPrice > 0 && market.price < avgEntryPrice * 0.8) {
-        const withdrawn = await withdrawAllPositions(companyId, auditContext);
-        if (withdrawn > 0) {
-          await logAgentAction(
-            "GUARDIAN",
-            { current_eth_price: market.price, avg_entry_price: avgEntryPrice },
-            { action: "CRASH_EXIT", withdrawn_eth: withdrawn },
-            "ETH dropped 20%+ since position entry. Exiting all Aave positions to protect capital.",
-            `CRASH_EXIT executed for ${withdrawn.toFixed(6)} ETH.`,
+            { balance, monthlyPayroll },
+            { action: "EMERGENCY_WITHDRAWAL", withdrawn_amount: withdrawn },
+            `Treasury below 1.5x payroll threshold. Closed active investment positions worth ${withdrawn.toFixed(6)} units.`,
+            `EMERGENCY_WITHDRAWAL executed for ${withdrawn.toFixed(6)} treasury units.`,
             companyId,
             {
               ...auditContext,
@@ -278,19 +142,18 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
       }
 
       const hoursToPayroll = nextPayroll?.hoursUntilRun ?? Number.POSITIVE_INFINITY;
-      if (nextPayroll && hoursToPayroll <= 48 && balanceEth < monthlyPayroll) {
-        const shortfall = monthlyPayroll - balanceEth;
-        const withdrawn = await withdrawFromPositions(companyId, shortfall, auditContext);
+      if (nextPayroll && hoursToPayroll <= 48 && balance < monthlyPayroll) {
+        const withdrawn = await unwindInvestmentPositions(companyId, auditContext);
 
         if (withdrawn > 0) {
           const refreshedBalance = await getTreasuryBalance(companyId);
-          balanceEth = parseFloat(refreshedBalance.balance);
+          balance = parseFloat(refreshedBalance.balance);
           await logAgentAction(
             "GUARDIAN",
-            { balanceEth, monthlyPayroll, hoursToPayroll },
-            { action: "PAYROLL_COVERAGE_WITHDRAWAL", withdrawn_eth: withdrawn },
-            `Payroll in 48h. Insufficient treasury. Withdrew ${withdrawn.toFixed(6)} ETH from Aave to guarantee coverage.`,
-            `PAYROLL_COVERAGE_WITHDRAWAL executed for ${withdrawn.toFixed(6)} ETH.`,
+            { balance, monthlyPayroll, hoursToPayroll },
+            { action: "PAYROLL_COVERAGE_WITHDRAWAL", withdrawn_amount: withdrawn },
+            `Payroll in 48h. Insufficient treasury. Closed active investment positions worth ${withdrawn.toFixed(6)} units.`,
+            `PAYROLL_COVERAGE_WITHDRAWAL executed for ${withdrawn.toFixed(6)} treasury units.`,
             companyId,
             {
               ...auditContext,
@@ -300,12 +163,12 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
           );
         }
 
-        if (balanceEth < monthlyPayroll) {
+        if (balance < monthlyPayroll) {
           await logAgentAction(
             "GUARDIAN",
-            { finalBalance: balanceEth, monthlyPayroll, hoursToPayroll },
+            { finalBalance: balance, monthlyPayroll, hoursToPayroll },
             { action: "CRITICAL_PAYROLL_SHORTFALL" },
-            "Critical payroll shortfall remains after Aave withdrawal.",
+            "Critical payroll shortfall remains after unwinding active investments.",
             "Critical payroll coverage alert raised.",
             companyId,
             {
@@ -314,7 +177,7 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
               executionStatus: "blocked"
             }
           );
-          const shortfall = Math.max(monthlyPayroll - balanceEth, 0);
+          const shortfall = Math.max(monthlyPayroll - balance, 0);
           try {
             await createOpsTask({
               companyId,
@@ -324,10 +187,10 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
                 companyId,
                 shortfall,
                 monthlyPayroll,
-                balanceEth,
+                balance,
                 hoursToPayroll,
                 treasuryAddress: initialBalance.wallet_address,
-                tokenSymbol: initialBalance.token_symbol ?? "ETH",
+                tokenSymbol: initialBalance.token_symbol ?? env.TREASURY_TOKEN_SYMBOL ?? "USDT",
                 requestedAt: new Date().toISOString()
               }
             });
@@ -345,7 +208,7 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
 
       await logAgentAction(
         "OpenClawOrchestrator",
-        { companyId, market, allocation, investmentDecision },
+        { companyId, allocation, investmentDecision },
         { mode: "strategy" },
         "Strategy loop completed successfully.",
         "Strategy loop completed.",
@@ -361,7 +224,7 @@ export async function runOrchestrator(options: OrchestratorRunOptions = {}) {
       console.error(`Error in orchestrator loop for company ${companyId}:`, error);
       await logAgentAction(
         "OpenClawOrchestrator",
-        { companyId, market },
+        { companyId },
         { mode: "strategy" },
         error instanceof Error ? error.message : "Strategy loop failed.",
         "Strategy loop failed.",

@@ -6,7 +6,8 @@ export type AgentActionType =
   | "treasury_allocation"
   | "loan_disbursement"
   | "payroll"
-  | "aave_rebalance";
+  | "aave_rebalance"
+  | "investment_rebalance";
 
 export type AgentPolicyEvaluationInput = {
   companyId: string;
@@ -127,17 +128,21 @@ export async function evaluateAgentPolicy(
   }
 
   if (
-    (input.action === "treasury_allocation" || input.action === "aave_rebalance") &&
+    (
+      input.action === "treasury_allocation" ||
+      input.action === "aave_rebalance" ||
+      input.action === "investment_rebalance"
+    ) &&
     typeof input.metadata?.allocationPct === "number"
   ) {
     const withinExposure = input.metadata.allocationPct <= policy.maxAaveAllocationPct;
     if (!withinExposure) {
       reasons.push(
-        `Allocation ${round(input.metadata.allocationPct)}% exceeds Aave exposure cap ${round(policy.maxAaveAllocationPct)}%.`
+        `Allocation ${round(input.metadata.allocationPct)}% exceeds investment exposure cap ${round(policy.maxAaveAllocationPct)}%.`
       );
     }
     checks.push({
-      name: "max_aave_allocation_pct",
+      name: "max_investment_allocation_pct",
       passed: withinExposure,
       limit: policy.maxAaveAllocationPct,
       allocationPct: round(input.metadata.allocationPct)
@@ -177,7 +182,7 @@ export async function evaluateAgentPolicy(
       maxSingleTransfer: policy.maxSingleTransfer,
       maxDailyOutflow: policy.maxDailyOutflow,
       maxLoanAmount: policy.maxLoanAmount,
-      maxAaveAllocationPct: policy.maxAaveAllocationPct,
+      maxInvestmentAllocationPct: policy.maxAaveAllocationPct,
       humanReviewAbove: policy.humanReviewAbove
     },
     metrics: {

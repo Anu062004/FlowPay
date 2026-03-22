@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { db } from "../db/pool.js";
+import { env } from "../config/env.js";
 import { runOrchestrator } from "../agents/orchestratorAgent.js";
 import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
 import { ApiError } from "../utils/errors.js";
@@ -117,7 +118,7 @@ export async function runAutonomousDemo(options: RunDemoOptions) {
       requestedAmount: loanAmount
     },
     { mode: workflowName },
-    "Starting autonomous demo across treasury allocation, lending, payroll, and Aave rebalance.",
+    "Starting autonomous demo across treasury allocation, lending, payroll, and TradingAgents investment execution.",
     "Autonomous demo started.",
     options.companyId,
     {
@@ -125,7 +126,7 @@ export async function runAutonomousDemo(options: RunDemoOptions) {
       stage: "workflow",
       executionStatus: "started",
       metadata: {
-        tokenSymbol: treasury.token_symbol ?? "ETH"
+        tokenSymbol: treasury.token_symbol ?? env.TREASURY_TOKEN_SYMBOL ?? "USDT"
       }
     }
   );
@@ -143,7 +144,7 @@ export async function runAutonomousDemo(options: RunDemoOptions) {
     const summary = {
       treasury: {
         balance: treasury.balance,
-        tokenSymbol: treasury.token_symbol ?? "ETH",
+        tokenSymbol: treasury.token_symbol ?? env.TREASURY_TOKEN_SYMBOL ?? "USDT",
         walletAddress: treasury.wallet_address ?? null
       },
       employee: {

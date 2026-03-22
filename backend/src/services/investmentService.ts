@@ -1,639 +1,496 @@
-import {
-  runInvestmentAgent,
-  type InvestmentAgentInput,
-  type InvestmentDecision,
-  type InvestmentStrategyCandidate
-} from "../agents/investmentAgent.js";
 import { db } from "../db/pool.js";
 import { env } from "../config/env.js";
-import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
+import type { AgentLogContext, AgentPolicyResult } from "./agentLogService.js";
+import { logAgentAction } from "./agentLogService.js";
+import {
+  analyzeInvestmentAllocation,
+  checkTradingAgentsHealth,
+  type TradingAgentsAllocationItem,
+  type TradingAgentsDecision
+} from "../clients/tradingAgentsClient.js";
+import {
+  closeActiveInvestmentPositions,
+  executeInvestmentDecision,
+  getCurrentInvestmentAllocation
+} from "./investmentExecutionService.js";
 import { evaluateAgentPolicy } from "./agentPolicyService.js";
-import { depositToAave, getATokenBalance, getYieldEarned, withdrawFromAave } from "./aaveService.js";
-import { getEthPrice } from "./priceService.js";
-import { getCompanySettings } from "./settingsService.js";
-import { formatTokenAmount, parseTokenAmount } from "../utils/amounts.js";
 
-function toFixedNum(value: number): number {
+type AggregatedPolicyResult = AgentPolicyResult & {
+  itemResults: Array<{
+    protocolKey: string;
+    status: AgentPolicyResult["status"];
+    reasons: string[];
+    amount: number;
+    percent: number;
+  }>;
+};
+
+function round(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
   return parseFloat(value.toFixed(6));
 }
 
-function clamp(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-  return Math.min(Math.max(value, min), max);
+function getTreasuryTokenSymbol() {
+  return (env.TREASURY_TOKEN_SYMBOL ?? "USDT").trim().toUpperCase();
 }
 
-function normalizeRiskTolerance(value: string): InvestmentAgentInput["risk_tolerance"] {
-  const normalized = value.trim().toLowerCase();
-  if (normalized.startsWith("agg")) return "aggressive";
-  if (normalized.startsWith("mod")) return "moderate";
-  return "conservative";
+function getExecutionTokenSymbol() {
+  return (
+    env.INVESTMENT_EXECUTION_TOKEN_SYMBOL ??
+    env.TREASURY_TOKEN_SYMBOL ??
+    "USDT"
+  ).trim().toUpperCase();
 }
 
-function riskToleranceCap(riskTolerance: InvestmentAgentInput["risk_tolerance"]) {
-  if (riskTolerance === "aggressive") return 0.2;
-  if (riskTolerance === "moderate") return 0.15;
-  return 0.1;
-}
-
-function buildStrategyCandidates(input: {
-  investmentPool: number;
-  managedTreasury: number;
-  atokenBalance: number;
-  yieldEarned: number;
-  priceChangePct: number;
-  openPositions: number;
-  payrollCoverageRatio: number;
-  riskTolerance: InvestmentAgentInput["risk_tolerance"];
-  maxAaveExposurePct: number;
-  aaveUnavailableReason: string | null;
-}): InvestmentStrategyCandidate[] {
-  const volatility = clamp(Math.abs(input.priceChangePct) / 2.5, 0, 10);
-  const payrollStress =
-    input.payrollCoverageRatio >= 1.5
-      ? 0
-      : input.payrollCoverageRatio >= 1
-        ? 1.5
-        : input.payrollCoverageRatio > 0
-          ? 3.5
-          : 5;
-
-  const currentAaveExposurePct =
-    input.managedTreasury > 0 ? (input.atokenBalance / input.managedTreasury) * 100 : 0;
-  const exposureStress =
-    input.maxAaveExposurePct > 0
-      ? clamp((currentAaveExposurePct / input.maxAaveExposurePct) * 4, 0, 4)
-      : 0;
-
-  const maxAaveExposureEth = input.managedTreasury * (input.maxAaveExposurePct / 100);
-  const remainingAaveCapacityEth = Math.max(maxAaveExposureEth - input.atokenBalance, 0);
-  const maxInvestableEth = Math.min(input.investmentPool, remainingAaveCapacityEth);
-  const maxByPolicyPct =
-    input.investmentPool > 0 ? clamp(maxInvestableEth / input.investmentPool, 0, 0.2) : 0;
-  const maxByRiskPct = riskToleranceCap(input.riskTolerance);
-  const aaveMaxAllocationPct = clamp(Math.min(maxByPolicyPct, maxByRiskPct), 0, 0.2);
-
-  return [
-    {
-      id: "hold_treasury_eth",
-      label: "Hold treasury ETH",
-      asset_symbol: "ETH",
-      protocol: "treasury",
-      available: true,
-      expected_return_score: clamp(2.5 - volatility * 0.1, 1, 4),
-      risk_score: clamp(1 + Math.max(volatility - 4, 0) * 0.2, 1, 4),
-      liquidity_score: 10,
-      payroll_safety_score: 10,
-      max_allocation_pct: 0,
-      notes:
-        input.payrollCoverageRatio < 1
-          ? "Best defensive option while payroll coverage is thin."
-          : "Keeps ETH fully liquid in treasury and avoids protocol risk."
-    },
-    {
-      id: "aave_weth_supply",
-      label: "Supply WETH to Aave",
-      asset_symbol: "WETH",
-      protocol: "aave",
-      available: !input.aaveUnavailableReason && input.investmentPool > 0 && aaveMaxAllocationPct > 0,
-      expected_return_score: clamp(6.5 + (input.yieldEarned > 0 ? 0.5 : 0) - volatility * 0.2, 2, 8),
-      risk_score: clamp(3 + volatility * 0.4 + payrollStress + exposureStress, 1, 10),
-      liquidity_score: 7,
-      payroll_safety_score: clamp(8 - payrollStress * 2, 1, 8),
-      max_allocation_pct: aaveMaxAllocationPct,
-      notes: input.aaveUnavailableReason
-        ? `Aave execution unavailable: ${input.aaveUnavailableReason}`
-        : `Yield strategy with current Aave exposure ${currentAaveExposurePct.toFixed(2)}% of managed treasury and max new allocation ${(aaveMaxAllocationPct * 100).toFixed(1)}% of the investment pool.`
-    },
-    {
-      id: "de_risk_to_treasury",
-      label: "Withdraw back to treasury",
-      asset_symbol: "ETH",
-      protocol: "treasury",
-      available: !input.aaveUnavailableReason && input.openPositions > 0,
-      expected_return_score: 2,
-      risk_score: 1,
-      liquidity_score: 10,
-      payroll_safety_score: 10,
-      max_allocation_pct: 0,
-      notes:
-        input.openPositions > 0
-          ? "Unwinds active Aave exposure and restores maximum treasury liquidity."
-          : "No active Aave positions are available to de-risk."
-    }
-  ];
-}
-
-function fallbackInvestmentDecision(
-  input: InvestmentAgentInput,
-  reason?: string
-): InvestmentDecision {
-  const aaveCandidate = input.strategy_candidates.find((candidate) => candidate.id === "aave_weth_supply");
-  const withdrawCandidate = input.strategy_candidates.find((candidate) => candidate.id === "de_risk_to_treasury");
-
-  if (
-    withdrawCandidate?.available &&
-    (input.price_change_pct <= -8 ||
-      input.payroll_coverage_ratio < 1.1 ||
-      input.current_aave_exposure_pct >= input.max_aave_exposure_pct * 0.9)
-  ) {
-    return {
-      action: "withdraw",
-      strategy_id: "de_risk_to_treasury",
-      target_asset: "ETH",
-      target_protocol: "treasury",
-      allocation_pct: 1,
-      confidence: 0.72,
-      risk_level: "low",
-      rationale:
-        reason ??
-        "Fallback strategy selected de-risking because payroll safety or market conditions make treasury liquidity more important than yield."
-    };
+function ensureStableTreasuryConfig() {
+  if (!env.TREASURY_TOKEN_ADDRESS) {
+    throw new Error("TREASURY_TOKEN_ADDRESS must be configured for TradingAgents investment automation");
   }
 
-  if (
-    aaveCandidate?.available &&
-    aaveCandidate.max_allocation_pct > 0 &&
-    input.investment_pool > 0 &&
-    input.payroll_coverage_ratio >= 1.25 &&
-    Math.abs(input.price_change_pct) <= 6
-  ) {
-    return {
-      action: "invest",
-      strategy_id: "aave_weth_supply",
-      target_asset: "WETH",
-      target_protocol: "aave",
-      allocation_pct: aaveCandidate.max_allocation_pct,
-      confidence: 0.64,
-      risk_level: input.price_change_pct >= 0 ? "low" : "medium",
-      rationale:
-        reason ??
-        "Fallback strategy selected Aave because payroll coverage is healthy, volatility is moderate, and Aave offers the best risk-adjusted yield among approved strategies."
-    };
-  }
-
-  return {
-    action: "hold",
-    strategy_id: "hold_treasury_eth",
-    target_asset: "ETH",
-    target_protocol: "treasury",
-    allocation_pct: 0,
-    confidence: 0.78,
-    risk_level: "low",
-    rationale:
-      reason ??
-      "Fallback strategy selected treasury hold because no approved yield strategy offered enough return advantage for the observed risk."
-  };
-}
-
-function sanitizeInvestmentDecision(
-  decision: InvestmentDecision,
-  input: InvestmentAgentInput
-): InvestmentDecision {
-  const selected = input.strategy_candidates.find((candidate) => candidate.id === decision.strategy_id);
-  if (!selected || !selected.available) {
-    return fallbackInvestmentDecision(
-      input,
-      `Selected strategy ${decision.strategy_id} was unavailable, so FlowPay fell back to the safest approved option.`
+  const treasurySymbol = getTreasuryTokenSymbol();
+  const executionSymbol = getExecutionTokenSymbol();
+  if (treasurySymbol !== executionSymbol && !env.INVESTMENT_EXECUTION_TOKEN_ADDRESS) {
+    throw new Error(
+      `INVESTMENT_EXECUTION_TOKEN_ADDRESS is required when treasury ${treasurySymbol} differs from execution ${executionSymbol}`
     );
   }
+}
 
-  if (decision.action === "invest") {
-    if (selected.id !== "aave_weth_supply" || selected.protocol !== "aave") {
-      return fallbackInvestmentDecision(
-        input,
-        "Investment action was mapped to a non-yield strategy, so FlowPay fell back to the safest approved option."
-      );
-    }
+function parseEnabledProtocols() {
+  return new Set(
+    (env.INVESTMENT_ENABLED_PROTOCOLS ?? "aave_usdc")
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
 
+function flagEnabled(value: string | undefined) {
+  return (value ?? "").trim().toLowerCase() === "true";
+}
+
+function getExecutableProtocols() {
+  const enabled = parseEnabledProtocols();
+  const executable = new Set<string>();
+
+  if (
+    enabled.has("aave_usdc") &&
+    (env.AAVE_USDC_POOL_ADDRESS?.trim() || env.AAVE_POOL_ADDRESS?.trim())
+  ) {
+    executable.add("aave_usdc");
+  }
+
+  if (
+    enabled.has("yearn_usdc") &&
+    flagEnabled(env.YEARN_VAULT_IS_ERC4626) &&
+    env.YEARN_USDC_VAULT_ADDRESS?.trim()
+  ) {
+    executable.add("yearn_usdc");
+  }
+
+  if (
+    enabled.has("pendle_pt_usdc") &&
+    flagEnabled(env.PENDLE_AUTOMATION_ENABLED) &&
+    env.PENDLE_ROUTER_ADDRESS?.trim() &&
+    env.PENDLE_USDC_MARKET_ADDRESS?.trim() &&
+    env.PENDLE_USDC_SY_ADDRESS?.trim()
+  ) {
+    executable.add("pendle_pt_usdc");
+  }
+
+  return executable;
+}
+
+function buildFallbackAllocation(totalAmount: number): Record<string, TradingAgentsAllocationItem> {
+  const executable = getExecutableProtocols();
+
+  if (executable.has("aave_usdc") && executable.has("yearn_usdc")) {
+    const yearnAmount = round(totalAmount * 0.6);
+    const aaveAmount = round(totalAmount - yearnAmount);
     return {
-      ...decision,
-      strategy_id: selected.id,
-      target_asset: selected.asset_symbol,
-      target_protocol: selected.protocol,
-      allocation_pct: clamp(
-        Math.min(decision.allocation_pct, selected.max_allocation_pct),
-        0,
-        selected.max_allocation_pct
-      )
+      yearn_usdc: {
+        protocol: "yearn-v3",
+        action: "deposit" as const,
+        percent: 0.6,
+        amount_usdc: yearnAmount
+      },
+      aave_usdc: {
+        protocol: "aave-v3",
+        action: "supply" as const,
+        percent: 0.4,
+        amount_usdc: aaveAmount
+      }
     };
   }
 
-  if (decision.action === "withdraw") {
-    if (selected.id !== "de_risk_to_treasury") {
-      return fallbackInvestmentDecision(
-        input,
-        "Withdraw action was mapped to an invalid strategy, so FlowPay fell back to the safest approved option."
-      );
-    }
+  if (executable.has("aave_usdc")) {
+    const allocation: Record<string, TradingAgentsAllocationItem> = {};
+    allocation.aave_usdc = {
+      protocol: "aave-v3",
+      action: "supply",
+      percent: 1,
+      amount_usdc: round(totalAmount)
+    };
+    return allocation;
+  }
 
+  if (executable.has("yearn_usdc")) {
+    const allocation: Record<string, TradingAgentsAllocationItem> = {};
+    allocation.yearn_usdc = {
+      protocol: "yearn-v3",
+      action: "deposit",
+      percent: 1,
+      amount_usdc: round(totalAmount)
+    };
+    return allocation;
+  }
+
+  throw new Error(
+    "No executable investment protocols are enabled. Configure INVESTMENT_ENABLED_PROTOCOLS and protocol addresses before running TradingAgents automation."
+  );
+}
+
+function normalizeAutomatedAllocation(
+  decision: TradingAgentsDecision
+): TradingAgentsDecision {
+  if (decision.action === "HOLD" || decision.action === "WITHDRAW") {
+    return decision;
+  }
+
+  const entries = Object.entries(decision.allocation ?? {});
+  if (entries.length === 0) {
+    return decision;
+  }
+
+  const executable = getExecutableProtocols();
+  const supported = entries.filter(([protocolKey]) => executable.has(protocolKey));
+  const unsupported = entries.filter(([protocolKey]) => !executable.has(protocolKey));
+  if (unsupported.length === 0) {
+    return decision;
+  }
+
+  const totalAmount = entries.reduce((sum, [, item]) => sum + item.amount_usdc, 0);
+  const note =
+    `FlowPay normalized unsupported or disabled protocols (${unsupported.map(([protocolKey]) => protocolKey).join(", ")}) ` +
+    `out of the executable plan because only configured executable protocols are allowed in this build.`;
+
+  if (supported.length === 0) {
     return {
       ...decision,
-      strategy_id: selected.id,
-      target_asset: "ETH",
-      target_protocol: "treasury",
-      allocation_pct: decision.allocation_pct > 0 ? clamp(decision.allocation_pct, 0, 1) : 1
+      allocation: buildFallbackAllocation(totalAmount),
+      confidence: Math.max(0.5, round(decision.confidence - 0.05)),
+      reasoning: `${decision.reasoning}\n\n${note}`
     };
   }
+
+  const supportedTotal = supported.reduce((sum, [, item]) => sum + item.amount_usdc, 0);
+  const normalizedAllocation = Object.fromEntries(
+    supported.map(([protocolKey, item]) => {
+      const share = supportedTotal > 0 ? item.amount_usdc / supportedTotal : 0;
+      const amount = round(totalAmount * share);
+      return [
+        protocolKey,
+        {
+          ...item,
+          amount_usdc: amount,
+          percent: totalAmount > 0 ? round(amount / totalAmount) : 0
+        }
+      ];
+    })
+  );
 
   return {
     ...decision,
-    action: "hold",
-    strategy_id: "hold_treasury_eth",
-    target_asset: "ETH",
-    target_protocol: "treasury",
-    allocation_pct: 0
+    allocation: normalizedAllocation,
+    confidence: Math.max(0.5, round(decision.confidence - 0.05)),
+    reasoning: `${decision.reasoning}\n\n${note}`
   };
 }
 
-function describeDecision(decision: InvestmentDecision): string {
-  if (decision.action === "invest") {
-    return `Selected ${decision.strategy_id} at ${(decision.allocation_pct * 100).toFixed(1)}% of the investment pool.`;
+async function getInvestmentPool(companyId: string) {
+  const result = await db.query(
+    `SELECT investment_pool, payroll_reserve, lending_pool, main_reserve
+     FROM treasury_allocations
+     WHERE company_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [companyId]
+  );
+
+  const row = result.rows[0] ?? null;
+  return {
+    investmentPool: parseFloat(row?.investment_pool ?? "0"),
+    payrollReserve: parseFloat(row?.payroll_reserve ?? "0"),
+    lendingPool: parseFloat(row?.lending_pool ?? "0"),
+    mainReserve: parseFloat(row?.main_reserve ?? "0")
+  };
+}
+
+async function evaluateInvestmentDecisionPolicy(
+  companyId: string,
+  decision: TradingAgentsDecision
+): Promise<AggregatedPolicyResult> {
+  const itemResults = [];
+  const combinedChecks: Array<Record<string, unknown>> = [];
+  const combinedReasons = new Set<string>();
+  let finalStatus: AgentPolicyResult["status"] = "allow";
+
+  for (const [protocolKey, allocation] of Object.entries(decision.allocation)) {
+    const result = await evaluateAgentPolicy({
+      companyId,
+      action: "investment_rebalance",
+      amount: allocation.amount_usdc,
+      metadata: {
+        allocationPct: allocation.percent * 100
+      }
+    });
+
+    itemResults.push({
+      protocolKey,
+      status: result.status,
+      reasons: result.reasons,
+      amount: allocation.amount_usdc,
+      percent: allocation.percent
+    });
+    combinedChecks.push({
+      protocolKey,
+      amount: round(allocation.amount_usdc),
+      percent: round(allocation.percent * 100),
+      result
+    });
+    result.reasons.forEach((reason) => combinedReasons.add(reason));
+
+    if (result.status === "block") {
+      finalStatus = "block";
+    } else if (result.status === "review" && finalStatus !== "block") {
+      finalStatus = "review";
+    }
   }
-  if (decision.action === "withdraw") {
-    return "Selected de-risking back to treasury liquidity.";
-  }
-  return "Selected treasury hold as the safest approved strategy.";
+
+  const totalAmount = Object.values(decision.allocation).reduce((sum, item) => sum + item.amount_usdc, 0);
+  const maxPercent = Object.values(decision.allocation).reduce((max, item) => Math.max(max, item.percent * 100), 0);
+
+  return {
+    status: finalStatus,
+    reasons: Array.from(combinedReasons),
+    checks: combinedChecks,
+    amount: round(totalAmount),
+    limits: {
+      maxAllocationPct: round(maxPercent)
+    },
+    metrics: {
+      allocationCount: Object.keys(decision.allocation).length
+    },
+    itemResults
+  };
+}
+
+function summarizeDecision(decision: TradingAgentsDecision) {
+  return {
+    action: decision.action,
+    confidence: decision.confidence,
+    model_used: decision.model_used,
+    allocation: decision.allocation,
+    reasoning: decision.reasoning.slice(0, 500),
+    defi_snapshot: decision.defi_snapshot.slice(0, 500)
+  };
 }
 
 export async function runInvestment(companyId: string, auditContext: AgentLogContext = {}) {
-  const [allocationResult, payrollResult, settings] = await Promise.all([
-    db.query(
-      `SELECT investment_pool, payroll_reserve, lending_pool, main_reserve
-       FROM treasury_allocations
-       WHERE company_id = $1
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [companyId]
-    ),
-    db.query(
-      "SELECT COALESCE(SUM(salary), 0) AS total_salary FROM employees WHERE company_id = $1 AND status = 'active'",
-      [companyId]
-    ),
-    getCompanySettings(companyId)
-  ]);
+  ensureStableTreasuryConfig();
+  const treasuryTokenSymbol = getTreasuryTokenSymbol();
 
-  const investmentPool = allocationResult.rowCount
-    ? parseFloat(allocationResult.rows[0].investment_pool)
-    : 0;
-  const payrollReserve = parseFloat(allocationResult.rows[0]?.payroll_reserve ?? "0");
-  const lendingPool = parseFloat(allocationResult.rows[0]?.lending_pool ?? "0");
-  const mainReserve = parseFloat(allocationResult.rows[0]?.main_reserve ?? "0");
-  const liquidTreasury = investmentPool + payrollReserve + lendingPool + mainReserve;
-  const monthlyPayroll = parseFloat(payrollResult.rows[0]?.total_salary ?? "0");
-  const payrollCoverageRatio =
-    monthlyPayroll > 0 ? payrollReserve / monthlyPayroll : payrollReserve > 0 ? 999 : 0;
+  const { investmentPool, payrollReserve, lendingPool, mainReserve } = await getInvestmentPool(companyId);
+  const currentAllocation = await getCurrentInvestmentAllocation(companyId);
 
-  let atokenBalance = 0;
-  let yieldEarned = 0;
-  let aaveUnavailableReason: string | null = null;
-  try {
-    atokenBalance = await getATokenBalance(companyId);
-    yieldEarned = await getYieldEarned(companyId);
-  } catch (error) {
-    aaveUnavailableReason = error instanceof Error ? error.message : "Aave unavailable";
-  }
-
-  const activePositionsResult = await db.query(
-    "SELECT COUNT(*) AS count FROM investment_positions WHERE company_id = $1 AND status = 'active'",
-    [companyId]
-  );
-  const openPositions = parseInt(activePositionsResult.rows[0].count, 10);
-  const priceInfo = await getEthPrice();
-  const riskTolerance = normalizeRiskTolerance(settings.agent.riskTolerance);
-  const managedTreasury = liquidTreasury + Math.max(atokenBalance, 0);
-  const currentAaveExposurePct =
-    managedTreasury > 0 ? (atokenBalance / managedTreasury) * 100 : 0;
-  const strategyCandidates = buildStrategyCandidates({
-    investmentPool,
-    managedTreasury,
-    atokenBalance,
-    yieldEarned,
-    priceChangePct: priceInfo.changePct,
-    openPositions,
-    payrollCoverageRatio,
-    riskTolerance,
-    maxAaveExposurePct: settings.agent.walletPolicy.maxAaveAllocationPct,
-    aaveUnavailableReason
-  });
-
-  const agentInput: InvestmentAgentInput = {
-    balance: investmentPool,
-    investment_pool: investmentPool,
-    eth_price: priceInfo.price,
-    price_change_pct: priceInfo.changePct,
-    atoken_balance: atokenBalance,
-    yield_earned: yieldEarned,
-    open_positions: openPositions,
-    monthly_payroll: monthlyPayroll,
-    payroll_coverage_ratio: toFixedNum(payrollCoverageRatio),
-    current_aave_exposure_pct: toFixedNum(currentAaveExposurePct),
-    max_aave_exposure_pct: settings.agent.walletPolicy.maxAaveAllocationPct,
-    risk_tolerance: riskTolerance,
-    strategy_candidates: strategyCandidates
-  };
-
-  let decision: InvestmentDecision;
-  try {
-    const modelDecision = await runInvestmentAgent(agentInput);
-    decision = sanitizeInvestmentDecision(modelDecision, agentInput);
-  } catch (error) {
-    decision = fallbackInvestmentDecision(
-      agentInput,
-      `Agent fallback: ${error instanceof Error ? error.message : "investment agent unavailable"}`
+  if (investmentPool < 10) {
+    await logAgentAction(
+      "TradingAgentsDecisionEngine",
+      {
+        companyId,
+        investmentPool,
+        currentAllocation
+      },
+      { action: "HOLD" },
+      "Investment pool is below the minimum threshold for TradingAgents analysis.",
+      `Skipped investment analysis because the investment pool is under 10 ${treasuryTokenSymbol}.`,
+      companyId,
+      {
+        ...auditContext,
+        stage: "decision",
+        executionStatus: "skipped"
+      }
     );
+
+    return {
+      action: "HOLD" as const,
+      allocation: {},
+      confidence: 0,
+      reasoning: "Investment pool below minimum threshold.",
+      invested_amount: 0,
+      txHashes: [],
+      current_allocation: currentAllocation
+    };
   }
+
+  await checkTradingAgentsHealth();
+  const rawDecision = await analyzeInvestmentAllocation({
+    capitalUsdc: investmentPool,
+    horizon: "30d",
+    currentAllocation
+  });
+  const decision = normalizeAutomatedAllocation(rawDecision);
 
   await logAgentAction(
-    "InvestmentAgent",
-    agentInput,
-    decision,
-    decision.rationale,
-    describeDecision(decision),
+    "TradingAgentsDecisionEngine",
+    {
+      companyId,
+      investmentPool,
+      payrollReserve,
+      lendingPool,
+      mainReserve,
+      currentAllocation
+    },
+    summarizeDecision(decision),
+    decision.reasoning,
+    `TradingAgents returned ${decision.action} at ${(decision.confidence * 100).toFixed(1)}% confidence.`,
     companyId,
     {
       ...auditContext,
       stage: "decision",
       metadata: {
-        strategyId: decision.strategy_id,
-        confidence: decision.confidence,
-        riskLevel: decision.risk_level
+        modelUsed: decision.model_used
       }
     }
   );
 
-  if (aaveUnavailableReason) {
-    const safeDecision = fallbackInvestmentDecision(
-      agentInput,
-      `Aave unavailable: ${aaveUnavailableReason}. FlowPay kept funds in treasury instead of forcing an investment action.`
-    );
+  if (decision.action === "HOLD") {
+    return {
+      ...decision,
+      invested_amount: 0,
+      txHashes: [],
+      current_allocation: currentAllocation
+    };
+  }
+
+  const policyResult = await evaluateInvestmentDecisionPolicy(companyId, decision);
+  await logAgentAction(
+    "FlowPayPolicyEngine",
+    {
+      companyId,
+      action: decision.action,
+      allocation: decision.allocation
+    },
+    {
+      action: "investment_rebalance",
+      result: policyResult.status
+    },
+    policyResult.reasons.join(" ") || "Investment allocation passed policy checks.",
+    `Investment policy status: ${policyResult.status.toUpperCase()}`,
+    companyId,
+    {
+      ...auditContext,
+      stage: "policy_validation",
+      policyResult,
+      executionStatus: policyResult.status
+    }
+  );
+
+  if (policyResult.status !== "allow") {
+    return {
+      ...decision,
+      invested_amount: 0,
+      txHashes: [],
+      policy: policyResult,
+      current_allocation: currentAllocation
+    };
+  }
+
+  const txHashes: string[] = [];
+  const closedPositions =
+    decision.action === "REBALANCE" || decision.action === "WITHDRAW"
+      ? await closeActiveInvestmentPositions(companyId)
+      : [];
+
+  for (const closed of closedPositions) {
+    txHashes.push(closed.txHash);
     await logAgentAction(
-      "InvestmentAgent",
-      agentInput,
-      safeDecision,
-      safeDecision.rationale,
-      "Skipped investment execution because Aave context was unavailable.",
+      "WDKExecutionLayer",
+      {
+        companyId,
+        protocol: closed.protocolKey,
+        amount: closed.amount,
+        txHash: closed.txHash
+      },
+      {
+        action: "withdraw"
+      },
+      "Closed active protocol position before applying the new TradingAgents posture.",
+      `Closed ${closed.protocolKey} position for ${closed.amount.toFixed(6)} ${closed.assetSymbol}.`,
       companyId,
       {
         ...auditContext,
         stage: "wdk_execution",
-        executionStatus: "skipped",
+        executionStatus: "success",
         metadata: {
-          strategyId: safeDecision.strategy_id
+          protocol: closed.protocolKey,
+          txHash: closed.txHash
         }
       }
     );
-    return { ...safeDecision, invested_amount: 0, txHash: null };
   }
 
-  if (decision.action === "invest" && decision.strategy_id === "aave_weth_supply" && decision.allocation_pct > 0) {
-    const investAmount = investmentPool * decision.allocation_pct;
-    const aaveDecimals = parseInt(env.AAVE_SUPPLY_TOKEN_DECIMALS, 10);
-    let investAmountRaw = 0n;
-    let normalizedInvestAmount = 0;
+  if (decision.action === "WITHDRAW") {
+    return {
+      ...decision,
+      invested_amount: 0,
+      txHashes,
+      policy: policyResult,
+      closed_positions: closedPositions,
+      current_allocation: currentAllocation
+    };
+  }
 
-    if (Number.isFinite(investAmount) && investAmount > 0) {
-      investAmountRaw = parseTokenAmount(investAmount.toFixed(aaveDecimals), aaveDecimals);
-      normalizedInvestAmount = parseFloat(formatTokenAmount(investAmountRaw, aaveDecimals));
-    }
-
-    if (investAmountRaw <= 0n || normalizedInvestAmount <= 0) {
-      await logAgentAction(
-        "InvestmentAgent",
-        agentInput,
-        decision,
-        "Skipped invest because the computed allocation rounded down to zero.",
-        "Investment execution skipped because the computed deposit amount was zero.",
-        companyId,
-        {
-          ...auditContext,
-          stage: "wdk_execution",
-          executionStatus: "skipped",
-          metadata: {
-            strategyId: decision.strategy_id
-          }
-        }
-      );
-      return { ...decision, invested_amount: 0, txHash: null };
-    }
-
-    const projectedExposurePct =
-      managedTreasury > 0 ? ((atokenBalance + normalizedInvestAmount) / managedTreasury) * 100 : 0;
-    const policyResult = await evaluateAgentPolicy({
-      companyId,
-      action: "aave_rebalance",
-      amount: normalizedInvestAmount,
-      metadata: {
-        allocationPct: projectedExposurePct,
-        currentTreasuryBalance: managedTreasury
-      }
-    });
-
+  const executed = await executeInvestmentDecision(companyId, decision);
+  for (const item of executed) {
+    txHashes.push(item.txHash);
     await logAgentAction(
-      "FlowPayPolicyEngine",
+      "WDKExecutionLayer",
       {
         companyId,
-        investAmount: normalizedInvestAmount,
-        projectedExposurePct,
-        liquidTreasury,
-        managedTreasury,
-        strategyId: decision.strategy_id
+        protocol: item.protocolKey,
+        action: item.action,
+        amount: item.amount,
+        txHash: item.txHash
       },
       {
-        action: "aave_rebalance",
-        strategy_id: decision.strategy_id
+        action: item.action,
+        protocol: item.protocol
       },
-      policyResult.reasons.join(" ") || "Investment action passed wallet policy checks.",
-      `Investment policy status: ${policyResult.status.toUpperCase()}`,
+      "Executed TradingAgents allocation against the company treasury wallet.",
+      `Executed ${item.action} on ${item.protocolKey} for ${item.amount.toFixed(6)} ${item.assetSymbol}.`,
       companyId,
       {
         ...auditContext,
-        stage: "policy_validation",
-        policyResult,
-        executionStatus: policyResult.status,
+        stage: "wdk_execution",
+        executionStatus: "success",
         metadata: {
-          strategyId: decision.strategy_id
+          protocol: item.protocolKey,
+          txHash: item.txHash
         }
       }
     );
-
-    if (policyResult.status === "block") {
-      return { ...decision, invested_amount: 0, txHash: null, policy: policyResult };
-    }
-
-    try {
-      const txHash = await depositToAave(companyId, normalizedInvestAmount);
-      const updatedATokenBalance = await getATokenBalance(companyId);
-      const updatedYieldEarned = await getYieldEarned(companyId);
-
-      await db.query(
-        `INSERT INTO investment_positions
-         (company_id, amount_deposited, atoken_balance, yield_earned, entry_price, tx_hash, status)
-         VALUES ($1, $2, $3, $4, $5, $6, 'active')`,
-        [
-          companyId,
-          toFixedNum(normalizedInvestAmount),
-          toFixedNum(updatedATokenBalance),
-          toFixedNum(updatedYieldEarned),
-          toFixedNum(priceInfo.price),
-          txHash
-        ]
-      );
-
-      await logAgentAction(
-        "InvestmentAgent",
-        agentInput,
-        decision,
-        decision.rationale,
-        `Executed ${decision.strategy_id} for ${normalizedInvestAmount.toFixed(6)} ETH. Tx: ${txHash}`,
-        companyId,
-        {
-          ...auditContext,
-          stage: "wdk_execution",
-          policyResult,
-          executionStatus: "success",
-          metadata: {
-            strategyId: decision.strategy_id,
-            txHash
-          }
-        }
-      );
-
-      return { ...decision, invested_amount: normalizedInvestAmount, txHash, policy: policyResult };
-    } catch (error) {
-      await logAgentAction(
-        "InvestmentAgent",
-        agentInput,
-        decision,
-        error instanceof Error ? error.message : "Aave deposit failed.",
-        `Investment execution failed for ${normalizedInvestAmount.toFixed(6)} ETH.`,
-        companyId,
-        {
-          ...auditContext,
-          stage: "wdk_execution",
-          executionStatus: "failed",
-          metadata: {
-            strategyId: decision.strategy_id
-          }
-        }
-      );
-      throw error;
-    }
   }
 
-  const activePositionsDetail = await db.query(
-    "SELECT id, amount_deposited, entry_price FROM investment_positions WHERE company_id = $1 AND status = 'active' ORDER BY opened_at ASC",
-    [companyId]
-  );
-
-  if (decision.action === "withdraw" && decision.strategy_id === "de_risk_to_treasury" && (activePositionsDetail.rowCount ?? 0) > 0) {
-    for (const pos of activePositionsDetail.rows) {
-      const withdrawAmount = parseFloat(pos.amount_deposited);
-      try {
-        const txHash = await withdrawFromAave(companyId, withdrawAmount);
-        await db.query(
-          "UPDATE investment_positions SET status = 'closed', closed_at = now() WHERE id = $1",
-          [pos.id]
-        );
-        await logAgentAction(
-          "InvestmentAgent",
-          agentInput,
-          decision,
-          decision.rationale,
-          `Withdrew ${withdrawAmount.toFixed(6)} ETH from Aave under ${decision.strategy_id}. Tx: ${txHash}`,
-          companyId,
-          {
-            ...auditContext,
-            stage: "wdk_execution",
-            executionStatus: "success",
-            metadata: {
-              strategyId: decision.strategy_id,
-              txHash
-            }
-          }
-        );
-      } catch (error) {
-        await db.query("UPDATE investment_positions SET status = 'sync_failed' WHERE id = $1", [pos.id]);
-        const errorMessage = error instanceof Error ? error.message : "Unknown withdrawal error";
-        await logAgentAction(
-          "InvestmentAgent",
-          agentInput,
-          decision,
-          errorMessage,
-          `WITHDRAWAL_FAILED for ${withdrawAmount.toFixed(6)} ETH on position ${pos.id}`,
-          companyId,
-          {
-            ...auditContext,
-            stage: "wdk_execution",
-            executionStatus: "failed",
-            metadata: {
-              strategyId: decision.strategy_id
-            }
-          }
-        );
-      }
-    }
-  }
-
-  if (decision.action === "hold" && (activePositionsDetail.rowCount ?? 0) > 0) {
-    for (const pos of activePositionsDetail.rows) {
-      const entryPrice = parseFloat(pos.entry_price);
-      if (!Number.isFinite(entryPrice) || entryPrice <= 0) {
-        continue;
-      }
-
-      const priceDropPct = ((entryPrice - priceInfo.price) / entryPrice) * 100;
-      if (priceDropPct <= 15) {
-        continue;
-      }
-
-      const withdrawAmount = parseFloat(pos.amount_deposited);
-      try {
-        const txHash = await withdrawFromAave(companyId, withdrawAmount);
-        await db.query(
-          "UPDATE investment_positions SET status = 'closed', closed_at = now() WHERE id = $1",
-          [pos.id]
-        );
-        await logAgentAction(
-          "InvestmentAgent",
-          agentInput,
-          decision,
-          decision.rationale,
-          `Hold-mode stop loss triggered (${priceDropPct.toFixed(2)}% drop). Withdrew ${withdrawAmount.toFixed(6)} ETH. Tx: ${txHash}`,
-          companyId,
-          {
-            ...auditContext,
-            stage: "wdk_execution",
-            executionStatus: "success",
-            metadata: {
-              strategyId: decision.strategy_id,
-              txHash
-            }
-          }
-        );
-      } catch (error) {
-        await db.query("UPDATE investment_positions SET status = 'sync_failed' WHERE id = $1", [pos.id]);
-        const errorMessage = error instanceof Error ? error.message : "Unknown withdrawal error";
-        await logAgentAction(
-          "InvestmentAgent",
-          agentInput,
-          decision,
-          errorMessage,
-          `WITHDRAWAL_FAILED during hold stop-loss for ${withdrawAmount.toFixed(6)} ETH on position ${pos.id}`,
-          companyId,
-          {
-            ...auditContext,
-            stage: "wdk_execution",
-            executionStatus: "failed",
-            metadata: {
-              strategyId: decision.strategy_id
-            }
-          }
-        );
-      }
-    }
-  }
-
-  return decision;
+  const investedAmount = executed.reduce((sum, item) => sum + item.amount, 0);
+  return {
+    ...decision,
+    invested_amount: round(investedAmount),
+    txHashes,
+    policy: policyResult,
+    closed_positions: closedPositions,
+    current_allocation: currentAllocation
+  };
 }

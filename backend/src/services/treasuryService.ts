@@ -253,7 +253,6 @@ export async function allocateTreasury(
     throw new ApiError(400, policyResult.reasons[0] ?? "Treasury allocation blocked by policy");
   }
 
-  // 1. DB Commit
   await db.query(
     `INSERT INTO treasury_allocations
        (company_id, payroll_reserve, lending_pool, investment_pool, main_reserve)
@@ -267,7 +266,6 @@ export async function allocateTreasury(
     ]
   );
 
-  // 2. Sync to contract - AWAIT THIS to ensure chain success
   try {
     await allocateCore(
       payrollPct / ACTIVE_TREASURY_PCT,

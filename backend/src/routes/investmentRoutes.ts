@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/errors.js";
 import { db } from "../db/pool.js";
+import { env } from "../config/env.js";
 import { uuidQueryParam } from "../utils/validation.js";
 import { runInvestment } from "../services/investmentService.js";
 import { getEthPrice, getTrackedMarketBoard } from "../services/priceService.js";
@@ -54,6 +55,7 @@ router.get(
       `SELECT
          t.id,
          t.amount,
+         t.token_symbol,
          t.tx_hash,
          t.created_at
        FROM transactions t
@@ -101,6 +103,10 @@ router.get(
         investment_pool: allocation?.investment_pool ?? "0",
         transaction_count: txResult.rows.length,
       },
+      execution_token_symbol:
+        env.INVESTMENT_EXECUTION_TOKEN_SYMBOL ??
+        env.TREASURY_TOKEN_SYMBOL ??
+        "USDT",
       market,
       marketBoard
     });

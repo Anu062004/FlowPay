@@ -194,12 +194,19 @@ export type InvestmentData = {
     tx_hash: string | null;
     entry_price: string | null;
   }[];
-  transactions: { id: string; amount: string; tx_hash: string | null; created_at: string }[];
+  transactions: {
+    id: string;
+    amount: string;
+    token_symbol?: string;
+    tx_hash: string | null;
+    created_at: string;
+  }[];
   summary: {
     total_invested: string;
     investment_pool: string;
     transaction_count: number;
   };
+  execution_token_symbol?: string;
   market: {
     asset: string;
     price: number;

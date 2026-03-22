@@ -49,7 +49,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function fmtEth(value: string | number, symbol = "ETH"): string {
+function fmtToken(value: string | number, symbol = "USDT"): string {
   const parsed = typeof value === "number" ? value : parseFloat(value);
   if (!Number.isFinite(parsed)) {
     return `0.000000 ${symbol}`;
@@ -190,7 +190,8 @@ export default function InvestmentsPage() {
   const marketBoard = data?.marketBoard;
   const treasuryAddress = treasury.data?.wallet_address ?? null;
   const treasuryBalance = treasury.data?.balance ?? "0";
-  const treasuryTokenSymbol = treasury.data?.token_symbol ?? "ETH";
+  const treasuryTokenSymbol = treasury.data?.token_symbol ?? "USDT";
+  const executionTokenSymbol = data?.execution_token_symbol ?? treasuryTokenSymbol;
 
   const summary = useMemo(() => {
     const totalDeployed = positions.reduce((sum, item) => sum + parseFloat(item.amount_deposited), 0);
@@ -238,7 +239,7 @@ export default function InvestmentsPage() {
       <div className="page-header-row">
         <div className="page-header">
           <h1 className="page-title">Investments</h1>
-          <p className="page-subtitle">WDK market board plus Aave v3 Sepolia positions and treasury deployment history</p>
+          <p className="page-subtitle">TradingAgents-driven stablecoin treasury allocations with automated execution across supported DeFi venues</p>
         </div>
         <div className="row">
           <button
@@ -276,7 +277,7 @@ export default function InvestmentsPage() {
           <div className="card-header">
             <div>
               <div className="card-title">Treasury Assignment Wallet</div>
-              <div className="card-subtitle">The investment agent deploys funds from and settles assets back to this treasury wallet automatically.</div>
+              <div className="card-subtitle">TradingAgents recommendations are executed from and settled back to this treasury wallet.</div>
             </div>
             <Badge variant="success">Connected</Badge>
           </div>
@@ -292,19 +293,19 @@ export default function InvestmentsPage() {
                 </div>
                 <div className="alert alert-info">
                   <span className="alert-icon"><Icon d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={16} /></span>
-                  <span>Any automated investment allocation by the agent is routed against this treasury wallet. No separate asset target needs to be configured.</span>
+                  <span>FlowPay validates policy first, then executes approved allocations against this treasury wallet. Protocol deployments can use a separate execution asset from treasury settlement when the treasury remains in a different stablecoin.</span>
                 </div>
               </div>
               <div className="grid-2">
                 <div className="metric-card">
                   <div className="metric-card-label">Live Treasury Balance</div>
-                  <div className="metric-card-value font-num">{fmtEth(treasuryBalance, treasuryTokenSymbol)}</div>
-                  <div className="metric-card-change neutral">{treasuryTokenSymbol} available for allocation</div>
+                  <div className="metric-card-value font-num">{fmtToken(treasuryBalance, treasuryTokenSymbol)}</div>
+                  <div className="metric-card-change neutral">{treasuryTokenSymbol} available for investment allocation</div>
                 </div>
                 <div className="metric-card">
                   <div className="metric-card-label">Network</div>
                   <div className="metric-card-value font-num">Sepolia</div>
-                  <div className="metric-card-change neutral">WDK EVM treasury wallet</div>
+                  <div className="metric-card-change neutral">Treasury wallet used for DeFi protocol execution</div>
                 </div>
               </div>
             </div>
@@ -331,8 +332,8 @@ export default function InvestmentsPage() {
               <Icon d="M3 10h18M7 15h.01M11 15h.01M3 7h18a1 1 0 011 1v9a1 1 0 01-1 1H3a1 1 0 01-1-1V8a1 1 0 011-1z" size={16} />
             </div>
           </div>
-          <div className="metric-card-value font-num">{fmtEth(summary.totalDeployed)}</div>
-          <div className="metric-card-change neutral">Capital currently or previously deployed to Aave</div>
+          <div className="metric-card-value font-num">{fmtToken(summary.totalDeployed, executionTokenSymbol)}</div>
+          <div className="metric-card-change neutral">Capital currently or previously deployed across investment protocols</div>
         </div>
 
         <div className="metric-card">
@@ -342,8 +343,8 @@ export default function InvestmentsPage() {
               <Icon d="M12 3l7 4v10l-7 4-7-4V7l7-4zm0 6v6m-3-3h6" size={16} />
             </div>
           </div>
-          <div className="metric-card-value font-num">{fmtEth(summary.totalYield)}</div>
-          <div className="metric-card-change neutral">Yield recorded across investment positions</div>
+          <div className="metric-card-value font-num">{fmtToken(summary.totalYield, executionTokenSymbol)}</div>
+          <div className="metric-card-change neutral">Yield recorded across deployed investment positions</div>
         </div>
 
         <div className="metric-card">
@@ -395,16 +396,16 @@ export default function InvestmentsPage() {
             <div className="card-header">
               <div>
                 <div className="card-title">Investment Positions</div>
-                <div className="card-subtitle">Aave v3 Sepolia deployment ledger</div>
+                <div className="card-subtitle">Execution-asset deployment ledger across supported protocols</div>
               </div>
             </div>
             {positions.length === 0 ? (
-              <div className="card-body">
-                <div className="empty-state" style={{ padding: "40px 0" }}>
-                  <div className="empty-state-title">No investment positions found</div>
-                  <div className="empty-state-desc">Run the investment agent or fund treasury allocations to create Aave positions.</div>
+                <div className="card-body">
+                  <div className="empty-state" style={{ padding: "40px 0" }}>
+                    <div className="empty-state-title">No investment positions found</div>
+                    <div className="empty-state-desc">Run the investment cycle or fund treasury allocations to create supported protocol positions.</div>
+                  </div>
                 </div>
-              </div>
             ) : (
               <div className="data-table-wrapper" style={{ border: "none", borderRadius: 0 }}>
                 <table className="data-table">
@@ -412,8 +413,8 @@ export default function InvestmentsPage() {
                     <tr>
                       <th>Protocol</th>
                       <th className="right">Amount Deposited</th>
-                      <th className="right">aToken Balance</th>
-                      <th className="right">Yield Earned</th>
+                      <th className="right">Reported Balance</th>
+                      <th className="right">Yield Recorded</th>
                       <th>Status</th>
                       <th>Opened At</th>
                       <th>Closed At</th>
@@ -426,9 +427,9 @@ export default function InvestmentsPage() {
                           <div className="fw-medium text-sm">{position.protocol}</div>
                           <div className="text-xs text-secondary font-mono">{position.id.slice(0, 8)}...</div>
                         </td>
-                        <td className="data-table-num">{fmtEth(position.amount_deposited)}</td>
-                        <td className="data-table-num">{fmtEth(position.atoken_balance)}</td>
-                        <td className="data-table-num">{fmtEth(position.yield_earned)}</td>
+                        <td className="data-table-num">{fmtToken(position.amount_deposited, executionTokenSymbol)}</td>
+                        <td className="data-table-num">{fmtToken(position.atoken_balance, executionTokenSymbol)}</td>
+                        <td className="data-table-num">{fmtToken(position.yield_earned, executionTokenSymbol)}</td>
                         <td>
                           <Badge variant={positionBadgeVariant(position.status)}>
                             {position.status}
@@ -469,7 +470,7 @@ export default function InvestmentsPage() {
                     {transactions.map((tx) => (
                       <tr key={tx.id}>
                         <td className="text-sm text-secondary">{fmtDate(tx.created_at)}</td>
-                        <td className="data-table-num">{fmtEth(tx.amount)}</td>
+                        <td className="data-table-num">{fmtToken(tx.amount, tx.token_symbol ?? executionTokenSymbol)}</td>
                         <td>
                           <TransactionHashCell
                             txHash={tx.tx_hash}

@@ -607,6 +607,43 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </SettingsSection>
+
+              <SettingsSection
+                eyebrow="Danger Zone"
+                title="Irreversible Controls"
+                subtitle="These actions stay visible for completeness, but remain protected and disabled in the current build."
+                tone="danger"
+              >
+                <div className="settings-danger-list">
+                  <div className="settings-danger-row">
+                    <div>
+                      <div className="settings-danger-title">Pause All Payroll</div>
+                      <div className="settings-danger-copy">Temporarily halt all automated salary disbursements.</div>
+                    </div>
+                    <button className="btn btn-danger btn-sm" disabled>
+                      Pause Payroll
+                    </button>
+                  </div>
+                  <div className="settings-danger-row">
+                    <div>
+                      <div className="settings-danger-title">Disable AI Agent</div>
+                      <div className="settings-danger-copy">Stop autonomous lending and treasury actions immediately.</div>
+                    </div>
+                    <button className="btn btn-danger btn-sm" disabled>
+                      Disable Agent
+                    </button>
+                  </div>
+                  <div className="settings-danger-row">
+                    <div>
+                      <div className="settings-danger-title">Close Account</div>
+                      <div className="settings-danger-copy">Permanently close the FlowPay organization account.</div>
+                    </div>
+                    <button className="btn btn-danger btn-sm" disabled>
+                      Close Account
+                    </button>
+                  </div>
+                </div>
+              </SettingsSection>
             </div>
 
             <div className="settings-column">
@@ -925,42 +962,6 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <SettingsSection
-            eyebrow="Danger Zone"
-            title="Irreversible Controls"
-            subtitle="These actions stay visible for completeness, but remain protected and disabled in the current build."
-            tone="danger"
-          >
-            <div className="settings-danger-list">
-              <div className="settings-danger-row">
-                <div>
-                  <div className="settings-danger-title">Pause All Payroll</div>
-                  <div className="settings-danger-copy">Temporarily halt all automated salary disbursements.</div>
-                </div>
-                <button className="btn btn-danger btn-sm" disabled>
-                  Pause Payroll
-                </button>
-              </div>
-              <div className="settings-danger-row">
-                <div>
-                  <div className="settings-danger-title">Disable AI Agent</div>
-                  <div className="settings-danger-copy">Stop autonomous lending and treasury actions immediately.</div>
-                </div>
-                <button className="btn btn-danger btn-sm" disabled>
-                  Disable Agent
-                </button>
-              </div>
-              <div className="settings-danger-row">
-                <div>
-                  <div className="settings-danger-title">Close Account</div>
-                  <div className="settings-danger-copy">Permanently close the FlowPay organization account.</div>
-                </div>
-                <button className="btn btn-danger btn-sm" disabled>
-                  Close Account
-                </button>
-              </div>
-            </div>
-          </SettingsSection>
         </>
       )}
     </div>

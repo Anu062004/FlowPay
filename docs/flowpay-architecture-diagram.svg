@@ -1,0 +1,257 @@
+<svg width="1600" height="960" viewBox="0 0 1600 960" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="960" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FAFBFD"/>
+      <stop offset="1" stop-color="#F3F6FA"/>
+    </linearGradient>
+    <linearGradient id="frontend" x1="230" y1="135" x2="470" y2="525" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2F80ED"/>
+      <stop offset="1" stop-color="#2B61C8"/>
+    </linearGradient>
+    <linearGradient id="backend" x1="550" y1="135" x2="820" y2="755" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38A169"/>
+      <stop offset="1" stop-color="#2F855A"/>
+    </linearGradient>
+    <linearGradient id="wdk" x1="1085" y1="305" x2="1260" y2="405" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F6AD55"/>
+      <stop offset="1" stop-color="#DD6B20"/>
+    </linearGradient>
+    <linearGradient id="chain" x1="1360" y1="135" x2="1560" y2="525" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4A5568"/>
+      <stop offset="1" stop-color="#2D3748"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="1150" y1="740" x2="1320" y2="890" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#805AD5"/>
+      <stop offset="1" stop-color="#6B46C1"/>
+    </linearGradient>
+    <filter id="shadow" x="-40" y="-40" width="1680" height="1040" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#1A202C" flood-opacity="0.08"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0L10 5L0 10V0Z" fill="#718096"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0L10 5L0 10V0Z" fill="#C53030"/>
+    </marker>
+    <style>
+      .title { font: 700 28px 'Segoe UI', Arial, sans-serif; fill: #1A202C; }
+      .section { font: 700 16px 'Segoe UI', Arial, sans-serif; fill: #2D3748; }
+      .panel-title { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: #FFFFFF; }
+      .box-title { font: 600 14px 'Segoe UI', Arial, sans-serif; fill: #1A202C; }
+      .box-title-light { font: 600 14px 'Segoe UI', Arial, sans-serif; fill: #FFFFFF; }
+      .small { font: 600 12px 'Segoe UI', Arial, sans-serif; fill: #2D3748; }
+      .small-light { font: 600 12px 'Segoe UI', Arial, sans-serif; fill: #FFFFFF; }
+      .body { font: 500 11px 'Segoe UI', Arial, sans-serif; fill: #4A5568; }
+      .body-light { font: 500 11px 'Segoe UI', Arial, sans-serif; fill: #EDF2F7; }
+      .callout { font: 700 12px 'Segoe UI', Arial, sans-serif; fill: #C53030; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="960" rx="28" fill="url(#bg)"/>
+
+  <g filter="url(#shadow)">
+    <text x="28" y="52" class="title">Current-state of FlowPay, Fintech Product</text>
+
+    <text x="70" y="120" class="section">Actors</text>
+    <text x="275" y="120" class="section">Frontend layer</text>
+    <text x="565" y="120" class="section">Backend Control Plane</text>
+    <text x="930" y="450" class="section">Data and Execution Services</text>
+    <text x="1335" y="120" class="section">Blockchain and protocol layer</text>
+
+    <rect x="40" y="185" width="130" height="72" rx="16" fill="#FFFFFF" stroke="#718096" stroke-width="2"/>
+    <text x="105" y="228" text-anchor="middle" class="box-title">Employer</text>
+
+    <rect x="40" y="285" width="130" height="72" rx="16" fill="#FFFFFF" stroke="#718096" stroke-width="2"/>
+    <text x="105" y="328" text-anchor="middle" class="box-title">Employee</text>
+
+    <rect x="40" y="595" width="130" height="92" rx="16" fill="#FFFFFF" stroke="#718096" stroke-width="2"/>
+    <text x="105" y="635" text-anchor="middle" class="box-title">Admin /</text>
+    <text x="105" y="656" text-anchor="middle" class="box-title">Operator</text>
+
+    <rect x="40" y="715" width="130" height="92" rx="16" fill="#FFFFFF" stroke="#718096" stroke-width="2"/>
+    <text x="105" y="755" text-anchor="middle" class="box-title">OpenClaw</text>
+    <text x="105" y="776" text-anchor="middle" class="box-title">Worker</text>
+
+    <rect x="230" y="135" width="240" height="390" rx="18" fill="url(#frontend)" stroke="#2556B0" stroke-width="2"/>
+    <text x="350" y="168" text-anchor="middle" class="panel-title">Next.js Frontend</text>
+
+    <rect x="250" y="185" width="200" height="48" rx="12" fill="#F7FAFC" stroke="#CBD5E0" stroke-width="1.5"/>
+    <text x="350" y="214" text-anchor="middle" class="box-title">Marketing Site</text>
+
+    <rect x="250" y="245" width="200" height="48" rx="12" fill="#F7FAFC" stroke="#CBD5E0" stroke-width="1.5"/>
+    <text x="350" y="274" text-anchor="middle" class="box-title">Employer Workspace</text>
+
+    <rect x="250" y="305" width="200" height="48" rx="12" fill="#F7FAFC" stroke="#CBD5E0" stroke-width="1.5"/>
+    <text x="350" y="334" text-anchor="middle" class="box-title">Employee Workspace</text>
+
+    <rect x="250" y="365" width="200" height="58" rx="12" fill="#F7FAFC" stroke="#CBD5E0" stroke-width="1.5"/>
+    <text x="350" y="392" text-anchor="middle" class="box-title">OpenClaw</text>
+    <text x="350" y="412" text-anchor="middle" class="box-title">Command Deck</text>
+
+    <rect x="250" y="437" width="200" height="70" rx="12" fill="#E6EEF9" stroke="#CBD5E0" stroke-width="1.5"/>
+    <text x="350" y="465" text-anchor="middle" class="box-title">Next Admin</text>
+    <text x="350" y="485" text-anchor="middle" class="box-title">Proxy Routes</text>
+
+    <rect x="550" y="135" width="270" height="640" rx="18" fill="url(#backend)" stroke="#2F6E4E" stroke-width="2"/>
+    <text x="685" y="168" text-anchor="middle" class="panel-title">Express Backend API</text>
+
+    <rect x="575" y="185" width="220" height="52" rx="12" fill="#F0FFF4" stroke="#C6F6D5" stroke-width="1.5"/>
+    <text x="685" y="207" text-anchor="middle" class="box-title">Auth and Session</text>
+    <text x="685" y="225" text-anchor="middle" class="box-title">Service</text>
+
+    <rect x="575" y="247" width="220" height="60" rx="12" fill="#F0FFF4" stroke="#C6F6D5" stroke-width="1.5"/>
+    <text x="685" y="271" text-anchor="middle" class="box-title">Company and Employee</text>
+    <text x="685" y="291" text-anchor="middle" class="box-title">Service</text>
+
+    <rect x="575" y="317" width="220" height="52" rx="12" fill="#F0FFF4" stroke="#C6F6D5" stroke-width="1.5"/>
+    <text x="685" y="348" text-anchor="middle" class="box-title">Treasury Service</text>
+
+    <rect x="575" y="379" width="220" height="52" rx="12" fill="#F0FFF4" stroke="#C6F6D5" stroke-width="1.5"/>
+    <text x="685" y="410" text-anchor="middle" class="box-title">Payroll Service</text>
+
+    <rect x="575" y="441" width="220" height="52" rx="12" fill="#F0FFF4" stroke="#C6F6D5" stroke-width="1.5"/>
+    <text x="685" y="472" text-anchor="middle" class="box-title">Loan Service</text>
+
+    <rect x="575" y="503" width="220" height="52" rx="12" fill="#F0FFF4" stroke="#C6F6D5" stroke-width="1.5"/>
+    <text x="685" y="534" text-anchor="middle" class="box-title">Investment Service</text>
+
+    <rect x="575" y="565" width="220" height="52" rx="12" fill="#F0FFF4" stroke="#C6F6D5" stroke-width="1.5"/>
+    <text x="685" y="596" text-anchor="middle" class="box-title">Policy Engine</text>
+
+    <rect x="575" y="627" width="220" height="62" rx="12" fill="#F0FFF4" stroke="#C6F6D5" stroke-width="1.5"/>
+    <text x="685" y="651" text-anchor="middle" class="box-title">Ops Tasks and</text>
+    <text x="685" y="671" text-anchor="middle" class="box-title">Approvals</text>
+
+    <rect x="575" y="699" width="220" height="52" rx="12" fill="#F0FFF4" stroke="#C6F6D5" stroke-width="1.5"/>
+    <text x="685" y="730" text-anchor="middle" class="box-title">Agent Log Service</text>
+
+    <rect x="575" y="761" width="220" height="62" rx="12" fill="#F0FFF4" stroke="#C6F6D5" stroke-width="1.5"/>
+    <text x="685" y="785" text-anchor="middle" class="box-title">Schedulers and</text>
+    <text x="685" y="805" text-anchor="middle" class="box-title">Deposit Watchers</text>
+
+    <rect x="885" y="500" width="255" height="265" rx="18" fill="#E2E8F0" stroke="#A0AEC0" stroke-width="2"/>
+    <text x="1012.5" y="540" text-anchor="middle" class="box-title">PostgreSQL</text>
+    <text x="905" y="572" class="small">companies</text>
+    <text x="905" y="594" class="small">employees</text>
+    <text x="905" y="616" class="small">wallets</text>
+    <text x="905" y="638" class="small">loans</text>
+    <text x="905" y="660" class="small">transactions</text>
+    <text x="905" y="682" class="small">treasury_allocations</text>
+    <text x="905" y="704" class="small">payroll_disbursements</text>
+    <text x="905" y="726" class="small">company_settings</text>
+    <text x="905" y="748" class="small">ops_tasks</text>
+    <text x="1020" y="726" class="small">ops_approvals</text>
+    <text x="1020" y="748" class="small">agent_logs</text>
+
+    <rect x="1085" y="305" width="180" height="100" rx="18" fill="url(#wdk)" stroke="#C05621" stroke-width="2"/>
+    <text x="1175" y="345" text-anchor="middle" class="box-title-light">Tether WDK</text>
+    <text x="1175" y="367" text-anchor="middle" class="box-title-light">Wallet Execution</text>
+
+    <rect x="1160" y="520" width="170" height="84" rx="16" fill="#EDF2F7" stroke="#A0AEC0" stroke-width="2"/>
+    <text x="1245" y="554" text-anchor="middle" class="box-title">RPC Providers</text>
+    <text x="1245" y="575" text-anchor="middle" class="box-title">and Indexer</text>
+
+    <rect x="1160" y="620" width="170" height="64" rx="16" fill="#EDF2F7" stroke="#A0AEC0" stroke-width="2"/>
+    <text x="1245" y="658" text-anchor="middle" class="box-title">Email / Gmail</text>
+
+    <rect x="1160" y="700" width="170" height="64" rx="16" fill="url(#purple)" stroke="#6B46C1" stroke-width="2"/>
+    <text x="1245" y="738" text-anchor="middle" class="box-title-light">LLM Providers</text>
+
+    <rect x="1160" y="780" width="170" height="64" rx="16" fill="url(#purple)" stroke="#6B46C1" stroke-width="2"/>
+    <text x="1245" y="818" text-anchor="middle" class="box-title-light">TradingAgents</text>
+
+    <rect x="1360" y="135" width="200" height="420" rx="18" fill="url(#chain)" stroke="#1A202C" stroke-width="2"/>
+    <text x="1460" y="168" text-anchor="middle" class="panel-title">Ethereum / Sepolia</text>
+
+    <rect x="1380" y="190" width="160" height="58" rx="12" fill="#EDF2F7" fill-opacity="0.95"/>
+    <text x="1460" y="225" text-anchor="middle" class="box-title">FlowPayCore</text>
+
+    <rect x="1380" y="260" width="160" height="58" rx="12" fill="#EDF2F7" fill-opacity="0.95"/>
+    <text x="1460" y="295" text-anchor="middle" class="box-title">FlowPayLoan</text>
+
+    <rect x="1380" y="330" width="160" height="58" rx="12" fill="#EDF2F7" fill-opacity="0.95"/>
+    <text x="1460" y="365" text-anchor="middle" class="box-title">FlowPayInvestment</text>
+
+    <rect x="1380" y="400" width="160" height="58" rx="12" fill="#EDF2F7" fill-opacity="0.95"/>
+    <text x="1460" y="435" text-anchor="middle" class="box-title">ScoreTierVerifier</text>
+
+    <rect x="1380" y="470" width="160" height="58" rx="12" fill="#EDF2F7" fill-opacity="0.95"/>
+    <text x="1460" y="505" text-anchor="middle" class="box-title">Aave / Yearn / Pendle</text>
+
+    <rect x="245" y="560" width="205" height="44" rx="12" fill="#F8FAFC" stroke="#A0AEC0" stroke-width="1.5"/>
+    <text x="347.5" y="587" text-anchor="middle" class="box-title">Ops Tasks</text>
+
+    <rect x="245" y="614" width="205" height="44" rx="12" fill="#F8FAFC" stroke="#A0AEC0" stroke-width="1.5"/>
+    <text x="347.5" y="641" text-anchor="middle" class="box-title">Approvals</text>
+
+    <rect x="245" y="668" width="205" height="44" rx="12" fill="#F8FAFC" stroke="#A0AEC0" stroke-width="1.5"/>
+    <text x="347.5" y="695" text-anchor="middle" class="box-title">Automation</text>
+
+    <rect x="245" y="722" width="205" height="44" rx="12" fill="#F8FAFC" stroke="#A0AEC0" stroke-width="1.5"/>
+    <text x="347.5" y="749" text-anchor="middle" class="box-title">Orchestration</text>
+
+    <path d="M170 221C205 221 198 245 230 245" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <path d="M170 321C205 321 198 305 230 305" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <path d="M470 330H548" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="510" y="310" text-anchor="middle" class="small">Calls</text>
+    <text x="510" y="327" text-anchor="middle" class="small">cookie-based</text>
+    <text x="510" y="344" text-anchor="middle" class="small">sessions</text>
+
+    <path d="M450 582H548" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <path d="M450 636H548" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <path d="M450 690H548" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <path d="M450 744H548" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <path d="M170 640C205 640 208 582 245 582" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <path d="M170 640C205 640 208 636 245 636" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <path d="M170 640C205 640 208 690 245 690" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <path d="M170 640C205 640 208 744 245 744" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <path d="M170 761C300 761 390 761 548 761" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="330" y="790" text-anchor="middle" class="body">polls pending tasks and approvals from the backend</text>
+
+    <path d="M820 255H1010" stroke="#718096" stroke-width="2.5"/>
+    <text x="925" y="236" text-anchor="middle" class="small">Loan</text>
+    <text x="925" y="252" text-anchor="middle" class="body">eligibility and score-tier proof verification</text>
+    <path d="M1010 255H1378" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <path d="M1378 305H1010" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="1188" y="287" text-anchor="middle" class="body">loan contract sync</text>
+
+    <path d="M796 343H1083" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="940" y="325" text-anchor="middle" class="small">policy-approved</text>
+    <text x="940" y="342" text-anchor="middle" class="small">wallet actions</text>
+
+    <path d="M820 490C850 490 850 540 883 540" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="850" y="558" text-anchor="middle" class="small">System</text>
+    <text x="850" y="575" text-anchor="middle" class="small">of Record</text>
+
+    <path d="M1175 405V518" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <text x="1230" y="446" class="small">Executes transfers and</text>
+    <text x="1210" y="463" class="small">contract transactions</text>
+
+    <path d="M1265 355C1320 355 1320 355 1360 355" stroke="#718096" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+    <path d="M140 472C176 472 182 472 250 472" stroke="#C53030" stroke-width="3" marker-end="url(#arrow-red)"/>
+    <text x="38" y="430" class="callout">Frontend admin</text>
+    <text x="38" y="447" class="callout">proxy exposes</text>
+    <text x="38" y="464" class="callout">master-key-backed</text>
+    <text x="38" y="481" class="callout">admin capabilities.</text>
+
+    <path d="M1330 562C1360 562 1360 562 1388 562" stroke="#C53030" stroke-width="3" marker-end="url(#arrow-red)"/>
+    <text x="1338" y="620" class="callout">Database state and wallet side</text>
+    <text x="1338" y="637" class="callout">effects are not coordinated by</text>
+    <text x="1338" y="654" class="callout">a durable workflow or outbox.</text>
+
+    <path d="M1330 662C1360 662 1360 470 1388 470" stroke="#C53030" stroke-width="3" marker-end="url(#arrow-red)"/>
+    <text x="1338" y="718" class="callout">Smart contract layer is</text>
+    <text x="1338" y="735" class="callout">effectively single-tenant while</text>
+    <text x="1338" y="752" class="callout">the app is multi-company.</text>
+
+    <path d="M1330 770C1360 770 1360 744 1330 744" stroke="#C53030" stroke-width="3"/>
+    <path d="M1330 770C1350 770 1350 720 1318 720" stroke="#C53030" stroke-width="3" marker-end="url(#arrow-red)"/>
+    <text x="1338" y="812" class="callout">Database schema migration</text>
+    <text x="1338" y="829" class="callout">happens during backend</text>
+    <text x="1338" y="846" class="callout">startup.</text>
+  </g>
+</svg>

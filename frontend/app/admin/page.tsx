@@ -159,6 +159,56 @@ function formatJsonBlock(value: unknown) {
   }
 }
 
+function DeckSectionHeader({
+  eyebrow,
+  title,
+  subtitle,
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="admin-section-head">
+      <div className="admin-section-kicker">{eyebrow}</div>
+      <h2 className="admin-section-title">{title}</h2>
+      <p className="admin-section-subtitle">{subtitle}</p>
+    </div>
+  );
+}
+
+function FoldCard({
+  title,
+  subtitle,
+  count,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  count?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="deck-fold-card" open={defaultOpen ? true : undefined}>
+      <summary className="deck-fold-summary">
+        <div className="deck-fold-summary-copy">
+          <div className="card-title">{title}</div>
+          <div className="card-subtitle">{subtitle}</div>
+        </div>
+        <div className="deck-fold-summary-meta">
+          {count ? <Badge variant="neutral">{count}</Badge> : null}
+          <span className="deck-fold-toggle">
+            <Icon d={Icons.chevronDown} size={14} />
+          </span>
+        </div>
+      </summary>
+      <div className="deck-fold-content">{children}</div>
+    </details>
+  );
+}
+
 export default function AdminControlPage() {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
@@ -550,176 +600,189 @@ export default function AdminControlPage() {
         </div>
       )}
 
-      <div className="grid-4">
-        <div className="metric-card">
-          <div className="metric-card-header">
-            <div className="metric-card-label">Backend Health</div>
-            <div className="metric-card-icon icon-bg-success">
-              <Icon d="M9 12l2 2 4-4" size={16} />
-            </div>
-          </div>
-          <div className="metric-card-value monospace">{health?.status ?? "N/A"}</div>
-          <div className="metric-card-change neutral">API ping status</div>
-        </div>
-
-        <div className="metric-card">
-          <div className="metric-card-header">
-            <div className="metric-card-label">Open Tasks</div>
-            <div className="metric-card-icon icon-bg-warning">
-              <Icon d="M12 8v4l3 3" size={16} />
-            </div>
-          </div>
-          <div className="metric-card-value font-num">{pendingCount}</div>
-          <div className="metric-card-change neutral">Pending approvals</div>
-        </div>
-
-        <div className="metric-card">
-          <div className="metric-card-header">
-            <div className="metric-card-label">Sent Queue</div>
-            <div className="metric-card-icon icon-bg-info">
-              <Icon d="M22 6l-10 7L2 6" size={16} />
-            </div>
-          </div>
-          <div className="metric-card-value font-num">{sentCount}</div>
-          <div className="metric-card-change neutral">Awaiting replies</div>
-        </div>
-
-        <div className="metric-card">
-          <div className="metric-card-header">
-            <div className="metric-card-label">Approved</div>
-            <div className="metric-card-icon icon-bg-emerald">
-              <Icon d={Icons.check} size={16} />
-            </div>
-          </div>
-          <div className="metric-card-value font-num">{approvedCount}</div>
-          <div className="metric-card-change neutral">Completed approvals</div>
-        </div>
-      </div>
-
-      <div className="grid-2">
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <div className="card-title">Create Ops Task</div>
-              <div className="card-subtitle">Manually queue tasks for OpenClaw to process.</div>
-            </div>
-          </div>
-          <div className="card-body stack-sm">
-            <div className="row-wrap">
-              <div style={{ minWidth: 180, flex: 1 }}>
-                <div className="text-xs text-secondary">Task Type</div>
-                <select
-                  className="form-select"
-                  value={createForm.type}
-                  onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })}
-                >
-                  {TASK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div style={{ minWidth: 180, flex: 1 }}>
-                <div className="text-xs text-secondary">Approval Kind</div>
-                <input
-                  className="form-input"
-                  placeholder="payroll | loan | contract | ..."
-                  value={createForm.approvalKind}
-                  onChange={(e) => setCreateForm({ ...createForm, approvalKind: e.target.value })}
-                />
+      <section className="admin-section">
+        <DeckSectionHeader
+          eyebrow="Control Posture"
+          title="Deck Telemetry"
+          subtitle="Key runtime counts stay in a single aligned strip so the command deck reads like an operator console."
+        />
+        <div className="grid-4">
+          <div className="metric-card">
+            <div className="metric-card-header">
+              <div className="metric-card-label">Backend Health</div>
+              <div className="metric-card-icon icon-bg-success">
+                <Icon d="M9 12l2 2 4-4" size={16} />
               </div>
             </div>
-            <div className="row-wrap">
-              <div style={{ minWidth: 220, flex: 1 }}>
-                <div className="text-xs text-secondary">Recipient Email</div>
-                <input
-                  className="form-input"
-                  placeholder="admin@example.com"
-                  value={createForm.recipientEmail}
-                  onChange={(e) => setCreateForm({ ...createForm, recipientEmail: e.target.value })}
-                />
-              </div>
-              <div style={{ minWidth: 220, flex: 1 }}>
-                <div className="text-xs text-secondary">Subject</div>
-                <input
-                  className="form-input"
-                  placeholder="Optional subject"
-                  value={createForm.subject}
-                  onChange={(e) => setCreateForm({ ...createForm, subject: e.target.value })}
-                />
+            <div className="metric-card-value monospace">{health?.status ?? "N/A"}</div>
+            <div className="metric-card-change neutral">API ping status</div>
+          </div>
+
+          <div className="metric-card">
+            <div className="metric-card-header">
+              <div className="metric-card-label">Open Tasks</div>
+              <div className="metric-card-icon icon-bg-warning">
+                <Icon d="M12 8v4l3 3" size={16} />
               </div>
             </div>
-            <div>
-              <div className="text-xs text-secondary">Payload (JSON)</div>
-              <textarea
-                className="form-textarea"
-                rows={6}
-                value={createForm.payload}
-                onChange={(e) => setCreateForm({ ...createForm, payload: e.target.value })}
-              />
+            <div className="metric-card-value font-num">{pendingCount}</div>
+            <div className="metric-card-change neutral">Pending approvals</div>
+          </div>
+
+          <div className="metric-card">
+            <div className="metric-card-header">
+              <div className="metric-card-label">Sent Queue</div>
+              <div className="metric-card-icon icon-bg-info">
+                <Icon d="M22 6l-10 7L2 6" size={16} />
+              </div>
             </div>
-            <div className="row">
-              <button className="btn btn-primary" onClick={createOpsTask}>
-                <Icon d={Icons.bolt} size={14} />
-                Queue Task
-              </button>
+            <div className="metric-card-value font-num">{sentCount}</div>
+            <div className="metric-card-change neutral">Awaiting replies</div>
+          </div>
+
+          <div className="metric-card">
+            <div className="metric-card-header">
+              <div className="metric-card-label">Approved</div>
+              <div className="metric-card-icon icon-bg-emerald">
+                <Icon d={Icons.check} size={16} />
+              </div>
             </div>
+            <div className="metric-card-value font-num">{approvedCount}</div>
+            <div className="metric-card-change neutral">Completed approvals</div>
           </div>
         </div>
+      </section>
 
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <div className="card-title">Runtime Snapshot</div>
-              <div className="card-subtitle">Live EC2 state, workflow health, and last wallet execution.</div>
-            </div>
-          </div>
-          <div className="card-body stack-sm">
-            <div className="row-between">
-              <span className="text-sm text-secondary">Backend Health</span>
-              <span className="text-sm font-num">{health?.status ?? "N/A"}</span>
-            </div>
-            <div className="row-between">
-              <span className="text-sm text-secondary">Queue Pending</span>
-              <span className="text-sm font-num">{pendingCount}</span>
-            </div>
-            <div className="row-between">
-              <span className="text-sm text-secondary">Approvals Pending</span>
-              <span className="text-sm font-num">{pendingApprovalCount}</span>
-            </div>
-            <div className="row-between">
-              <span className="text-sm text-secondary">Policy Reviews</span>
-              <span className="text-sm font-num">{policyReviewCount}</span>
-            </div>
-            <div className="row-between">
-              <span className="text-sm text-secondary">Last Agent Log</span>
-              <span className="text-sm">{formatDate(lastAgentLog)}</span>
-            </div>
-            <div className="row-between">
-              <span className="text-sm text-secondary">Tracked Workflows</span>
-              <span className="text-sm font-num">{recentWorkflows.length}</span>
-            </div>
-            <div
-              style={{
-                padding: 14,
-                borderRadius: 16,
-                border: "1px solid var(--border-subtle)",
-                background: "var(--bg-muted)"
-              }}
-            >
-              <div className="fw-medium text-sm">Last WDK Execution</div>
-              <div className="text-xs text-secondary mt-1">
-                {lastExecutionLog ? `${lastExecutionLog.action_taken} | ${lastExecutionLog.execution_status ?? "pending"}` : "No wallet execution logged yet."}
+      <section className="admin-section">
+        <DeckSectionHeader
+          eyebrow="Operator Controls"
+          title="Runbooks and Runtime"
+          subtitle="Primary actions, manual ops task creation, and runtime health are grouped into balanced cards with fixed spacing."
+        />
+        <div className="grid-2 admin-grid-stretch">
+          <div className="card admin-panel-card">
+            <div className="card-header">
+              <div>
+                <div className="card-title">Create Ops Task</div>
+                <div className="card-subtitle">Manually queue tasks for OpenClaw to process.</div>
               </div>
-              {lastExecutionLog?.rationale ? (
-                <div className="text-xs text-secondary mt-2" style={{ wordBreak: "break-word" }}>
-                  {lastExecutionLog.rationale}
+            </div>
+            <div className="card-body stack-sm">
+              <div className="row-wrap">
+                <div style={{ minWidth: 180, flex: 1 }}>
+                  <div className="text-xs text-secondary">Task Type</div>
+                  <select
+                    className="form-select"
+                    value={createForm.type}
+                    onChange={(e) => setCreateForm({ ...createForm, type: e.target.value })}
+                  >
+                    {TASK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </div>
-              ) : null}
+                <div style={{ minWidth: 180, flex: 1 }}>
+                  <div className="text-xs text-secondary">Approval Kind</div>
+                  <input
+                    className="form-input"
+                    placeholder="payroll | loan | contract | ..."
+                    value={createForm.approvalKind}
+                    onChange={(e) => setCreateForm({ ...createForm, approvalKind: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="row-wrap">
+                <div style={{ minWidth: 220, flex: 1 }}>
+                  <div className="text-xs text-secondary">Recipient Email</div>
+                  <input
+                    className="form-input"
+                    placeholder="admin@example.com"
+                    value={createForm.recipientEmail}
+                    onChange={(e) => setCreateForm({ ...createForm, recipientEmail: e.target.value })}
+                  />
+                </div>
+                <div style={{ minWidth: 220, flex: 1 }}>
+                  <div className="text-xs text-secondary">Subject</div>
+                  <input
+                    className="form-input"
+                    placeholder="Optional subject"
+                    value={createForm.subject}
+                    onChange={(e) => setCreateForm({ ...createForm, subject: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-secondary">Payload (JSON)</div>
+                <textarea
+                  className="form-textarea"
+                  rows={6}
+                  value={createForm.payload}
+                  onChange={(e) => setCreateForm({ ...createForm, payload: e.target.value })}
+                />
+              </div>
+              <div className="row">
+                <button className="btn btn-primary" onClick={createOpsTask}>
+                  <Icon d={Icons.bolt} size={14} />
+                  Queue Task
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="card admin-panel-card">
+            <div className="card-header">
+              <div>
+                <div className="card-title">Runtime Snapshot</div>
+                <div className="card-subtitle">Live EC2 state, workflow health, and last wallet execution.</div>
+              </div>
+            </div>
+            <div className="card-body stack-sm">
+              <div className="row-between">
+                <span className="text-sm text-secondary">Backend Health</span>
+                <span className="text-sm font-num">{health?.status ?? "N/A"}</span>
+              </div>
+              <div className="row-between">
+                <span className="text-sm text-secondary">Queue Pending</span>
+                <span className="text-sm font-num">{pendingCount}</span>
+              </div>
+              <div className="row-between">
+                <span className="text-sm text-secondary">Approvals Pending</span>
+                <span className="text-sm font-num">{pendingApprovalCount}</span>
+              </div>
+              <div className="row-between">
+                <span className="text-sm text-secondary">Policy Reviews</span>
+                <span className="text-sm font-num">{policyReviewCount}</span>
+              </div>
+              <div className="row-between">
+                <span className="text-sm text-secondary">Last Agent Log</span>
+                <span className="text-sm">{formatDate(lastAgentLog)}</span>
+              </div>
+              <div className="row-between">
+                <span className="text-sm text-secondary">Tracked Workflows</span>
+                <span className="text-sm font-num">{recentWorkflows.length}</span>
+              </div>
+              <div className="admin-note-card">
+                <div className="fw-medium text-sm">Last WDK Execution</div>
+                <div className="text-xs text-secondary mt-1">
+                  {lastExecutionLog ? `${lastExecutionLog.action_taken} | ${lastExecutionLog.execution_status ?? "pending"}` : "No wallet execution logged yet."}
+                </div>
+                {lastExecutionLog?.rationale ? (
+                  <div className="text-xs text-secondary mt-2" style={{ wordBreak: "break-word" }}>
+                    {lastExecutionLog.rationale}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="grid-2">
-        <div className="card">
+      <section className="admin-section">
+        <DeckSectionHeader
+          eyebrow="System Map"
+          title="Architecture and Workflow State"
+          subtitle="Reference context and recent orchestration output stay separated from operator queues."
+        />
+        <div className="grid-2 admin-grid-stretch">
+        <div className="card admin-panel-card">
           <div className="card-header">
             <div>
               <div className="card-title">Architecture Slide</div>
@@ -727,56 +790,48 @@ export default function AdminControlPage() {
             </div>
           </div>
           <div className="card-body stack-sm">
-            <div style={{ padding: 14, borderRadius: 16, border: "1px solid var(--border-subtle)", background: "var(--bg-muted)" }}>
+            <div className="admin-note-card">
               <div className="fw-medium text-sm">1. OpenClaw reasoning on EC2</div>
               <div className="text-xs text-secondary mt-1">Runs strategy loops, launches the autonomous demo, and pushes intents into FlowPay.</div>
             </div>
-            <div style={{ padding: 14, borderRadius: 16, border: "1px solid var(--border-subtle)", background: "var(--bg-muted)" }}>
+            <div className="admin-note-card">
               <div className="fw-medium text-sm">2. FlowPay backend policy layer</div>
               <div className="text-xs text-secondary mt-1">Applies wallet permissions, max transfer limits, daily outflow caps, and review thresholds before execution.</div>
             </div>
-            <div style={{ padding: 14, borderRadius: 16, border: "1px solid var(--border-subtle)", background: "var(--bg-muted)" }}>
+            <div className="admin-note-card">
               <div className="fw-medium text-sm">3. WDK wallet execution</div>
               <div className="text-xs text-secondary mt-1">Treasury allocation, loan disbursal, payroll, and Aave actions are executed through the WDK-backed wallet layer.</div>
             </div>
-            <div style={{ padding: 14, borderRadius: 16, border: "1px solid var(--border-subtle)", background: "var(--bg-muted)" }}>
+            <div className="admin-note-card">
               <div className="fw-medium text-sm">4. On-chain settlement</div>
               <div className="text-xs text-secondary mt-1">ETH on Sepolia is used for the prototype today; the same control path can later switch to production asset rails.</div>
             </div>
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <div className="card-title">Workflow Tracker</div>
-              <div className="card-subtitle">Recent orchestration runs and their latest states.</div>
-            </div>
-          </div>
-          <div className="card-body stack-sm">
+        <FoldCard
+          title="Workflow Tracker"
+          subtitle="Recent orchestration runs and their latest states."
+          count={`${recentWorkflows.length} tracked`}
+          defaultOpen
+        >
+          <div className="deck-scroll-panel deck-scroll-panel-md stack-sm">
             {recentWorkflows.length === 0 ? (
               <div className="text-sm text-secondary">No orchestration workflows logged yet.</div>
             ) : recentWorkflows.map((workflow) => (
-              <div key={workflow.id} className="row-between" style={{ padding: "10px 0", borderBottom: "1px solid var(--border-subtle)" }}>
+              <div key={workflow.id} className="admin-scroll-item">
                 <div>
                   <div className="fw-medium text-sm">{workflow.name}</div>
                   <div className="text-xs text-secondary mt-1">{workflow.id}</div>
                 </div>
-                <div style={{ textAlign: "right" }}>
+                <div className="admin-scroll-item-meta">
                   <div><Badge variant={STATUS_BADGE[workflow.status] ?? "neutral"}>{workflow.status}</Badge></div>
-                  <div className="text-xs text-secondary mt-1">{workflow.stageCount} events • {formatDate(workflow.lastSeen)}</div>
+                  <div className="text-xs text-secondary mt-1">{workflow.stageCount} events | {formatDate(workflow.lastSeen)}</div>
                 </div>
               </div>
             ))}
             {lastWorkflow ? (
-              <div
-                style={{
-                  padding: 14,
-                  borderRadius: 16,
-                  border: "1px solid var(--border-subtle)",
-                  background: "var(--bg-muted)"
-                }}
-              >
+              <div className="admin-note-card">
                 <div className="fw-medium text-sm">Last Triggered Result</div>
                 <div className="text-xs text-secondary mt-1" style={{ wordBreak: "break-word" }}>
                   {JSON.stringify(lastWorkflow)}
@@ -784,20 +839,26 @@ export default function AdminControlPage() {
               </div>
             ) : null}
           </div>
+        </FoldCard>
         </div>
-      </div>
+      </section>
 
-      <div className="grid-2">
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <div className="card-title">Ops Tasks</div>
-              <div className="card-subtitle">Workflow tasks generated by the system.</div>
-            </div>
-            <div className="row">
+      <section className="admin-section">
+        <DeckSectionHeader
+          eyebrow="Operator Queues"
+          title="Expandable Data Panels"
+          subtitle="Long-form task and approval queues are moved into dropdown cards with internal scroll regions so the deck stays compact."
+        />
+        <div className="grid-2 admin-grid-stretch">
+        <FoldCard
+          title="Ops Tasks"
+          subtitle="Workflow tasks generated by the system."
+          count={`${tasks.length} tasks`}
+          defaultOpen
+        >
+          <div className="deck-panel-toolbar">
               <select
                 className="form-select"
-                style={{ minWidth: 140 }}
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
@@ -811,98 +872,105 @@ export default function AdminControlPage() {
               </select>
               <select
                 className="form-select"
-                style={{ minWidth: 160 }}
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
               >
                 <option value="all">all types</option>
                 {TASK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
+          </div>
+          <div className="deck-scroll-panel deck-scroll-panel-md">
+            <div className="data-table-wrapper deck-table-shell">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Recipient</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={4}>Loading...</td></tr>
+                  ) : tasks.length === 0 ? (
+                    <tr><td colSpan={4}>No tasks found.</td></tr>
+                  ) : tasks.map((task) => (
+                    <tr key={task.id}>
+                      <td className="text-xs">{task.type}</td>
+                      <td><Badge variant={STATUS_BADGE[task.status] ?? "neutral"}>{task.status}</Badge></td>
+                      <td className="text-xs">{task.recipient_email ?? "N/A"}</td>
+                      <td className="text-xs">{formatDate(task.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-          <div className="data-table-wrapper" style={{ border: "none", borderRadius: 0 }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Recipient</th>
-                  <th>Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={4}>Loading...</td></tr>
-                ) : tasks.length === 0 ? (
-                  <tr><td colSpan={4}>No tasks found.</td></tr>
-                ) : tasks.map((task) => (
-                  <tr key={task.id}>
-                    <td className="text-xs">{task.type}</td>
-                    <td><Badge variant={STATUS_BADGE[task.status] ?? "neutral"}>{task.status}</Badge></td>
-                    <td className="text-xs">{task.recipient_email ?? "N/A"}</td>
-                    <td className="text-xs">{formatDate(task.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        </FoldCard>
 
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <div className="card-title">Approvals</div>
-              <div className="card-subtitle">Manually approve or deny workflows.</div>
+        <FoldCard
+          title="Approvals"
+          subtitle="Manually approve or deny workflows."
+          count={`${approvals.length} approvals`}
+        >
+          <div className="deck-scroll-panel deck-scroll-panel-md">
+            <div className="data-table-wrapper deck-table-shell">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Requested</th>
+                    <th className="right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={4}>Loading...</td></tr>
+                  ) : approvals.length === 0 ? (
+                    <tr><td colSpan={4}>No approvals found.</td></tr>
+                  ) : approvals.map((approval) => (
+                    <tr key={approval.id}>
+                      <td className="text-xs">{approval.task_type ?? approval.kind}</td>
+                      <td><Badge variant={STATUS_BADGE[approval.status] ?? "neutral"}>{approval.status}</Badge></td>
+                      <td className="text-xs">{formatDate(approval.requested_at)}</td>
+                      <td className="right">
+                        {approval.status === "pending" ? (
+                          <div className="row" style={{ justifyContent: "flex-end" }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => decideApproval(approval.id, "deny")}>
+                              Deny
+                            </button>
+                            <button className="btn btn-primary btn-sm" onClick={() => decideApproval(approval.id, "approve")}>
+                              Approve
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-secondary">N/A</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-          <div className="data-table-wrapper" style={{ border: "none", borderRadius: 0 }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Requested</th>
-                  <th className="right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={4}>Loading...</td></tr>
-                ) : approvals.length === 0 ? (
-                  <tr><td colSpan={4}>No approvals found.</td></tr>
-                ) : approvals.map((approval) => (
-                  <tr key={approval.id}>
-                    <td className="text-xs">{approval.task_type ?? approval.kind}</td>
-                    <td><Badge variant={STATUS_BADGE[approval.status] ?? "neutral"}>{approval.status}</Badge></td>
-                    <td className="text-xs">{formatDate(approval.requested_at)}</td>
-                    <td className="right">
-                      {approval.status === "pending" ? (
-                        <div className="row" style={{ justifyContent: "flex-end" }}>
-                          <button className="btn btn-secondary btn-sm" onClick={() => decideApproval(approval.id, "deny")}>
-                            Deny
-                          </button>
-                          <button className="btn btn-primary btn-sm" onClick={() => decideApproval(approval.id, "approve")}>
-                            Approve
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-secondary">N/A</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        </FoldCard>
         </div>
-      </div>
+      </section>
 
-      <div className="card agent-log-card">
-        <div className="card-header agent-log-header">
-          <div>
-            <div className="card-title">Agent Activity Logs</div>
-            <div className="card-subtitle">Decision to policy validation to WDK execution audit trail.</div>
-          </div>
+      <section className="admin-section">
+        <DeckSectionHeader
+          eyebrow="Audit Trail"
+          title="Agent Activity Logs"
+          subtitle="Decision to policy validation to WDK execution audit entries are contained in a dropdown feed with scrollable detail panels."
+        />
+        <FoldCard
+          title="Agent Activity Logs"
+          subtitle="Decision to policy validation to WDK execution audit trail."
+          count={`${visibleLogs.length} visible`}
+          defaultOpen
+        >
           <div className="agent-log-controls">
             <label className="agent-log-control">
               <span>Stage</span>
@@ -941,9 +1009,7 @@ export default function AdminControlPage() {
               </select>
             </label>
           </div>
-        </div>
 
-        <div className="card-body stack-sm">
           <div className="agent-log-summary-bar">
             <div className="agent-log-summary-chip">
               <span className="agent-log-summary-label">Showing</span>
@@ -968,82 +1034,84 @@ export default function AdminControlPage() {
           ) : filteredLogs.length === 0 ? (
             <div className="agent-log-empty">No agent activity matches the current filters.</div>
           ) : (
-            <div className="agent-log-list">
-              {visibleLogs.map((log) => {
-                const policyStatus = log.policy_result?.status;
-                const workflowLabel = log.workflow_name ?? "General activity";
-                const workflowId = log.workflow_id ?? "No workflow id";
-                const stageLabel = log.stage ?? "workflow";
+            <div className="deck-scroll-panel deck-scroll-panel-lg">
+              <div className="agent-log-list">
+                {visibleLogs.map((log) => {
+                  const policyStatus = log.policy_result?.status;
+                  const workflowLabel = log.workflow_name ?? "General activity";
+                  const workflowId = log.workflow_id ?? "No workflow id";
+                  const stageLabel = log.stage ?? "workflow";
 
-                return (
-                  <details key={log.id} className="agent-log-entry">
-                    <summary className="agent-log-entry-summary">
-                      <div className="agent-log-main">
-                        <div className="agent-log-topline">
-                          <span className="text-xs text-secondary">{formatDate(log.timestamp)}</span>
-                          <Badge variant={STAGE_BADGE[stageLabel] ?? "neutral"}>{stageLabel}</Badge>
-                          <Badge variant="info">{log.agent_name}</Badge>
-                          {policyStatus ? (
-                            <Badge variant={POLICY_BADGE[policyStatus] ?? "neutral"}>{policyStatus}</Badge>
-                          ) : (
-                            <Badge variant="neutral">no policy</Badge>
-                          )}
+                  return (
+                    <details key={log.id} className="agent-log-entry">
+                      <summary className="agent-log-entry-summary">
+                        <div className="agent-log-main">
+                          <div className="agent-log-topline">
+                            <span className="text-xs text-secondary">{formatDate(log.timestamp)}</span>
+                            <Badge variant={STAGE_BADGE[stageLabel] ?? "neutral"}>{stageLabel}</Badge>
+                            <Badge variant="info">{log.agent_name}</Badge>
+                            {policyStatus ? (
+                              <Badge variant={POLICY_BADGE[policyStatus] ?? "neutral"}>{policyStatus}</Badge>
+                            ) : (
+                              <Badge variant="neutral">no policy</Badge>
+                            )}
+                          </div>
+                          <div className="agent-log-action">{log.action_taken}</div>
+                          <div className="agent-log-meta">
+                            <span>{workflowLabel}</span>
+                            <span>{workflowId}</span>
+                            {log.source ? <span>{log.source}</span> : null}
+                            {log.execution_status ? <span>{log.execution_status}</span> : null}
+                          </div>
                         </div>
-                        <div className="agent-log-action">{log.action_taken}</div>
-                        <div className="agent-log-meta">
-                          <span>{workflowLabel}</span>
-                          <span>{workflowId}</span>
-                          {log.source ? <span>{log.source}</span> : null}
-                          {log.execution_status ? <span>{log.execution_status}</span> : null}
+                        <span className="agent-log-expand">
+                          <span>Details</span>
+                          <span className="agent-log-expand-icon"><Icon d={Icons.chevronDown} size={14} /></span>
+                        </span>
+                      </summary>
+
+                      <div className="agent-log-detail-grid">
+                        <div className="agent-log-detail-card">
+                          <div className="agent-log-detail-label">Rationale</div>
+                          <p className="text-sm text-secondary">{log.rationale || "No rationale recorded."}</p>
                         </div>
-                      </div>
-                      <span className="agent-log-expand">
-                        <span>Details</span>
-                        <span className="agent-log-expand-icon"><Icon d={Icons.chevronDown} size={14} /></span>
-                      </span>
-                    </summary>
 
-                    <div className="agent-log-detail-grid">
-                      <div className="agent-log-detail-card">
-                        <div className="agent-log-detail-label">Rationale</div>
-                        <p className="text-sm text-secondary">{log.rationale || "No rationale recorded."}</p>
-                      </div>
+                        <div className="agent-log-detail-card">
+                          <div className="agent-log-detail-label">Policy Outcome</div>
+                          <p className="text-sm text-secondary">
+                            {policyStatus ? `Result: ${policyStatus}` : "No policy verdict recorded for this step."}
+                          </p>
+                          {log.policy_result?.reasons?.length ? (
+                            <div className="agent-log-reason-list">
+                              {log.policy_result.reasons.map((reason) => (
+                                <div key={reason} className="agent-log-reason-item">{reason}</div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
 
-                      <div className="agent-log-detail-card">
-                        <div className="agent-log-detail-label">Policy Outcome</div>
-                        <p className="text-sm text-secondary">
-                          {policyStatus ? `Result: ${policyStatus}` : "No policy verdict recorded for this step."}
-                        </p>
-                        {log.policy_result?.reasons?.length ? (
-                          <div className="agent-log-reason-list">
-                            {log.policy_result.reasons.map((reason) => (
-                              <div key={reason} className="agent-log-reason-item">{reason}</div>
-                            ))}
+                        {log.decision ? (
+                          <div className="agent-log-detail-card">
+                            <div className="agent-log-detail-label">Decision Payload</div>
+                            <pre className="agent-log-json">{formatJsonBlock(log.decision)}</pre>
+                          </div>
+                        ) : null}
+
+                        {log.metadata ? (
+                          <div className="agent-log-detail-card">
+                            <div className="agent-log-detail-label">Execution Metadata</div>
+                            <pre className="agent-log-json">{formatJsonBlock(log.metadata)}</pre>
                           </div>
                         ) : null}
                       </div>
-
-                      {log.decision ? (
-                        <div className="agent-log-detail-card">
-                          <div className="agent-log-detail-label">Decision Payload</div>
-                          <pre className="agent-log-json">{formatJsonBlock(log.decision)}</pre>
-                        </div>
-                      ) : null}
-
-                      {log.metadata ? (
-                        <div className="agent-log-detail-card">
-                          <div className="agent-log-detail-label">Execution Metadata</div>
-                          <pre className="agent-log-json">{formatJsonBlock(log.metadata)}</pre>
-                        </div>
-                      ) : null}
-                    </div>
-                  </details>
-                );
-              })}
+                    </details>
+                  );
+                })}
+              </div>
             </div>
           )}
-        </div>
-      </div>
+        </FoldCard>
+      </section>
     </div>
   );
 }

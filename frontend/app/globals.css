@@ -352,46 +352,56 @@ button, input, select, textarea {
   padding: var(--sp-4) var(--sp-3);
   border-top: 1px solid rgba(255,255,255,0.06);
   flex-shrink: 0;
-}
-
-.sidebar-user {
   display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background var(--transition-fast);
+  flex-direction: column;
+  gap: 2px;
 }
 
-.sidebar-user:hover {
-  background: rgba(255,255,255,0.06);
+.sidebar-footer-header {
+  padding: 0 var(--sp-3);
+  font-size: 10px;
+  font-weight: var(--fw-semi);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gray-600);
 }
 
-.sidebar-user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--primary-600), var(--accent-600));
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.sidebar-footer-name {
+  padding: var(--sp-2) var(--sp-3) 0;
   font-size: var(--text-sm);
   font-weight: var(--fw-semi);
-  color: #fff;
-  flex-shrink: 0;
-}
-
-.sidebar-user-name {
-  font-size: var(--text-sm);
-  font-weight: var(--fw-medium);
   color: var(--text-sidebar-active);
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
-.sidebar-user-role {
+.sidebar-footer-role {
+  padding: 0 var(--sp-3);
   font-size: var(--text-xs);
   color: var(--gray-500);
+}
+
+.sidebar-footer-meta {
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  font-size: var(--text-xs);
+  color: var(--text-sidebar);
+  font-family: var(--font-mono);
+  word-break: break-word;
+}
+
+.sidebar-footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: var(--sp-2);
+}
+
+.sidebar-link-danger {
+  color: #fca5a5;
+}
+
+.sidebar-link-danger:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
 }
 
 /* ── Main content ── */

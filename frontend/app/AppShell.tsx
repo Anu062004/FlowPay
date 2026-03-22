@@ -123,15 +123,6 @@ function getTitle(path: string): { section: string; page: string } {
   };
 }
 
-function initials(label: string) {
-  return label
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("") || "FP";
-}
-
 function shortAddress(address?: string | null) {
   if (!address) return null;
   if (address.length <= 18) return address;
@@ -340,24 +331,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="sidebar-logo-text">Flow<span>Pay</span></div>
         </div>
 
-        <div style={{ padding: "12px 12px 0" }}>
-          <div style={{
-            padding: 14,
-            borderRadius: 16,
-            background: "rgba(255,255,255,0.05)",
-            border: "1px solid rgba(255,255,255,0.06)"
-          }}>
-            <div style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#64748b", marginBottom: 8 }}>
-              Active Workspace
-            </div>
-            <div style={{ color: "#f8fafc", fontWeight: 700, fontSize: 14 }}>{activeRole}</div>
-            <div style={{ color: "#cbd5e1", fontSize: 12, marginTop: 4 }}>{activeName}</div>
-            {activeMeta ? (
-              <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 8, fontFamily: "var(--font-mono)" }}>{activeMeta}</div>
-            ) : null}
-          </div>
-        </div>
-
         <nav className="sidebar-nav">
           {navItems.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -371,21 +344,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="sidebar-user-avatar">{initials(activeName)}</div>
-            <div>
-              <div className="sidebar-user-name">{activeName}</div>
-              <div className="sidebar-user-role">{activeRole}</div>
-            </div>
+          <div className="sidebar-footer-header">Workspace</div>
+          <div className="sidebar-footer-name">{activeName}</div>
+          <div className="sidebar-footer-role">{activeRole}</div>
+          {activeMeta ? (
+            <div className="sidebar-footer-meta">{activeMeta}</div>
+          ) : null}
+          <div className="sidebar-footer-links">
+            <Link className="sidebar-link" href="/">
+              <span className="sidebar-link-icon"><Icon d={Icons.overview} size={16} /></span>
+              Back to Get In
+            </Link>
+            <button className="sidebar-link sidebar-link-danger" type="button" onClick={handleLogout}>
+              <span className="sidebar-link-icon"><Icon d={Icons.logout} size={16} /></span>
+              Leave Workspace
+            </button>
           </div>
-          <Link className="sidebar-link" href="/" style={{ marginTop: 8 }}>
-            <span className="sidebar-link-icon"><Icon d={Icons.overview} size={16} /></span>
-            Back to Get In
-          </Link>
-          <button className="sidebar-link" type="button" onClick={handleLogout} style={{ marginTop: 8 }}>
-            <span className="sidebar-link-icon"><Icon d={Icons.logout} size={16} /></span>
-            Leave Workspace
-          </button>
         </div>
       </aside>
 

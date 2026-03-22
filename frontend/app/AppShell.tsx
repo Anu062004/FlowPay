@@ -167,9 +167,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { section, page } = getTitle(pathname);
   const signInHref = `${employeeView ? "/login/employee" : "/login"}?next=${encodeURIComponent(pathname)}`;
 
-  const [ready, setReady] = useState(false);
-  const [companyCtx, setCompanyCtx] = useState<CompanyContext | null>(null);
-  const [employeeCtx, setEmployeeCtx] = useState<EmployeeContext | null>(null);
+  const [companyCtx, setCompanyCtx] = useState<CompanyContext | null>(() => loadCompanyContext());
+  const [employeeCtx, setEmployeeCtx] = useState<EmployeeContext | null>(() => loadEmployeeContext());
+  const [ready, setReady] = useState(() => employeeView ? loadEmployeeContext() !== null : loadCompanyContext() !== null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarReady, setSidebarReady] = useState(false);
 
@@ -187,9 +187,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function restoreWorkspace() {
-      setReady(false);
       let nextCompany = loadCompanyContext();
       let nextEmployee = loadEmployeeContext();
+      const hasRelevantContext = employeeView ? nextEmployee !== null : nextCompany !== null;
+
+      if (!hasRelevantContext) {
+        setReady(false);
+      }
+
+      if (!cancelled) {
+        setCompanyCtx(nextCompany);
+        setEmployeeCtx(nextEmployee);
+      }
 
       if (!employeeView) {
         const currentCompany = await fetchCurrentCompanySession().catch(() => null);

@@ -73,7 +73,7 @@ function EmployeeLoginInner() {
     event.preventDefault();
     const access = employeeAccess.trim();
     if (!access) {
-      setStatus({ type: "error", message: "Enter an employee ID or wallet address." });
+      setStatus({ type: "error", message: "Enter an employee ID, registered email, or wallet address." });
       return;
     }
     if (!employeeLoginPassword) {
@@ -168,18 +168,18 @@ function EmployeeLoginInner() {
               <div className="card-header">
                 <div>
                   <div className="card-title">Use Existing Employee Wallet</div>
-                  <div className="card-subtitle">Enter your employee ID or wallet address, then confirm with your password.</div>
+                  <div className="card-subtitle">Enter your employee ID, wallet address, or registered email, then confirm with your password.</div>
                 </div>
               </div>
               <div className="card-body">
                 <form className="stack" onSubmit={handleExistingEmployee}>
                   <div className="form-group">
-                    <label className="form-label">Employee ID or Wallet Address</label>
+                    <label className="form-label">Employee ID, Wallet Address, or Email</label>
                     <input
                       className="form-input font-mono"
                       value={employeeAccess}
                       onChange={(e) => setEmployeeAccess(e.target.value)}
-                      placeholder="UUID or 0x..."
+                      placeholder="UUID, 0x..., or jane@company.com"
                     />
                   </div>
                   <div className="form-group">
@@ -213,7 +213,7 @@ function EmployeeLoginInner() {
                 </form>
 
                 <div className="landing-auth-footer">
-                  Returning employees can use an employee ID or wallet address, but the password still gates access.
+                  Returning employees can use an employee ID, wallet address, or registered email, but the password still gates access.
                 </div>
               </div>
             </div>

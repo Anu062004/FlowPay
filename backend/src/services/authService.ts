@@ -12,6 +12,7 @@ const EMPLOYEE_SESSION_COOKIE = "flowpay_employee_session";
 const DEFAULT_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const RECOVERY_TOKEN_TTL_MS = 60 * 60 * 1000;
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 export type CompanyProfile = {
   id: string;
@@ -194,7 +195,7 @@ async function getCompanySessionTimeout(companyId?: string | null) {
 async function findCompanyByAccess(access: string) {
   const normalized = access.trim();
   if (!normalized) {
-    throw new ApiError(400, "Company ID or treasury wallet address is required");
+    throw new ApiError(400, "Company ID, registered email, or treasury wallet address is required");
   }
 
   const result = uuidRegex.test(normalized)
@@ -205,13 +206,21 @@ async function findCompanyByAccess(access: string) {
          WHERE c.id = $1`,
         [normalized]
       )
-    : await db.query(
-        `SELECT c.id, c.name, c.email, c.created_at, c.access_pin_hash, w.wallet_address AS treasury_address
-         FROM companies c
-         JOIN wallets w ON c.treasury_wallet_id = w.id
-         WHERE LOWER(w.wallet_address) = LOWER($1)`,
-        [normalized]
-      );
+    : emailRegex.test(normalized)
+      ? await db.query(
+          `SELECT c.id, c.name, c.email, c.created_at, c.access_pin_hash, w.wallet_address AS treasury_address
+           FROM companies c
+           LEFT JOIN wallets w ON c.treasury_wallet_id = w.id
+           WHERE LOWER(c.email) = LOWER($1)`,
+          [normalized]
+        )
+      : await db.query(
+          `SELECT c.id, c.name, c.email, c.created_at, c.access_pin_hash, w.wallet_address AS treasury_address
+           FROM companies c
+           JOIN wallets w ON c.treasury_wallet_id = w.id
+           WHERE LOWER(w.wallet_address) = LOWER($1)`,
+          [normalized]
+        );
 
   if ((result.rowCount ?? 0) === 0) {
     throw new ApiError(404, "Company access not found");
@@ -223,7 +232,7 @@ async function findCompanyByAccess(access: string) {
 async function findEmployeeByAccess(access: string) {
   const normalized = access.trim();
   if (!normalized) {
-    throw new ApiError(400, "Employee ID or wallet address is required");
+    throw new ApiError(400, "Employee ID, registered email, or wallet address is required");
   }
 
   const result = uuidRegex.test(normalized)
@@ -246,25 +255,45 @@ async function findEmployeeByAccess(access: string) {
          WHERE e.id = $1`,
         [normalized]
       )
-    : await db.query(
-        `SELECT
-           e.id,
-           e.full_name,
-           COALESCE(e.email, '') AS email,
-           e.salary,
-           e.credit_score,
-           e.status,
-           e.created_at,
-           e.password_hash,
-           e.company_id,
-           c.name AS company_name,
-           w.wallet_address
-         FROM employees e
-         JOIN wallets w ON e.wallet_id = w.id
-         LEFT JOIN companies c ON e.company_id = c.id
-         WHERE LOWER(w.wallet_address) = LOWER($1)`,
-        [normalized]
-      );
+    : emailRegex.test(normalized)
+      ? await db.query(
+          `SELECT
+             e.id,
+             e.full_name,
+             COALESCE(e.email, '') AS email,
+             e.salary,
+             e.credit_score,
+             e.status,
+             e.created_at,
+             e.password_hash,
+             e.company_id,
+             c.name AS company_name,
+             w.wallet_address
+           FROM employees e
+           LEFT JOIN wallets w ON e.wallet_id = w.id
+           LEFT JOIN companies c ON e.company_id = c.id
+           WHERE LOWER(COALESCE(e.email, '')) = LOWER($1)`,
+          [normalized]
+        )
+      : await db.query(
+          `SELECT
+             e.id,
+             e.full_name,
+             COALESCE(e.email, '') AS email,
+             e.salary,
+             e.credit_score,
+             e.status,
+             e.created_at,
+             e.password_hash,
+             e.company_id,
+             c.name AS company_name,
+             w.wallet_address
+           FROM employees e
+           JOIN wallets w ON e.wallet_id = w.id
+           LEFT JOIN companies c ON e.company_id = c.id
+           WHERE LOWER(w.wallet_address) = LOWER($1)`,
+          [normalized]
+        );
 
   if ((result.rowCount ?? 0) === 0) {
     throw new ApiError(404, "Employee access not found");
@@ -279,7 +308,9 @@ export async function authenticateCompany(input: {
   email?: string;
 }) {
   const company = await findCompanyByAccess(input.access);
-  const normalizedEmail = input.email?.trim().toLowerCase();
+  const normalizedEmail = (input.email ?? (emailRegex.test(input.access.trim()) ? input.access : undefined))
+    ?.trim()
+    .toLowerCase();
 
   if (!company.access_pin_hash) {
     if (!normalizedEmail || normalizedEmail !== company.email.trim().toLowerCase()) {
@@ -313,7 +344,9 @@ export async function authenticateEmployee(input: {
   }
 
   if (!employee.password_hash) {
-    const normalizedEmail = input.email?.trim().toLowerCase();
+    const normalizedEmail = (input.email ?? (emailRegex.test(input.access.trim()) ? input.access : undefined))
+      ?.trim()
+      .toLowerCase();
     if (!normalizedEmail || !employee.email || normalizedEmail !== employee.email.trim().toLowerCase()) {
       throw new ApiError(
         403,

@@ -184,6 +184,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!isDashboard) {
+      return;
+    }
+
     let cancelled = false;
 
     async function restoreWorkspace() {
@@ -244,7 +248,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [employeeView, pathname]);
+  }, [employeeView, isDashboard, pathname]);
 
   useEffect(() => {
     if (!sidebarReady || typeof window === "undefined") {

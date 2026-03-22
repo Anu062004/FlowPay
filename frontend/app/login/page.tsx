@@ -75,7 +75,7 @@ function EmployerLoginInner() {
     event.preventDefault();
     const access = companyAccess.trim();
     if (!access) {
-      setStatus({ type: "error", message: "Enter a company ID or treasury wallet address." });
+      setStatus({ type: "error", message: "Enter a company ID, registered email, or treasury wallet address." });
       return;
     }
     if (!companyLoginPin.trim()) {
@@ -172,18 +172,18 @@ function EmployerLoginInner() {
               <div className="card-header">
                 <div>
                   <div className="card-title">Use Existing Employer Wallet</div>
-                  <div className="card-subtitle">Enter your company ID or treasury wallet address, then confirm with your company PIN.</div>
+                  <div className="card-subtitle">Enter your company ID, treasury wallet address, or registered email, then confirm with your company PIN.</div>
                 </div>
               </div>
               <div className="card-body">
                 <form className="stack" onSubmit={handleExistingCompany}>
                   <div className="form-group">
-                    <label className="form-label">Company ID or Wallet Address</label>
+                    <label className="form-label">Company ID, Wallet Address, or Email</label>
                     <input
                       className="form-input font-mono"
                       value={companyAccess}
                       onChange={(e) => setCompanyAccess(e.target.value)}
-                      placeholder="UUID or 0x..."
+                      placeholder="UUID, 0x..., or finance@acme.com"
                     />
                   </div>
                   <div className="form-group">
@@ -217,7 +217,7 @@ function EmployerLoginInner() {
                 </form>
 
                 <div className="landing-auth-footer">
-                  Returning employers can use a company ID or treasury address, but the company PIN still gates access.
+                  Returning employers can use a company ID, treasury address, or registered email, but the company PIN still gates access.
                 </div>
               </div>
             </div>

@@ -88,7 +88,8 @@ export default function EmployeesPage() {
       });
       setShowAdd(false);
       setForm({ fullName: "", email: "", salary: "", creditScore: "" });
-      setActionMessage(`Invite sent to ${form.email}`);
+      setActionMessage(`Employee added for ${result.employee.email || form.email}. Activation link is ready.`);
+      setActionError(result.warnings?.map((warning) => warning.message).join(" ") ?? null);
       setInvitePreview({
         email: result.employee.email || form.email,
         activationUrl: result.activationUrl,

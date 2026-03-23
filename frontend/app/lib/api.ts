@@ -19,15 +19,6 @@ export class ApiFetchError extends Error {
   }
 }
 
-function clearStoredContexts() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.removeItem("flowpay_company");
-  window.localStorage.removeItem("flowpay_employee");
-}
-
 async function sessionFetch<T>(path: string): Promise<T | null> {
   const res = await fetch(`${BASE}${path}`, {
     cache: "no-store",
@@ -54,26 +45,6 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     ...init,
   });
   const data = await res.json();
-  if ((res.status === 401 || res.status === 403) && typeof window !== "undefined") {
-    const authEntryPaths = new Set([
-      "/companies/login",
-      "/companies/recover/request",
-      "/companies/recover/reset",
-      "/employees/login",
-      "/employees/recover/request",
-      "/employees/recover/reset",
-      "/companies/register",
-      "/employees/register-self",
-      "/employees/activate"
-    ]);
-
-    if (!authEntryPaths.has(path)) {
-      clearStoredContexts();
-      window.setTimeout(() => {
-        window.location.href = "/";
-      }, 0);
-    }
-  }
   if (!res.ok) {
     throw new ApiFetchError(data?.error ?? `API error ${res.status}`, res.status, data?.details);
   }
@@ -150,6 +121,17 @@ export type EmployeeWallet = {
   max_withdrawable: string;
   token_symbol: string;
   chain: string;
+};
+
+export type EmployeeAddResult = {
+  employee: Employee;
+  wallet: { wallet_address: string };
+  activationToken: string;
+  activationUrl: string;
+  warnings?: Array<{
+    code: string;
+    message: string;
+  }>;
 };
 
 export type WithdrawalResult = {
@@ -426,7 +408,7 @@ export const addEmployee = (body: {
   salary: number;
   creditScore?: number;
 }) =>
-  apiFetch<{ employee: Employee; activationToken: string; activationUrl: string }>("/employees/add", {
+  apiFetch<EmployeeAddResult>("/employees/add", {
     method: "POST",
     body: JSON.stringify(body),
   });

@@ -1,11 +1,13 @@
 import { ethers } from "ethers";
 import { env } from "../config/env.js";
-import { sendAdminTransaction } from "./wdkAdmin.js";
 import { formatAmount, parseAmount } from "../utils/amounts.js";
 import { getContractRpcProvider } from "./rpcService.js";
+import { getCompanyContractKey, sendCompanyManagedContractTransaction } from "./companyContractSignerService.js";
 
 const CORE_ABI = [
-  "function initializeEmployee(address employee, uint256 monthlySalary, uint8 employmentType) external",
+  "function registerCompanyActor(bytes32 companyId, address actor) external",
+  "function updateCompanyActor(bytes32 companyId, address newActor) external",
+  "function initializeEmployee(bytes32 companyId, address employee, uint256 monthlySalary, uint8 employmentType) external",
   "function executePayroll(address employee, uint256 amount) external",
   "function disburseLoan(address employee, uint256 amount) external",
   "function recordEMIRepaid(address employee) external",
@@ -14,8 +16,10 @@ const CORE_ABI = [
   "function getScore(address employee) external view returns (uint256)",
   "function getLoanTerms(address employee) external view returns (bool allowed, uint256 maxAmount, uint256 interestRatePct)",
   "function getEmployee(address employee) external view returns (uint256 score, uint256 monthlySalary, uint256 lastPayrollAt, uint256 activeLoans, bool initialized)",
-  "function allocate(uint256 payrollPct, uint256 lendingPct, uint256 investmentPct) external",
-  "function withdraw(address to, uint256 amount) external"
+  "function allocate(bytes32 companyId, uint256 payrollPct, uint256 lendingPct, uint256 investmentPct) external",
+  "function withdraw(bytes32 companyId, address to, uint256 amount) external",
+  "function canManageEmployee(address employee, address actor) external view returns (bool)",
+  "function getEmployeeCompany(address employee) external view returns (bytes32)"
 ];
 
 const LOAN_ABI = [
@@ -61,7 +65,13 @@ export async function getCoreEmployeeState(employeeAddress: string) {
   };
 }
 
+export async function getEmployeeCompanyKeyOnCore(employeeAddress: string) {
+  const contract = getCoreContract();
+  return contract.getEmployeeCompany(employeeAddress) as Promise<string>;
+}
+
 export async function initializeEmployeeOnCore(
+  companyId: string,
   employeeAddress: string,
   monthlySalaryEth: string | number,
   employmentType = 1
@@ -71,17 +81,19 @@ export async function initializeEmployeeOnCore(
     throw new Error("Employee salary must be greater than zero before on-chain initialization");
   }
 
-  await sendAdminTransaction(
-    env.CORE_CONTRACT_ADDRESS,
-    CORE_ABI,
-    "initializeEmployee",
-    [employeeAddress, monthlySalaryWei, employmentType]
-  );
+  await sendCompanyManagedContractTransaction({
+    companyId,
+    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    abi: CORE_ABI,
+    method: "initializeEmployee",
+    args: [getCompanyContractKey(companyId), employeeAddress, monthlySalaryWei, employmentType]
+  });
 
   return getCoreEmployeeState(employeeAddress);
 }
 
 export async function ensureEmployeeInitializedOnCore(
+  companyId: string,
   employeeAddress: string,
   monthlySalaryEth: string | number,
   employmentType = 1
@@ -91,7 +103,7 @@ export async function ensureEmployeeInitializedOnCore(
     return current;
   }
 
-  return initializeEmployeeOnCore(employeeAddress, monthlySalaryEth, employmentType);
+  return initializeEmployeeOnCore(companyId, employeeAddress, monthlySalaryEth, employmentType);
 }
 
 export async function getEmployeeCreditScoreOnCore(employeeAddress: string) {
@@ -103,11 +115,16 @@ export async function getEmployeeCreditScoreOnCore(employeeAddress: string) {
 export async function syncEmployeeCreditScoreOnCore(
   employeeAddress: string,
   monthlySalaryEth: string | number,
-  employmentType = 1
+  options: { companyId?: string; employmentType?: number } = {}
 ) {
   const monthlySalary = parseMonthlySalaryEth(monthlySalaryEth);
-  if (monthlySalary > 0) {
-    const state = await ensureEmployeeInitializedOnCore(employeeAddress, monthlySalary, employmentType);
+  if (monthlySalary > 0 && options.companyId) {
+    const state = await ensureEmployeeInitializedOnCore(
+      options.companyId,
+      employeeAddress,
+      monthlySalary,
+      options.employmentType ?? 1
+    );
     return state.score;
   }
 
@@ -130,46 +147,52 @@ export async function checkLoanEligibilityOnCore(employeeAddress: string) {
   };
 }
 
-// Payroll and loan cash still move through the company treasury wallet today.
-// We call the new core methods with a zero amount to preserve on-chain score/state updates
-// without introducing duplicate ETH transfers during this migration.
-export async function recordPayrollOnCore(employeeAddress: string): Promise<string> {
-  return sendAdminTransaction(
-    env.CORE_CONTRACT_ADDRESS,
-    CORE_ABI,
-    "executePayroll",
-    [employeeAddress, 0n]
-  );
+export async function recordPayrollOnCore(companyId: string, employeeAddress: string): Promise<string> {
+  const tx = await sendCompanyManagedContractTransaction({
+    companyId,
+    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    abi: CORE_ABI,
+    method: "executePayroll",
+    args: [employeeAddress, 0n]
+  });
+  return tx.txHash ?? "";
 }
 
-export async function recordLoanDisbursementOnCore(employeeAddress: string): Promise<string> {
-  return sendAdminTransaction(
-    env.CORE_CONTRACT_ADDRESS,
-    CORE_ABI,
-    "disburseLoan",
-    [employeeAddress, 0n]
-  );
+export async function recordLoanDisbursementOnCore(companyId: string, employeeAddress: string): Promise<string> {
+  const tx = await sendCompanyManagedContractTransaction({
+    companyId,
+    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    abi: CORE_ABI,
+    method: "disburseLoan",
+    args: [employeeAddress, 0n]
+  });
+  return tx.txHash ?? "";
 }
 
-export async function recordLoanClosureOnCore(employeeAddress: string): Promise<string> {
-  return sendAdminTransaction(
-    env.CORE_CONTRACT_ADDRESS,
-    CORE_ABI,
-    "recordLoanClosed",
-    [employeeAddress]
-  );
+export async function recordLoanClosureOnCore(companyId: string, employeeAddress: string): Promise<string> {
+  const tx = await sendCompanyManagedContractTransaction({
+    companyId,
+    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    abi: CORE_ABI,
+    method: "recordLoanClosed",
+    args: [employeeAddress]
+  });
+  return tx.txHash ?? "";
 }
 
-export async function recordEmiRepaidOnCore(employeeAddress: string): Promise<string> {
-  return sendAdminTransaction(
-    env.CORE_CONTRACT_ADDRESS,
-    CORE_ABI,
-    "recordEMIRepaid",
-    [employeeAddress]
-  );
+export async function recordEmiRepaidOnCore(companyId: string, employeeAddress: string): Promise<string> {
+  const tx = await sendCompanyManagedContractTransaction({
+    companyId,
+    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    abi: CORE_ABI,
+    method: "recordEMIRepaid",
+    args: [employeeAddress]
+  });
+  return tx.txHash ?? "";
 }
 
 export async function allocateCore(
+  companyId: string,
   payrollPct: number,
   lendingPct: number,
   investmentPct: number
@@ -190,26 +213,34 @@ export async function allocateCore(
     else i += diff;
   }
 
-  return sendAdminTransaction(
-    env.CORE_CONTRACT_ADDRESS,
-    CORE_ABI,
-    "allocate",
-    [p, l, i]
-  );
+  const tx = await sendCompanyManagedContractTransaction({
+    companyId,
+    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    abi: CORE_ABI,
+    method: "allocate",
+    args: [getCompanyContractKey(companyId), p, l, i]
+  });
+  return tx.txHash ?? "";
 }
 
 export async function issueContractLoan(
+  companyId: string,
   employeeAddress: string,
   amountEth: string,
   duration: number
 ): Promise<{ txHash: string; contractLoanId: number; interestRatePct: number }> {
   const amountWei = parseAmount(amountEth);
-  const txHash = await sendAdminTransaction(
-    env.LOAN_CONTRACT_ADDRESS,
-    LOAN_ABI,
-    "issueLoan",
-    [employeeAddress, amountWei, duration]
-  );
+  const tx = await sendCompanyManagedContractTransaction({
+    companyId,
+    contractAddress: env.LOAN_CONTRACT_ADDRESS,
+    abi: LOAN_ABI,
+    method: "issueLoan",
+    args: [employeeAddress, amountWei, duration]
+  });
+  const txHash = tx.txHash;
+  if (!txHash) {
+    throw new Error("Loan issuance transaction hash is unavailable");
+  }
 
   const receipt = await getContractRpcProvider().getTransactionReceipt(txHash);
   if (!receipt) {
@@ -236,14 +267,17 @@ export async function issueContractLoan(
 }
 
 export async function repayContractEMI(
+  companyId: string,
   contractLoanId: number,
   amountEth: string
 ): Promise<string> {
   const amountWei = parseAmount(amountEth);
-  return sendAdminTransaction(
-    env.LOAN_CONTRACT_ADDRESS,
-    LOAN_ABI,
-    "repayEMI",
-    [contractLoanId, amountWei]
-  );
+  const tx = await sendCompanyManagedContractTransaction({
+    companyId,
+    contractAddress: env.LOAN_CONTRACT_ADDRESS,
+    abi: LOAN_ABI,
+    method: "repayEMI",
+    args: [contractLoanId, amountWei]
+  });
+  return tx.txHash ?? "";
 }

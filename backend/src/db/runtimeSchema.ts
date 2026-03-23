@@ -37,6 +37,11 @@ export async function ensureRuntimeSchema() {
   `);
 
   await db.query(`
+    ALTER TABLE companies
+    ADD COLUMN IF NOT EXISTS contract_signer_wallet_id UUID REFERENCES wallets(id)
+  `);
+
+  await db.query(`
     UPDATE companies
     SET email = CONCAT('company+', id::text, '@flowpay.local')
     WHERE email IS NULL

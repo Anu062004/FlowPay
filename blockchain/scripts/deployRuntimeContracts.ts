@@ -51,13 +51,13 @@ function updateBackendEnv(addresses: RuntimeDeployAddresses) {
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-  const admin = deployer.address;
+  const systemAdmin = deployer.address;
 
   console.log(`Network: ${network.name}`);
-  console.log(`Deployer: ${admin}`);
+  console.log(`Deployer: ${systemAdmin}`);
 
   const Core = await ethers.getContractFactory("FlowPayCore");
-  const core = await Core.deploy(admin);
+  const core = await Core.deploy(systemAdmin);
   await core.waitForDeployment();
   const coreAddress = await core.getAddress();
   const coreDeployTx = core.deploymentTransaction();
@@ -67,7 +67,7 @@ async function main() {
   console.log(`FlowPayCore deployed to ${coreAddress}`);
 
   const Loan = await ethers.getContractFactory("FlowPayLoan");
-  const loan = await Loan.deploy(admin, coreAddress);
+  const loan = await Loan.deploy(coreAddress);
   await loan.waitForDeployment();
   const loanAddress = await loan.getAddress();
   const loanDeployTx = loan.deploymentTransaction();
@@ -81,7 +81,7 @@ async function main() {
   console.log(`FlowPayCore wired to FlowPayLoan at ${loanAddress}`);
 
   const ScoreTierVerifier = await ethers.getContractFactory("ScoreTierVerifier");
-  const scoreTierVerifier = await ScoreTierVerifier.deploy(admin);
+  const scoreTierVerifier = await ScoreTierVerifier.deploy();
   await scoreTierVerifier.waitForDeployment();
   const scoreTierVerifierAddress = await scoreTierVerifier.getAddress();
   const verifierDeployTx = scoreTierVerifier.deploymentTransaction();

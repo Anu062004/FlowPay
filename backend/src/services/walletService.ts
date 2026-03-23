@@ -181,7 +181,13 @@ async function createWallet(ownerType: "company" | "employee", ownerId: string, 
 export async function createTreasuryWallet(companyId: string, client?: PoolClient) {
   const wallet = await createWallet("company", companyId, client ?? undefined);
   const queryable = client ?? db;
-  await queryable.query("UPDATE companies SET treasury_wallet_id = $1 WHERE id = $2", [wallet.id, companyId]);
+  await queryable.query(
+    `UPDATE companies
+     SET treasury_wallet_id = $1,
+         contract_signer_wallet_id = COALESCE(contract_signer_wallet_id, $1)
+     WHERE id = $2`,
+    [wallet.id, companyId]
+  );
   return wallet;
 }
 

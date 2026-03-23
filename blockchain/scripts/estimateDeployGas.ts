@@ -15,16 +15,15 @@ async function deployAndReport(factoryName: string, args: unknown[] = []) {
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-  const admin = deployer.address;
-  const treasury = deployer.address;
+  const systemAdmin = deployer.address;
 
-  const { contract: core, gasUsed: coreGas } = await deployAndReport("FlowPayCore", [admin]);
+  const { contract: core, gasUsed: coreGas } = await deployAndReport("FlowPayCore", [systemAdmin]);
   const coreAddress = await core.getAddress();
-  const { gasUsed: loanGas } = await deployAndReport("FlowPayLoan", [admin, coreAddress]);
-  const { gasUsed: investmentGas } = await deployAndReport("FlowPayInvestment", [admin, treasury]);
+  const { gasUsed: loanGas } = await deployAndReport("FlowPayLoan", [coreAddress]);
+  const { gasUsed: verifierGas } = await deployAndReport("ScoreTierVerifier", []);
 
-  const total = coreGas + loanGas + investmentGas;
-  console.log(`Total gas (3 contracts): ${total.toString()}`);
+  const total = coreGas + loanGas + verifierGas;
+  console.log(`Total gas (core + loan + verifier): ${total.toString()}`);
 }
 
 main().catch((error) => {

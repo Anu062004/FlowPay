@@ -168,7 +168,7 @@ export async function runPayroll(
 
       for (const employee of dueEmployees) {
         const salary = parseFloat(employee.salary);
-        await ensureEmployeeInitializedOnCore(employee.wallet_address, salary, 1);
+        await ensureEmployeeInitializedOnCore(company.id, employee.wallet_address, salary, 1);
         const loans = await db.query(
           "SELECT id, amount, interest_rate, duration_months, remaining_balance FROM loans WHERE employee_id = $1 AND status = 'active'",
           [employee.id]
@@ -267,7 +267,7 @@ export async function runPayroll(
         }
 
         try {
-          await recordPayrollOnCore(employee.walletAddress);
+          await recordPayrollOnCore(company.id, employee.walletAddress);
           await syncEmployeeCreditScore(employee.employeeId, employee.walletAddress);
         } catch (error) {
           console.error("[Blockchain] Failed to sync payroll to FlowPayCore", {

@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS companies (
   recovery_token_hash TEXT,
   recovery_token_expires_at TIMESTAMPTZ,
   treasury_wallet_id UUID REFERENCES wallets(id),
+  contract_signer_wallet_id UUID REFERENCES wallets(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

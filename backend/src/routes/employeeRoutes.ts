@@ -80,6 +80,7 @@ router.get(
     const result = await db.query(
       `SELECT
          e.id,
+         e.company_id,
          e.full_name,
          COALESCE(e.email, '') AS email,
          e.salary,
@@ -119,10 +120,12 @@ router.get(
       [companyId]
     );
     const employees = await Promise.all(result.rows.map(async (row) => {
-      let creditScore = row.credit_score;
+        let creditScore = row.credit_score;
       if (row.wallet_address) {
         try {
-          creditScore = await syncEmployeeCreditScoreOnCore(row.wallet_address, row.salary);
+          creditScore = await syncEmployeeCreditScoreOnCore(row.wallet_address, row.salary, {
+            companyId: row.company_id ?? undefined
+          });
           if (creditScore !== row.credit_score) {
             await db.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [creditScore, row.id]);
           }

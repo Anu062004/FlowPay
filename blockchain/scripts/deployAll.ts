@@ -45,11 +45,11 @@ function updateBackendEnv(addresses: {
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-  const admin = deployer.address;
+  const systemAdmin = deployer.address;
   const treasury = deployer.address;
 
   const Core = await ethers.getContractFactory("FlowPayCore");
-  const core = await Core.deploy(admin);
+  const core = await Core.deploy(systemAdmin);
   await core.waitForDeployment();
   const coreAddress = await core.getAddress();
   console.log(`FlowPayCore deployed to ${coreAddress}`);
@@ -59,7 +59,7 @@ async function main() {
   const coreDeployTxHash = core.deploymentTransaction()!.hash;
 
   const Loan = await ethers.getContractFactory("FlowPayLoan");
-  const loan = await Loan.deploy(admin, coreAddress);
+  const loan = await Loan.deploy(coreAddress);
   await loan.waitForDeployment();
   const loanAddress = await loan.getAddress();
   console.log(`FlowPayLoan deployed to ${loanAddress}`);
@@ -74,7 +74,7 @@ async function main() {
   const coreSetLoanTxHash = setLoanTx.hash;
 
   const Investment = await ethers.getContractFactory("FlowPayInvestment");
-  const investment = await Investment.deploy(admin, treasury);
+  const investment = await Investment.deploy(systemAdmin, treasury);
   await investment.waitForDeployment();
   const investmentAddress = await investment.getAddress();
   console.log(`FlowPayInvestment deployed to ${investmentAddress}`);
@@ -84,7 +84,7 @@ async function main() {
   const investmentDeployTxHash = investment.deploymentTransaction()!.hash;
 
   const ScoreTierVerifier = await ethers.getContractFactory("ScoreTierVerifier");
-  const scoreTierVerifier = await ScoreTierVerifier.deploy(admin);
+  const scoreTierVerifier = await ScoreTierVerifier.deploy();
   await scoreTierVerifier.waitForDeployment();
   const scoreTierVerifierAddress = await scoreTierVerifier.getAddress();
   console.log(`ScoreTierVerifier deployed to ${scoreTierVerifierAddress}`);

@@ -66,7 +66,13 @@ function sanitizeEmployee(employee: ResolvedEmployee): EmployeeProfile {
   return publicEmployee;
 }
 
-async function hydrateEmployeeCreditScore<T extends { id: string; wallet_address: string | null; credit_score: number; salary: string | number }>(
+async function hydrateEmployeeCreditScore<T extends {
+  id: string;
+  wallet_address: string | null;
+  credit_score: number;
+  salary: string | number;
+  company_id?: string | null;
+}>(
   employee: T
 ): Promise<T> {
   if (!employee.wallet_address) {
@@ -74,7 +80,9 @@ async function hydrateEmployeeCreditScore<T extends { id: string; wallet_address
   }
 
   try {
-    const creditScore = await syncEmployeeCreditScoreOnCore(employee.wallet_address, employee.salary);
+    const creditScore = await syncEmployeeCreditScoreOnCore(employee.wallet_address, employee.salary, {
+      companyId: employee.company_id ?? undefined
+    });
     if (creditScore !== employee.credit_score) {
       await db.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [creditScore, employee.id]);
     }

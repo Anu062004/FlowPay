@@ -12,6 +12,21 @@ function getActivationUrl(token: string) {
   return `${env.APP_BASE_URL}/employees/activate?token=${token}`;
 }
 
+function isPgError(error: unknown): error is { code?: string; constraint?: string; detail?: string } {
+  return typeof error === "object" && error !== null;
+}
+
+function mapEmployeeInsertError(error: unknown) {
+  if (isPgError(error) && error.code === "23505") {
+    const constraint = error.constraint ?? "";
+    const detail = error.detail ?? "";
+    if (constraint === "employees_email_key" || /email/i.test(constraint) || /Key \(email\)=/i.test(detail)) {
+      return new ApiError(409, "An employee with this email already exists");
+    }
+  }
+  return error;
+}
+
 export async function addEmployee(input: {
   companyId: string;
   fullName: string;
@@ -20,9 +35,24 @@ export async function addEmployee(input: {
   creditScore?: number;
 }) {
   const client = await pool.connect();
+  const activationToken = uuidv4();
+  const activationUrl = getActivationUrl(activationToken);
+  let employee: {
+    id: string;
+    company_id: string;
+    full_name: string;
+    email: string;
+    salary: string;
+    credit_score: number;
+    status: string;
+  };
+  let wallet: {
+    id: string;
+    wallet_id: string;
+    wallet_address: string;
+  };
   try {
     await client.query("BEGIN");
-    const activationToken = uuidv4();
     const insertResult = await client.query(
       `INSERT INTO employees (company_id, full_name, email, salary, credit_score, status, activation_token)
        VALUES ($1, $2, $3, $4, $5, 'invited', $6)
@@ -36,33 +66,62 @@ export async function addEmployee(input: {
         activationToken
       ]
     );
-    const employee = insertResult.rows[0];
-    const wallet = await createEmployeeWallet(employee.id, client);
-    const coreState = await ensureEmployeeInitializedOnCore(wallet.wallet_address, input.salary, 1);
-    await client.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [coreState.score, employee.id]);
-    employee.credit_score = coreState.score;
+    employee = insertResult.rows[0];
+    wallet = await createEmployeeWallet(employee.id, client);
     await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw mapEmployeeInsertError(error);
+  } finally {
+    client.release();
+  }
 
-    await sendEmployeeInvite({
+  const warnings: Array<{ code: string; message: string }> = [];
+
+  try {
+    const coreState = await ensureEmployeeInitializedOnCore(input.companyId, wallet.wallet_address, input.salary, 1);
+    await pool.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [coreState.score, employee.id]);
+    employee.credit_score = coreState.score;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    warnings.push({
+      code: "core_init_failed",
+      message: `Blockchain initialization is pending: ${message}`
+    });
+    console.error(`[EmployeeAdd] Core initialization failed for employee ${employee.id}`, error);
+  }
+
+  try {
+    const delivered = await sendEmployeeInvite({
       email: employee.email,
       activationToken,
       companyId: input.companyId,
       employeeId: employee.id,
-      activationUrl: getActivationUrl(activationToken)
+      activationUrl
     });
 
-    return {
-      employee,
-      wallet,
-      activationToken,
-      activationUrl: getActivationUrl(activationToken)
-    };
+    if (!delivered) {
+      warnings.push({
+        code: "invite_delivery_skipped",
+        message: "Invite delivery was skipped by the current email provider settings. Use the activation URL manually."
+      });
+    }
   } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
+    const message = error instanceof Error ? error.message : String(error);
+    warnings.push({
+      code: "invite_delivery_failed",
+      message: `Invite delivery failed: ${message}`
+    });
+    console.error(`[EmployeeAdd] Invite delivery failed for employee ${employee.id}`, error);
   }
+
+  return {
+    employee,
+    wallet,
+    activationToken,
+    activationUrl,
+    warnings
+  };
 }
 
 export async function registerEmployeeWallet(input: {

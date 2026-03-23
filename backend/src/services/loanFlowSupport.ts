@@ -136,11 +136,14 @@ export function buildFallbackLoanDecision(input: {
 }
 
 export async function syncEmployeeCreditScore(
+  companyId: string,
   employeeId: string,
   walletAddress: string,
   salary: string | number
 ) {
-  const score = await syncEmployeeCreditScoreOnCore(walletAddress, salary);
+  const score = await syncEmployeeCreditScoreOnCore(walletAddress, salary, {
+    companyId
+  });
   await db.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [score, employeeId]);
   return score;
 }
@@ -217,6 +220,7 @@ export async function insertRejectedLoan(
 }
 
 export async function syncLoanToContracts(input: {
+  companyId: string;
   loanId: string;
   employeeId: string;
   employeeWalletAddress: string;
@@ -226,6 +230,7 @@ export async function syncLoanToContracts(input: {
 }) {
   try {
     const contractSync = await issueContractLoan(
+      input.companyId,
       input.employeeWalletAddress,
       input.amount.toString(),
       input.duration
@@ -236,12 +241,12 @@ export async function syncLoanToContracts(input: {
     );
 
     try {
-      await recordLoanDisbursementOnCore(input.employeeWalletAddress);
+      await recordLoanDisbursementOnCore(input.companyId, input.employeeWalletAddress);
     } catch (error) {
       console.error(`[Blockchain] Loan disbursal event sync failed for loan ${input.loanId}:`, error);
     }
 
-    await syncEmployeeCreditScore(input.employeeId, input.employeeWalletAddress, input.salary);
+    await syncEmployeeCreditScore(input.companyId, input.employeeId, input.employeeWalletAddress, input.salary);
     console.log(`[Blockchain] Successfully synced loan ${input.loanId} to contract`);
   } catch (error) {
     console.error(`[Blockchain] Failed to sync loan ${input.loanId} to contract:`, error);
@@ -317,6 +322,7 @@ export async function executeLoanDisbursement(
   }
 
   await syncLoanToContracts({
+    companyId: row.company_id,
     loanId: row.id,
     employeeId: row.employee_id,
     employeeWalletAddress: row.wallet_address,

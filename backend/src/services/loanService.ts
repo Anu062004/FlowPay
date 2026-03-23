@@ -92,8 +92,13 @@ export async function requestLoan(
   }
 
   const salary = parseFloat(employee.salary);
-  await ensureEmployeeInitializedOnCore(employee.wallet_address, salary, 1);
-  const syncedScore = await syncEmployeeCreditScore(employeeId, employee.wallet_address, employee.salary);
+  await ensureEmployeeInitializedOnCore(employee.company_id, employee.wallet_address, salary, 1);
+  const syncedScore = await syncEmployeeCreditScore(
+    employee.company_id,
+    employeeId,
+    employee.wallet_address,
+    employee.salary
+  );
 
   // Chain gate: FlowPayCore is the non-bypassable hard floor for loan eligibility.
   if (syncedScore < 300) {
@@ -127,8 +132,9 @@ export async function requestLoan(
     tierMax: tierContext.tierMax,
     companySalt
   });
-  await registerEmployeeCommitOnVerifier(employee.wallet_address, companySalt);
+  await registerEmployeeCommitOnVerifier(employee.company_id, employee.wallet_address, companySalt);
   const verification = await verifyScoreTierOnChain({
+    companyId: employee.company_id,
     employeeAddr: employee.wallet_address,
     solidityCalldata: proof.solidityCalldata
   });
@@ -336,7 +342,7 @@ export async function executeApprovedLoan(loanId: string, auditContext: AgentLog
     throw new ApiError(400, policyResult.reasons[0] ?? "Approved loan blocked by policy");
   }
 
-  await ensureEmployeeInitializedOnCore(row.wallet_address, parseFloat(row.salary), 1);
+  await ensureEmployeeInitializedOnCore(row.company_id, row.wallet_address, parseFloat(row.salary), 1);
   const transfer = await executeLoanDisbursement(row, policyResult, auditContext, row.status === "pending_review" ? null : "rejected");
   await db.query("UPDATE loans SET status = 'active', updated_at = now() WHERE id = $1", [loanId]);
   return { loanId, status: "active" as const, policy: policyResult, txHash: transfer.txHash ?? null };

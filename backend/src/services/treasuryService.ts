@@ -268,6 +268,7 @@ export async function allocateTreasury(
 
   try {
     await allocateCore(
+      companyId,
       payrollPct / ACTIVE_TREASURY_PCT,
       lendingPct / ACTIVE_TREASURY_PCT,
       investmentPct / ACTIVE_TREASURY_PCT

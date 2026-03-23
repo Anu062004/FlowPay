@@ -17,6 +17,7 @@ async function getRepayableLoan(loanId: string, employeeId: string) {
        l.contract_loan_id,
        l.remaining_balance,
        l.status,
+       e.company_id,
        e.salary,
        e.wallet_id AS employee_wallet_id,
        ew.wallet_address AS employee_wallet_address,
@@ -74,20 +75,25 @@ async function repayLoanAmount(loanId: string, employeeId: string, amount: numbe
   );
 
   if (loan.contract_loan_id) {
-    await repayContractEMI(Number(loan.contract_loan_id), amount.toString());
+    await repayContractEMI(loan.company_id, Number(loan.contract_loan_id), amount.toString());
   } else {
     const salary = parseFloat(loan.salary);
     if (Number.isFinite(salary) && salary > 0) {
-      await ensureEmployeeInitializedOnCore(loan.employee_wallet_address, salary, 1);
+      await ensureEmployeeInitializedOnCore(loan.company_id, loan.employee_wallet_address, salary, 1);
       if (nextRemaining <= 0) {
-        await recordLoanClosureOnCore(loan.employee_wallet_address);
+        await recordLoanClosureOnCore(loan.company_id, loan.employee_wallet_address);
       } else {
-        await recordEmiRepaidOnCore(loan.employee_wallet_address);
+        await recordEmiRepaidOnCore(loan.company_id, loan.employee_wallet_address);
       }
     }
   }
 
-  const updatedScore = await syncEmployeeCreditScore(employeeId, loan.employee_wallet_address, loan.salary);
+  const updatedScore = await syncEmployeeCreditScore(
+    loan.company_id,
+    employeeId,
+    loan.employee_wallet_address,
+    loan.salary
+  );
   return {
     loanId,
     status: nextStatus,

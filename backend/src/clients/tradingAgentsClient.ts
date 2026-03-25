@@ -1,4 +1,8 @@
-import { env } from "../config/env.js";
+type TradingAgentsClientConfig = {
+  url: string;
+  secret: string;
+  timeoutMs: number;
+};
 
 export type TradingAgentsAllocationAction =
   | "deposit"
@@ -21,16 +25,17 @@ export type TradingAgentsDecision = {
   model_used: string;
 };
 
-function requireTradingAgentsConfig() {
-  if (!env.TRADING_AGENTS_URL || !env.TRADING_AGENTS_SECRET) {
-    throw new Error("TRADING_AGENTS_URL and TRADING_AGENTS_SECRET are required for investment automation");
+function requireTradingAgentsConfig(config: TradingAgentsClientConfig | null): TradingAgentsClientConfig {
+  if (!config?.url || !config.secret) {
+    throw new Error("TradingAgents URL and secret are required for investment automation");
   }
+  return config;
 }
 
-export async function checkTradingAgentsHealth() {
-  requireTradingAgentsConfig();
-  const response = await fetch(`${env.TRADING_AGENTS_URL}/health`, {
-    signal: AbortSignal.timeout(parseInt(env.TRADING_AGENTS_TIMEOUT_MS, 10))
+export async function checkTradingAgentsHealth(config: TradingAgentsClientConfig | null) {
+  const resolved = requireTradingAgentsConfig(config);
+  const response = await fetch(`${resolved.url}/health`, {
+    signal: AbortSignal.timeout(resolved.timeoutMs)
   });
   if (!response.ok) {
     throw new Error(`TradingAgents health check failed with status ${response.status}`);
@@ -42,10 +47,10 @@ export async function analyzeInvestmentAllocation(input: {
   capitalUsdc: number;
   horizon?: string;
   currentAllocation?: Record<string, number>;
-}): Promise<TradingAgentsDecision> {
-  requireTradingAgentsConfig();
+}, config: TradingAgentsClientConfig | null): Promise<TradingAgentsDecision> {
+  const resolved = requireTradingAgentsConfig(config);
 
-  const response = await fetch(`${env.TRADING_AGENTS_URL}/analyze`, {
+  const response = await fetch(`${resolved.url}/analyze`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -53,10 +58,10 @@ export async function analyzeInvestmentAllocation(input: {
     body: JSON.stringify({
       capital_usdc: input.capitalUsdc,
       horizon: input.horizon ?? "30d",
-      api_secret: env.TRADING_AGENTS_SECRET,
+      api_secret: resolved.secret,
       current_allocation: input.currentAllocation ?? {}
     }),
-    signal: AbortSignal.timeout(parseInt(env.TRADING_AGENTS_TIMEOUT_MS, 10))
+    signal: AbortSignal.timeout(resolved.timeoutMs)
   });
 
   if (!response.ok) {

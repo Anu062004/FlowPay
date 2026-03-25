@@ -1,22 +1,15 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/errors.js";
 import { db } from "../db/pool.js";
-import { env } from "../config/env.js";
 import { uuidQueryParam } from "../utils/validation.js";
 import { getTradingAgentsOverview, runInvestment } from "../services/investmentService.js";
 import { getEthPrice, getTrackedMarketBoard } from "../services/priceService.js";
 import { z } from "zod";
 import { assertCompanyScope, requireCompanySession } from "../middleware/auth.js";
+import { getCompanySettlementChain } from "../services/companySettlementService.js";
+import { getExecutionTokenSymbolForChain } from "../services/investmentNetworkConfig.js";
 
 const router = Router();
-
-function getExecutionTokenSymbol() {
-  return (
-    env.INVESTMENT_EXECUTION_TOKEN_SYMBOL ??
-    env.TREASURY_TOKEN_SYMBOL ??
-    "USDT"
-  ).trim().toUpperCase();
-}
 
 // ── GET /investments?companyId= ───────────────────────────────
 // Summary + transaction history for the company's investment activity
@@ -26,6 +19,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const companyId = uuidQueryParam.parse(req.query.companyId);
     assertCompanyScope(res, companyId);
+    const settlementChain = await getCompanySettlementChain(companyId);
 
     // Latest treasury allocation (investment pool config)
     const allocResult = await db.query(
@@ -85,7 +79,7 @@ router.get(
     let market: { asset: string; price: number; change_pct: number; source: string } | null = null;
     let marketBoard: Awaited<ReturnType<typeof getTrackedMarketBoard>> | null = null;
     try {
-      const executionTokenSymbol = getExecutionTokenSymbol();
+      const executionTokenSymbol = getExecutionTokenSymbolForChain(settlementChain);
       if (executionTokenSymbol === "USDT" || executionTokenSymbol === "USDC") {
         market = {
           asset: executionTokenSymbol,
@@ -123,7 +117,8 @@ router.get(
         investment_pool: allocation?.investment_pool ?? "0",
         transaction_count: txResult.rows.length,
       },
-      execution_token_symbol: getExecutionTokenSymbol(),
+      execution_token_symbol: getExecutionTokenSymbolForChain(settlementChain),
+      settlement_chain: settlementChain,
       market,
       marketBoard,
       trading_agents: tradingAgents

@@ -1,5 +1,4 @@
 import { Contract, Interface, MaxUint256 } from "ethers";
-import { env } from "../config/env.js";
 import { db } from "../db/pool.js";
 import type {
   TradingAgentsAllocationAction,
@@ -9,6 +8,14 @@ import type {
 import { sendContractTransaction } from "./walletService.js";
 import { withRpcFailoverForChain } from "./rpcService.js";
 import { formatTokenAmount, parseTokenAmount } from "../utils/amounts.js";
+import { getCompanySettlementChain } from "./companySettlementService.js";
+import {
+  getExecutionAssetForChain,
+  getInvestmentProtocolAddresses,
+  getStableSwapConfigForChain,
+  getTreasuryAssetForChain
+} from "./investmentNetworkConfig.js";
+import type { SettlementChain } from "../utils/settlement.js";
 
 const ERC20_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
@@ -39,12 +46,6 @@ type TreasuryWalletContext = {
   walletAddress: string;
 };
 
-type AssetConfig = {
-  address: string;
-  symbol: string;
-  decimals: number;
-};
-
 type ExecutedAllocation = {
   protocolKey: string;
   protocol: string;
@@ -68,23 +69,7 @@ function round(value: number) {
   return parseFloat(value.toFixed(6));
 }
 
-function parseDecimals(value: string, label: string) {
-  const decimals = parseInt(value, 10);
-  if (!Number.isFinite(decimals) || decimals < 0) {
-    throw new Error(`${label} must be a valid non-negative integer`);
-  }
-  return decimals;
-}
-
-function parseBasisPoints(value: string, label: string) {
-  const bps = parseInt(value, 10);
-  if (!Number.isFinite(bps) || bps < 0 || bps >= 10_000) {
-    throw new Error(`${label} must be between 0 and 9999`);
-  }
-  return bps;
-}
-
-function requireAddress(value: string | undefined, label: string) {
+function requireAddress(value: string | null | undefined, label: string) {
   const trimmed = value?.trim();
   if (!trimmed) {
     throw new Error(`${label} is required for TradingAgents investment execution`);
@@ -96,67 +81,11 @@ function formatAmount(amountRaw: bigint, decimals: number) {
   return round(parseFloat(formatTokenAmount(amountRaw, decimals)));
 }
 
-function sameAsset(a: AssetConfig, b: AssetConfig) {
+function sameAsset(
+  a: ReturnType<typeof getTreasuryAssetForChain>,
+  b: ReturnType<typeof getExecutionAssetForChain>
+) {
   return a.address.toLowerCase() === b.address.toLowerCase();
-}
-
-function getExecutionChain() {
-  return (env.TREASURY_TOKEN_BLOCKCHAIN ?? "ethereum").trim().toLowerCase();
-}
-
-function getTreasuryAsset(): AssetConfig {
-  return {
-    address: requireAddress(
-      env.TREASURY_TOKEN_ADDRESS,
-      "TREASURY_TOKEN_ADDRESS"
-    ),
-    symbol: (env.TREASURY_TOKEN_SYMBOL?.trim() || "USDT").toUpperCase(),
-    decimals: parseDecimals(env.TREASURY_TOKEN_DECIMALS, "TREASURY_TOKEN_DECIMALS")
-  };
-}
-
-function getExecutionAsset(treasuryAsset: AssetConfig): AssetConfig {
-  const executionSymbol = (
-    env.INVESTMENT_EXECUTION_TOKEN_SYMBOL?.trim() || treasuryAsset.symbol
-  ).toUpperCase();
-  const executionAddress = env.INVESTMENT_EXECUTION_TOKEN_ADDRESS?.trim();
-
-  if (!executionAddress) {
-    if (executionSymbol === treasuryAsset.symbol) {
-      return treasuryAsset;
-    }
-    throw new Error(
-      `INVESTMENT_EXECUTION_TOKEN_ADDRESS is required when treasury ${treasuryAsset.symbol} differs from execution ${executionSymbol}`
-    );
-  }
-
-  return {
-    address: executionAddress,
-    symbol: executionSymbol,
-    decimals: parseDecimals(
-      env.INVESTMENT_EXECUTION_TOKEN_DECIMALS,
-      "INVESTMENT_EXECUTION_TOKEN_DECIMALS"
-    )
-  };
-}
-
-function getStableSwapConfig(treasuryAsset: AssetConfig, executionAsset: AssetConfig) {
-  if (sameAsset(treasuryAsset, executionAsset)) {
-    return null;
-  }
-
-  return {
-    routerAddress: requireAddress(
-      env.STABLE_SWAP_ROUTER_ADDRESS,
-      "STABLE_SWAP_ROUTER_ADDRESS"
-    ),
-    quoterAddress: requireAddress(
-      env.STABLE_SWAP_QUOTER_ADDRESS,
-      "STABLE_SWAP_QUOTER_ADDRESS"
-    ),
-    poolFee: parseInt(env.STABLE_SWAP_POOL_FEE, 10),
-    slippageBps: parseBasisPoints(env.STABLE_SWAP_SLIPPAGE_BPS, "STABLE_SWAP_SLIPPAGE_BPS")
-  };
 }
 
 async function getTreasuryWalletContext(companyId: string): Promise<TreasuryWalletContext> {
@@ -186,22 +115,23 @@ async function getCompanyIdForWallet(walletId: string) {
   return result.rows[0].owner_id as string;
 }
 
-async function getTokenBalanceRaw(tokenAddress: string, walletAddress: string) {
-  return withRpcFailoverForChain(getExecutionChain(), `erc20 balanceOf ${tokenAddress}`, async (provider) => {
+async function getTokenBalanceRaw(chain: SettlementChain, tokenAddress: string, walletAddress: string) {
+  return withRpcFailoverForChain(chain, `erc20 balanceOf ${tokenAddress}`, async (provider) => {
     const token = new Contract(tokenAddress, ERC20_ABI, provider);
     return (await token.balanceOf(walletAddress)) as bigint;
   });
 }
 
 async function ensureAllowance(params: {
+  chain: SettlementChain;
   walletId: string;
   walletAddress: string;
-  token: AssetConfig;
+  token: ReturnType<typeof getExecutionAssetForChain>;
   spender: string;
   amountRaw: bigint;
 }) {
   const currentAllowance = await withRpcFailoverForChain(
-    getExecutionChain(),
+    params.chain,
     "erc20 allowance",
     async (provider) => {
       const token = new Contract(params.token.address, ERC20_ABI, provider);
@@ -226,39 +156,40 @@ async function ensureAllowance(params: {
   });
 }
 
-function buildAllocationMetadata(protocolKey: string) {
+function buildAllocationMetadata(chain: SettlementChain, protocolKey: string) {
+  const protocolAddresses = getInvestmentProtocolAddresses(chain);
   switch (protocolKey) {
     case "yearn_usdc":
       return {
         contractAddress: requireAddress(
-          env.YEARN_USDC_VAULT_ADDRESS,
+          protocolAddresses.yearnVaultAddress,
           "YEARN_USDC_VAULT_ADDRESS"
         ),
         spender: requireAddress(
-          env.YEARN_USDC_VAULT_ADDRESS,
+          protocolAddresses.yearnVaultAddress,
           "YEARN_USDC_VAULT_ADDRESS"
         )
       };
     case "aave_usdc":
       return {
         contractAddress: requireAddress(
-          env.AAVE_USDC_POOL_ADDRESS ?? env.AAVE_POOL_ADDRESS,
+          protocolAddresses.aavePoolAddress,
           "AAVE_USDC_POOL_ADDRESS"
         ),
         spender: requireAddress(
-          env.AAVE_USDC_POOL_ADDRESS ?? env.AAVE_POOL_ADDRESS,
+          protocolAddresses.aavePoolAddress,
           "AAVE_USDC_POOL_ADDRESS"
         )
       };
     case "pendle_pt_usdc":
       return {
-        contractAddress: requireAddress(env.PENDLE_ROUTER_ADDRESS, "PENDLE_ROUTER_ADDRESS"),
-        spender: requireAddress(env.PENDLE_ROUTER_ADDRESS, "PENDLE_ROUTER_ADDRESS"),
+        contractAddress: requireAddress(protocolAddresses.pendleRouterAddress, "PENDLE_ROUTER_ADDRESS"),
+        spender: requireAddress(protocolAddresses.pendleRouterAddress, "PENDLE_ROUTER_ADDRESS"),
         marketAddress: requireAddress(
-          env.PENDLE_USDC_MARKET_ADDRESS,
+          protocolAddresses.pendleMarketAddress,
           "PENDLE_USDC_MARKET_ADDRESS"
         ),
-        syAddress: requireAddress(env.PENDLE_USDC_SY_ADDRESS, "PENDLE_USDC_SY_ADDRESS")
+        syAddress: requireAddress(protocolAddresses.pendleSyAddress, "PENDLE_USDC_SY_ADDRESS")
       };
     default:
       throw new Error(`Unsupported investment protocol ${protocolKey}`);
@@ -266,13 +197,14 @@ function buildAllocationMetadata(protocolKey: string) {
 }
 
 async function quoteStableSwap(params: {
+  chain: SettlementChain;
   quoterAddress: string;
-  tokenIn: AssetConfig;
-  tokenOut: AssetConfig;
+  tokenIn: ReturnType<typeof getTreasuryAssetForChain>;
+  tokenOut: ReturnType<typeof getExecutionAssetForChain>;
   fee: number;
   amountInRaw: bigint;
 }) {
-  return withRpcFailoverForChain(getExecutionChain(), "stable swap quote", async (provider) => {
+  return withRpcFailoverForChain(params.chain, "stable swap quote", async (provider) => {
     const quoter = new Contract(params.quoterAddress, V3_QUOTER_ABI, provider);
     return (await quoter.quoteExactInputSingle(
       params.tokenIn.address,
@@ -294,14 +226,19 @@ function minAmountOut(quotedAmountRaw: bigint, slippageBps: number) {
 }
 
 async function swapStableAsset(params: {
+  chain: SettlementChain;
   treasury: TreasuryWalletContext;
-  tokenIn: AssetConfig;
-  tokenOut: AssetConfig;
+  tokenIn: ReturnType<typeof getTreasuryAssetForChain> | ReturnType<typeof getExecutionAssetForChain>;
+  tokenOut: ReturnType<typeof getTreasuryAssetForChain> | ReturnType<typeof getExecutionAssetForChain>;
   amountInRaw: bigint;
   transactionType: "investment" | "withdrawal";
   recordTransaction: boolean;
 }) {
-  const swapConfig = getStableSwapConfig(params.tokenIn, params.tokenOut);
+  const swapConfig = getStableSwapConfigForChain(
+    params.chain,
+    getTreasuryAssetForChain(params.chain),
+    getExecutionAssetForChain(params.chain)
+  );
   if (!swapConfig) {
     return {
       amountOutRaw: params.amountInRaw,
@@ -310,6 +247,7 @@ async function swapStableAsset(params: {
   }
 
   await ensureAllowance({
+    chain: params.chain,
     walletId: params.treasury.walletId,
     walletAddress: params.treasury.walletAddress,
     token: params.tokenIn,
@@ -318,6 +256,7 @@ async function swapStableAsset(params: {
   });
 
   const quotedAmountRaw = await quoteStableSwap({
+    chain: params.chain,
     quoterAddress: swapConfig.quoterAddress,
     tokenIn: params.tokenIn,
     tokenOut: params.tokenOut,
@@ -326,6 +265,7 @@ async function swapStableAsset(params: {
   });
   const amountOutMinimum = minAmountOut(quotedAmountRaw, swapConfig.slippageBps);
   const balanceBefore = await getTokenBalanceRaw(
+    params.chain,
     params.tokenOut.address,
     params.treasury.walletAddress
   );
@@ -356,6 +296,7 @@ async function swapStableAsset(params: {
   });
 
   const balanceAfter = await getTokenBalanceRaw(
+    params.chain,
     params.tokenOut.address,
     params.treasury.walletAddress
   );
@@ -373,13 +314,14 @@ async function swapStableAsset(params: {
 }
 
 async function executeAllocation(params: {
+  chain: SettlementChain;
   treasury: TreasuryWalletContext;
   protocolKey: string;
   allocation: TradingAgentsAllocationItem;
 }): Promise<ExecutedAllocation> {
-  const treasuryAsset = getTreasuryAsset();
-  const executionAsset = getExecutionAsset(treasuryAsset);
-  const metadata = buildAllocationMetadata(params.protocolKey);
+  const treasuryAsset = getTreasuryAssetForChain(params.chain);
+  const executionAsset = getExecutionAssetForChain(params.chain);
+  const metadata = buildAllocationMetadata(params.chain, params.protocolKey);
 
   let protocolAmountRaw = parseTokenAmount(
     params.allocation.amount_usdc,
@@ -392,6 +334,7 @@ async function executeAllocation(params: {
       treasuryAsset.decimals
     );
     const swap = await swapStableAsset({
+      chain: params.chain,
       treasury: params.treasury,
       tokenIn: treasuryAsset,
       tokenOut: executionAsset,
@@ -403,6 +346,7 @@ async function executeAllocation(params: {
   }
 
   await ensureAllowance({
+    chain: params.chain,
     walletId: params.treasury.walletId,
     walletAddress: params.treasury.walletAddress,
     token: executionAsset,
@@ -484,14 +428,19 @@ async function executeAllocation(params: {
   };
 }
 
-async function getYearnWithdrawableAssets(vaultAddress: string, walletAddress: string) {
-  return withRpcFailoverForChain(getExecutionChain(), "yearn maxWithdraw", async (provider) => {
+async function getYearnWithdrawableAssets(
+  chain: SettlementChain,
+  vaultAddress: string,
+  walletAddress: string
+) {
+  return withRpcFailoverForChain(chain, "yearn maxWithdraw", async (provider) => {
     const vault = new Contract(vaultAddress, ERC4626_ABI, provider);
     return (await vault.maxWithdraw(walletAddress)) as bigint;
   });
 }
 
 async function closePosition(
+  chain: SettlementChain,
   treasury: TreasuryWalletContext,
   position: {
     id: string;
@@ -499,10 +448,11 @@ async function closePosition(
     amount_deposited: string;
   }
 ): Promise<ClosedPosition> {
-  const treasuryAsset = getTreasuryAsset();
-  const executionAsset = getExecutionAsset(treasuryAsset);
+  const treasuryAsset = getTreasuryAssetForChain(chain);
+  const executionAsset = getExecutionAssetForChain(chain);
   const swapBackToTreasury = !sameAsset(treasuryAsset, executionAsset);
   const executionBalanceBefore = await getTokenBalanceRaw(
+    chain,
     executionAsset.address,
     treasury.walletAddress
   );
@@ -511,10 +461,11 @@ async function closePosition(
 
   if (position.protocol === "yearn_usdc") {
     const vaultAddress = requireAddress(
-      env.YEARN_USDC_VAULT_ADDRESS,
+      getInvestmentProtocolAddresses(chain).yearnVaultAddress,
       "YEARN_USDC_VAULT_ADDRESS"
     );
     const withdrawableAssets = await getYearnWithdrawableAssets(
+      chain,
       vaultAddress,
       treasury.walletAddress
     );
@@ -541,7 +492,7 @@ async function closePosition(
     protocolTxHash = tx.txHash;
   } else if (position.protocol === "aave_usdc") {
     const poolAddress = requireAddress(
-      env.AAVE_USDC_POOL_ADDRESS ?? env.AAVE_POOL_ADDRESS,
+      getInvestmentProtocolAddresses(chain).aavePoolAddress,
       "AAVE_USDC_POOL_ADDRESS"
     );
     const iface = new Interface(AAVE_POOL_ABI);
@@ -569,6 +520,7 @@ async function closePosition(
   }
 
   const executionBalanceAfter = await getTokenBalanceRaw(
+    chain,
     executionAsset.address,
     treasury.walletAddress
   );
@@ -583,6 +535,7 @@ async function closePosition(
 
   if (swapBackToTreasury) {
     const swap = await swapStableAsset({
+      chain,
       treasury,
       tokenIn: executionAsset,
       tokenOut: treasuryAsset,
@@ -626,6 +579,7 @@ export async function getCurrentInvestmentAllocation(companyId: string) {
 }
 
 export async function closeActiveInvestmentPositions(companyId: string) {
+  const chain = await getCompanySettlementChain(companyId);
   const treasury = await getTreasuryWalletContext(companyId);
   const positions = await db.query(
     `SELECT id, protocol, amount_deposited
@@ -638,7 +592,7 @@ export async function closeActiveInvestmentPositions(companyId: string) {
 
   const closed: ClosedPosition[] = [];
   for (const position of positions.rows) {
-    closed.push(await closePosition(treasury, position));
+    closed.push(await closePosition(chain, treasury, position));
   }
   return closed;
 }
@@ -647,12 +601,14 @@ export async function executeInvestmentDecision(
   companyId: string,
   decision: TradingAgentsDecision
 ) {
+  const chain = await getCompanySettlementChain(companyId);
   const treasury = await getTreasuryWalletContext(companyId);
   const executions: ExecutedAllocation[] = [];
 
   for (const [protocolKey, allocation] of Object.entries(decision.allocation)) {
     executions.push(
       await executeAllocation({
+        chain,
         treasury,
         protocolKey,
         allocation

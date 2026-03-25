@@ -1,5 +1,4 @@
 import { db } from "../db/pool.js";
-import { env } from "../config/env.js";
 import type { AgentLogContext, AgentPolicyResult } from "./agentLogService.js";
 import { logAgentAction } from "./agentLogService.js";
 import {
@@ -17,6 +16,13 @@ import {
 import { evaluateAgentPolicy } from "./agentPolicyService.js";
 import { getCompanySettlementChain } from "./companySettlementService.js";
 import { getSettlementCurrencyLabel, getSettlementNetworkLabel } from "../utils/settlement.js";
+import {
+  getEnabledInvestmentProtocols as getConfiguredInvestmentProtocols,
+  getExecutableProtocolsForChain,
+  getExecutionAssetForChain,
+  getTradingAgentsConfig,
+  getTreasuryAssetForChain
+} from "./investmentNetworkConfig.js";
 
 type AggregatedPolicyResult = AgentPolicyResult & {
   itemResults: Array<{
@@ -86,92 +92,45 @@ function round(value: number) {
   return parseFloat(value.toFixed(6));
 }
 
-function getTreasuryTokenSymbol() {
-  return (env.TREASURY_TOKEN_SYMBOL ?? "USDT").trim().toUpperCase();
-}
-
-function getExecutionTokenSymbol() {
-  return (
-    env.INVESTMENT_EXECUTION_TOKEN_SYMBOL ??
-    env.TREASURY_TOKEN_SYMBOL ??
-    "USDT"
-  ).trim().toUpperCase();
-}
-
 export function getEnabledInvestmentProtocols() {
-  return Array.from(parseEnabledProtocols());
+  return Array.from(getConfiguredInvestmentProtocols());
 }
 
-function ensureStableTreasuryConfig() {
-  if (!env.TREASURY_TOKEN_ADDRESS) {
-    throw new Error("TREASURY_TOKEN_ADDRESS must be configured for TradingAgents investment automation");
+function ensureStableTreasuryConfig(chain: Awaited<ReturnType<typeof getCompanySettlementChain>>) {
+  const treasuryAsset = getTreasuryAssetForChain(chain);
+  const executionAsset = getExecutionAssetForChain(chain);
+  if (!treasuryAsset.address) {
+    throw new Error(`Treasury token must be configured for ${getSettlementNetworkLabel(chain)}`);
   }
-
-  const treasurySymbol = getTreasuryTokenSymbol();
-  const executionSymbol = getExecutionTokenSymbol();
-  if (treasurySymbol !== executionSymbol && !env.INVESTMENT_EXECUTION_TOKEN_ADDRESS) {
+  if (!executionAsset.address) {
     throw new Error(
-      `INVESTMENT_EXECUTION_TOKEN_ADDRESS is required when treasury ${treasurySymbol} differs from execution ${executionSymbol}`
+      `Investment execution token must be configured for ${getSettlementNetworkLabel(chain)}`
     );
   }
 }
 
-function parseEnabledProtocols() {
-  return new Set(
-    (env.INVESTMENT_ENABLED_PROTOCOLS ?? "aave_usdc")
-      .split(",")
-      .map((item) => item.trim().toLowerCase())
-      .filter(Boolean)
-  );
-}
-
-function flagEnabled(value: string | undefined) {
-  return (value ?? "").trim().toLowerCase() === "true";
-}
-
-function getExecutableProtocols() {
-  const enabled = parseEnabledProtocols();
-  const executable = new Set<string>();
-
-  if (
-    enabled.has("aave_usdc") &&
-    (env.AAVE_USDC_POOL_ADDRESS?.trim() || env.AAVE_POOL_ADDRESS?.trim())
-  ) {
-    executable.add("aave_usdc");
-  }
-
-  if (
-    enabled.has("yearn_usdc") &&
-    flagEnabled(env.YEARN_VAULT_IS_ERC4626) &&
-    env.YEARN_USDC_VAULT_ADDRESS?.trim()
-  ) {
-    executable.add("yearn_usdc");
-  }
-
-  if (
-    enabled.has("pendle_pt_usdc") &&
-    flagEnabled(env.PENDLE_AUTOMATION_ENABLED) &&
-    env.PENDLE_ROUTER_ADDRESS?.trim() &&
-    env.PENDLE_USDC_MARKET_ADDRESS?.trim() &&
-    env.PENDLE_USDC_SY_ADDRESS?.trim()
-  ) {
-    executable.add("pendle_pt_usdc");
-  }
-
-  return executable;
-}
-
-export function getExecutableInvestmentProtocols() {
-  return Array.from(getExecutableProtocols());
+export function getExecutableInvestmentProtocols(chain: Awaited<ReturnType<typeof getCompanySettlementChain>>) {
+  return Array.from(getExecutableProtocolsForChain(chain));
 }
 
 async function getInvestmentSupportState(companyId: string) {
   const chain = await getCompanySettlementChain(companyId);
-  if (chain !== "ethereum") {
+  const tradingAgentsConfig = getTradingAgentsConfig(chain);
+  const executableProtocols = getExecutableInvestmentProtocols(chain);
+
+  if (!tradingAgentsConfig) {
     return {
       chain,
       supported: false,
-      reason: `Investment automation is not configured for ${getSettlementNetworkLabel(chain)} yet. Treasury, payroll, lending, and contract sync support ${getSettlementCurrencyLabel(chain)}, but TradingAgents execution still needs Polygon-specific protocol addresses.`
+      reason: `TradingAgents is not configured for ${getSettlementNetworkLabel(chain)} yet. Add ${chain.toUpperCase()}_TRADING_AGENTS_URL and ${chain.toUpperCase()}_TRADING_AGENTS_SECRET on the backend.`
+    };
+  }
+
+  if (executableProtocols.length === 0) {
+    return {
+      chain,
+      supported: false,
+      reason: `Investment execution is not configured for ${getSettlementCurrencyLabel(chain)} yet. Add ${chain.toUpperCase()} investment protocol addresses before running TradingAgents automation.`
     };
   }
 
@@ -184,14 +143,15 @@ async function getInvestmentSupportState(companyId: string) {
 
 export async function getTradingAgentsOverview(companyId: string) {
   const investmentSupport = await getInvestmentSupportState(companyId);
-  const configured = Boolean(env.TRADING_AGENTS_URL?.trim() && env.TRADING_AGENTS_SECRET?.trim());
+  const tradingAgentsConfig = getTradingAgentsConfig(investmentSupport.chain);
+  const configured = Boolean(tradingAgentsConfig);
   let reachable = false;
   let health: Record<string, unknown> | null = null;
   let healthError: string | null = investmentSupport.reason;
 
   if (configured && investmentSupport.supported) {
     try {
-      health = await checkTradingAgentsHealth();
+      health = await checkTradingAgentsHealth(tradingAgentsConfig);
       reachable = true;
     } catch (error) {
       healthError = error instanceof Error ? error.message : "TradingAgents health check failed";
@@ -229,18 +189,21 @@ export async function getTradingAgentsOverview(companyId: string) {
   return {
     configured,
     reachable,
-    url: env.TRADING_AGENTS_URL?.trim() || null,
-    timeout_ms: parseInt(env.TRADING_AGENTS_TIMEOUT_MS, 10),
+    url: tradingAgentsConfig?.url ?? null,
+    timeout_ms: tradingAgentsConfig?.timeoutMs ?? 300000,
     enabled_protocols: getEnabledInvestmentProtocols(),
-    executable_protocols: getExecutableInvestmentProtocols(),
+    executable_protocols: getExecutableInvestmentProtocols(investmentSupport.chain),
     health,
     healthError,
     latestDecision
   };
 }
 
-function buildFallbackAllocation(totalAmount: number): Record<string, TradingAgentsAllocationItem> {
-  const executable = getExecutableProtocols();
+function buildFallbackAllocation(
+  totalAmount: number,
+  chain: Awaited<ReturnType<typeof getCompanySettlementChain>>
+): Record<string, TradingAgentsAllocationItem> {
+  const executable = getExecutableProtocolsForChain(chain);
 
   if (executable.has("aave_usdc") && executable.has("yearn_usdc")) {
     const yearnAmount = round(totalAmount * 0.6);
@@ -289,7 +252,8 @@ function buildFallbackAllocation(totalAmount: number): Record<string, TradingAge
 }
 
 function normalizeAutomatedAllocation(
-  decision: TradingAgentsDecision
+  decision: TradingAgentsDecision,
+  chain: Awaited<ReturnType<typeof getCompanySettlementChain>>
 ): TradingAgentsDecision {
   if (decision.action === "HOLD" || decision.action === "WITHDRAW") {
     return decision;
@@ -300,7 +264,7 @@ function normalizeAutomatedAllocation(
     return decision;
   }
 
-  const executable = getExecutableProtocols();
+  const executable = getExecutableProtocolsForChain(chain);
   const supported = entries.filter(([protocolKey]) => executable.has(protocolKey));
   const unsupported = entries.filter(([protocolKey]) => !executable.has(protocolKey));
   if (unsupported.length === 0) {
@@ -315,7 +279,7 @@ function normalizeAutomatedAllocation(
   if (supported.length === 0) {
     return {
       ...decision,
-      allocation: buildFallbackAllocation(totalAmount),
+      allocation: buildFallbackAllocation(totalAmount, chain),
       confidence: Math.max(0.5, round(decision.confidence - 0.05)),
       reasoning: `${decision.reasoning}\n\n${note}`
     };
@@ -440,8 +404,9 @@ export async function runInvestment(companyId: string, auditContext: AgentLogCon
     throw new Error(investmentSupport.reason ?? "Investment automation is not configured for this settlement network");
   }
 
-  ensureStableTreasuryConfig();
-  const treasuryTokenSymbol = getTreasuryTokenSymbol();
+  ensureStableTreasuryConfig(investmentSupport.chain);
+  const tradingAgentsConfig = getTradingAgentsConfig(investmentSupport.chain);
+  const treasuryTokenSymbol = getTreasuryAssetForChain(investmentSupport.chain).symbol;
 
   const { investmentPool, payrollReserve, lendingPool, mainReserve } = await getInvestmentPool(companyId);
   const currentAllocation = await getCurrentInvestmentAllocation(companyId);
@@ -476,13 +441,13 @@ export async function runInvestment(companyId: string, auditContext: AgentLogCon
     };
   }
 
-  await checkTradingAgentsHealth();
+  await checkTradingAgentsHealth(tradingAgentsConfig);
   const rawDecision = await analyzeInvestmentAllocation({
     capitalUsdc: investmentPool,
     horizon: "30d",
     currentAllocation
-  });
-  const decision = normalizeAutomatedAllocation(rawDecision);
+  }, tradingAgentsConfig);
+  const decision = normalizeAutomatedAllocation(rawDecision, investmentSupport.chain);
 
   await logAgentAction(
     "TradingAgentsDecisionEngine",

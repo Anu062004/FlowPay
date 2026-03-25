@@ -68,6 +68,7 @@ const envSchema = z.object({
   PAYROLL_AUTOMATION_LOCAL_MINUTE: z.string().default("0"),
   INVESTMENT_CRON: z.string().default("0 */6 * * *"),
   INVESTMENT_MIN_POOL_AMOUNT: z.string().default("10"),
+  INVESTMENT_SMALL_ALLOCATION_EXEMPTION_AMOUNT: z.string().default("10"),
   REPORT_CRON: z.string().default("0 9 * * 1"),
   FINANCE_DAILY_CRON: z.string().default("0 8 * * *"),
   RECONCILIATION_CRON: z.string().default("0 */4 * * *"),

@@ -1,3 +1,4 @@
+import { env } from "../config/env.js";
 import { db } from "../db/pool.js";
 import { getCompanySettings } from "./settingsService.js";
 import type { AgentPolicyResult } from "./agentLogService.js";
@@ -25,6 +26,11 @@ function round(value: number) {
     return 0;
   }
   return parseFloat(value.toFixed(6));
+}
+
+function getSmallAllocationExemptionAmount() {
+  const parsed = parseFloat(env.INVESTMENT_SMALL_ALLOCATION_EXEMPTION_AMOUNT ?? "10");
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 10;
 }
 
 function permissionForAction(
@@ -135,7 +141,11 @@ export async function evaluateAgentPolicy(
     ) &&
     typeof input.metadata?.allocationPct === "number"
   ) {
-    const withinExposure = input.metadata.allocationPct <= policy.maxAaveAllocationPct;
+    const smallAllocationExemptionAmount = getSmallAllocationExemptionAmount();
+    const exemptSmallInvestment =
+      input.action === "investment_rebalance" && input.amount <= smallAllocationExemptionAmount;
+    const withinExposure =
+      exemptSmallInvestment || input.metadata.allocationPct <= policy.maxAaveAllocationPct;
     if (!withinExposure) {
       reasons.push(
         `Allocation ${round(input.metadata.allocationPct)}% exceeds investment exposure cap ${round(policy.maxAaveAllocationPct)}%.`
@@ -145,7 +155,9 @@ export async function evaluateAgentPolicy(
       name: "max_investment_allocation_pct",
       passed: withinExposure,
       limit: policy.maxAaveAllocationPct,
-      allocationPct: round(input.metadata.allocationPct)
+      allocationPct: round(input.metadata.allocationPct),
+      exemptSmallInvestment,
+      exemptionAmount: smallAllocationExemptionAmount
     });
   }
 

@@ -10,6 +10,7 @@ import { withRpcFailoverForChain } from "./rpcService.js";
 import { formatTokenAmount, parseTokenAmount } from "../utils/amounts.js";
 import { getCompanySettlementChain } from "./companySettlementService.js";
 import {
+  canonicalizeInvestmentProtocolKey,
   getExecutionAssetForChain,
   getInvestmentProtocolAddresses,
   getStableSwapConfigForChain,
@@ -30,6 +31,10 @@ const ERC4626_ABI = [
 const AAVE_POOL_ABI = [
   "function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode)",
   "function withdraw(address asset, uint256 amount, address to) returns (uint256)"
+];
+const COMPOUND_COMET_ABI = [
+  "function supply(address asset, uint256 amount)",
+  "function withdraw(address asset, uint256 amount)"
 ];
 const PENDLE_ROUTER_ABI = [
   "function swapExactTokensForPt(address receiver, address market, uint256 minPtOut, tuple(uint256 netTokenIn, address tokenIn, address tokenMintSy, address pendleSwap, tuple(uint8 swapType, address extRouter, bytes extCalldata, bool needScale) swapData) input) returns (uint256 netPtOut, uint256 netSyFee)"
@@ -160,18 +165,47 @@ function buildAllocationMetadata(chain: SettlementChain, protocolKey: string) {
   const protocolAddresses = getInvestmentProtocolAddresses(chain);
   switch (protocolKey) {
     case "yearn_usdc":
+    case "morpho_v1_usdc":
+    case "beefy_usdc":
+    case "fluid_lending_usdc":
       return {
+        kind: "erc4626" as const,
         contractAddress: requireAddress(
-          protocolAddresses.yearnVaultAddress,
-          "YEARN_USDC_VAULT_ADDRESS"
+          protocolKey === "yearn_usdc"
+            ? protocolAddresses.yearnVaultAddress
+            : protocolKey === "morpho_v1_usdc"
+              ? protocolAddresses.morphoVaultAddress
+              : protocolKey === "beefy_usdc"
+                ? protocolAddresses.beefyVaultAddress
+                : protocolAddresses.fluidVaultAddress,
+          protocolKey === "yearn_usdc"
+            ? "YEARN_USDC_VAULT_ADDRESS"
+            : protocolKey === "morpho_v1_usdc"
+              ? "MORPHO_USDC_VAULT_ADDRESS"
+              : protocolKey === "beefy_usdc"
+                ? "BEEFY_USDC_VAULT_ADDRESS"
+                : "FLUID_USDC_VAULT_ADDRESS"
         ),
         spender: requireAddress(
-          protocolAddresses.yearnVaultAddress,
-          "YEARN_USDC_VAULT_ADDRESS"
+          protocolKey === "yearn_usdc"
+            ? protocolAddresses.yearnVaultAddress
+            : protocolKey === "morpho_v1_usdc"
+              ? protocolAddresses.morphoVaultAddress
+              : protocolKey === "beefy_usdc"
+                ? protocolAddresses.beefyVaultAddress
+                : protocolAddresses.fluidVaultAddress,
+          protocolKey === "yearn_usdc"
+            ? "YEARN_USDC_VAULT_ADDRESS"
+            : protocolKey === "morpho_v1_usdc"
+              ? "MORPHO_USDC_VAULT_ADDRESS"
+              : protocolKey === "beefy_usdc"
+                ? "BEEFY_USDC_VAULT_ADDRESS"
+                : "FLUID_USDC_VAULT_ADDRESS"
         )
       };
     case "aave_usdc":
       return {
+        kind: "aave_pool" as const,
         contractAddress: requireAddress(
           protocolAddresses.aavePoolAddress,
           "AAVE_USDC_POOL_ADDRESS"
@@ -181,8 +215,21 @@ function buildAllocationMetadata(chain: SettlementChain, protocolKey: string) {
           "AAVE_USDC_POOL_ADDRESS"
         )
       };
+    case "compound_v3_usdc":
+      return {
+        kind: "compound_comet" as const,
+        contractAddress: requireAddress(
+          protocolAddresses.compoundCometAddress,
+          "COMPOUND_USDC_COMET_ADDRESS"
+        ),
+        spender: requireAddress(
+          protocolAddresses.compoundCometAddress,
+          "COMPOUND_USDC_COMET_ADDRESS"
+        )
+      };
     case "pendle_pt_usdc":
       return {
+        kind: "pendle_router" as const,
         contractAddress: requireAddress(protocolAddresses.pendleRouterAddress, "PENDLE_ROUTER_ADDRESS"),
         spender: requireAddress(protocolAddresses.pendleRouterAddress, "PENDLE_ROUTER_ADDRESS"),
         marketAddress: requireAddress(
@@ -321,7 +368,8 @@ async function executeAllocation(params: {
 }): Promise<ExecutedAllocation> {
   const treasuryAsset = getTreasuryAssetForChain(params.chain);
   const executionAsset = getExecutionAssetForChain(params.chain);
-  const metadata = buildAllocationMetadata(params.chain, params.protocolKey);
+  const protocolKey = canonicalizeInvestmentProtocolKey(params.protocolKey);
+  const metadata = buildAllocationMetadata(params.chain, protocolKey);
 
   let protocolAmountRaw = parseTokenAmount(
     params.allocation.amount_usdc,
@@ -357,13 +405,13 @@ async function executeAllocation(params: {
   let toAddress = metadata.contractAddress;
   let data: string;
 
-  if (params.allocation.action === "deposit") {
+  if (metadata.kind === "erc4626") {
     const iface = new Interface(ERC4626_ABI);
     data = iface.encodeFunctionData("deposit", [
       protocolAmountRaw,
       params.treasury.walletAddress
     ]);
-  } else if (params.allocation.action === "supply") {
+  } else if (metadata.kind === "aave_pool") {
     const iface = new Interface(AAVE_POOL_ABI);
     data = iface.encodeFunctionData("supply", [
       executionAsset.address,
@@ -371,7 +419,13 @@ async function executeAllocation(params: {
       params.treasury.walletAddress,
       0
     ]);
-  } else if (params.allocation.action === "swap_to_pt") {
+  } else if (metadata.kind === "compound_comet") {
+    const iface = new Interface(COMPOUND_COMET_ABI);
+    data = iface.encodeFunctionData("supply", [
+      executionAsset.address,
+      protocolAmountRaw
+    ]);
+  } else if (metadata.kind === "pendle_router") {
     const iface = new Interface(PENDLE_ROUTER_ABI);
     data = iface.encodeFunctionData("swapExactTokensForPt", [
       params.treasury.walletAddress,
@@ -410,7 +464,7 @@ async function executeAllocation(params: {
      VALUES ($1, $2, $3, $4, $5, $6, 'active')`,
     [
       await getCompanyIdForWallet(params.treasury.walletId),
-      params.protocolKey,
+      protocolKey,
       depositedAmount.toFixed(6),
       depositedAmount.toFixed(6),
       "0.000000",
@@ -419,7 +473,7 @@ async function executeAllocation(params: {
   );
 
   return {
-    protocolKey: params.protocolKey,
+    protocolKey,
     protocol: params.allocation.protocol,
     action: params.allocation.action,
     amount: depositedAmount,
@@ -459,10 +513,29 @@ async function closePosition(
 
   let protocolTxHash: string;
 
-  if (position.protocol === "yearn_usdc") {
+  const protocolKey = canonicalizeInvestmentProtocolKey(position.protocol);
+
+  if (
+    protocolKey === "yearn_usdc" ||
+    protocolKey === "morpho_v1_usdc" ||
+    protocolKey === "beefy_usdc" ||
+    protocolKey === "fluid_lending_usdc"
+  ) {
     const vaultAddress = requireAddress(
-      getInvestmentProtocolAddresses(chain).yearnVaultAddress,
-      "YEARN_USDC_VAULT_ADDRESS"
+      protocolKey === "yearn_usdc"
+        ? getInvestmentProtocolAddresses(chain).yearnVaultAddress
+        : protocolKey === "morpho_v1_usdc"
+          ? getInvestmentProtocolAddresses(chain).morphoVaultAddress
+          : protocolKey === "beefy_usdc"
+            ? getInvestmentProtocolAddresses(chain).beefyVaultAddress
+            : getInvestmentProtocolAddresses(chain).fluidVaultAddress,
+      protocolKey === "yearn_usdc"
+        ? "YEARN_USDC_VAULT_ADDRESS"
+        : protocolKey === "morpho_v1_usdc"
+          ? "MORPHO_USDC_VAULT_ADDRESS"
+          : protocolKey === "beefy_usdc"
+            ? "BEEFY_USDC_VAULT_ADDRESS"
+            : "FLUID_USDC_VAULT_ADDRESS"
     );
     const withdrawableAssets = await getYearnWithdrawableAssets(
       chain,
@@ -490,7 +563,7 @@ async function closePosition(
       recordTransaction: !swapBackToTreasury
     });
     protocolTxHash = tx.txHash;
-  } else if (position.protocol === "aave_usdc") {
+  } else if (protocolKey === "aave_usdc") {
     const poolAddress = requireAddress(
       getInvestmentProtocolAddresses(chain).aavePoolAddress,
       "AAVE_USDC_POOL_ADDRESS"
@@ -511,7 +584,28 @@ async function closePosition(
       recordTransaction: !swapBackToTreasury
     });
     protocolTxHash = tx.txHash;
-  } else if (position.protocol === "pendle_pt_usdc") {
+  } else if (protocolKey === "compound_v3_usdc") {
+    const poolAddress = requireAddress(
+      getInvestmentProtocolAddresses(chain).compoundCometAddress,
+      "COMPOUND_USDC_COMET_ADDRESS"
+    );
+    const iface = new Interface(COMPOUND_COMET_ABI);
+    const amountRaw = parseTokenAmount(position.amount_deposited, executionAsset.decimals);
+    const data = iface.encodeFunctionData("withdraw", [
+      executionAsset.address,
+      amountRaw
+    ]);
+    const tx = await sendContractTransaction({
+      fromWalletId: treasury.walletId,
+      toAddress: poolAddress,
+      data,
+      type: "withdrawal",
+      amount: parseFloat(position.amount_deposited),
+      tokenSymbol: executionAsset.symbol,
+      recordTransaction: !swapBackToTreasury
+    });
+    protocolTxHash = tx.txHash;
+  } else if (protocolKey === "pendle_pt_usdc") {
     throw new Error(
       "Manual unwind required for existing Pendle PT positions before automated rebalancing can continue"
     );
@@ -554,7 +648,7 @@ async function closePosition(
   );
 
   return {
-    protocolKey: position.protocol,
+    protocolKey,
     amount: settledAmount,
     assetSymbol: settledSymbol,
     txHash: finalTxHash

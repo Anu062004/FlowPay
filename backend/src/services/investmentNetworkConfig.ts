@@ -24,9 +24,23 @@ type TradingAgentsConfig = {
 type ProtocolAddressMap = {
   yearnVaultAddress: string | null;
   aavePoolAddress: string | null;
+  compoundCometAddress: string | null;
+  morphoVaultAddress: string | null;
+  beefyVaultAddress: string | null;
+  fluidVaultAddress: string | null;
   pendleRouterAddress: string | null;
   pendleMarketAddress: string | null;
   pendleSyAddress: string | null;
+};
+
+const PROTOCOL_KEY_ALIASES: Record<string, string> = {
+  aave_v3_usdc: "aave_usdc",
+  compound_v3_usdc: "compound_v3_usdc",
+  morpho_v1_usdc: "morpho_v1_usdc",
+  beefy_usdc: "beefy_usdc",
+  fluid_lending_usdc: "fluid_lending_usdc",
+  yearn_v3_usdc: "yearn_usdc",
+  pendle_pt_usdc: "pendle_pt_usdc"
 };
 
 function prefixedName(chain: SettlementChain, name: string) {
@@ -180,9 +194,20 @@ export function getEnabledInvestmentProtocols() {
   return new Set(
     (env.INVESTMENT_ENABLED_PROTOCOLS ?? "aave_usdc")
       .split(",")
-      .map((item) => item.trim().toLowerCase())
+      .map((item) => canonicalizeInvestmentProtocolKey(item))
       .filter(Boolean)
   );
+}
+
+export function canonicalizeInvestmentProtocolKey(value: string | null | undefined) {
+  const normalized = (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^polygon:/, "")
+    .replace(/^ethereum:/, "")
+    .replace(/-/g, "_");
+
+  return PROTOCOL_KEY_ALIASES[normalized] ?? normalized;
 }
 
 function flagEnabled(value: string | null | undefined) {
@@ -205,6 +230,30 @@ export function getInvestmentProtocolAddresses(chain: SettlementChain): Protocol
         chain === "ethereum"
       ) ??
       envValue(chain, "AAVE_POOL_ADDRESS", env.AAVE_POOL_ADDRESS, chain === "ethereum"),
+    compoundCometAddress: envValue(
+      chain,
+      "COMPOUND_USDC_COMET_ADDRESS",
+      null,
+      false
+    ),
+    morphoVaultAddress: envValue(
+      chain,
+      "MORPHO_USDC_VAULT_ADDRESS",
+      null,
+      false
+    ),
+    beefyVaultAddress: envValue(
+      chain,
+      "BEEFY_USDC_VAULT_ADDRESS",
+      null,
+      false
+    ),
+    fluidVaultAddress: envValue(
+      chain,
+      "FLUID_USDC_VAULT_ADDRESS",
+      null,
+      false
+    ),
     pendleRouterAddress: envValue(
       chain,
       "PENDLE_ROUTER_ADDRESS",
@@ -233,6 +282,14 @@ export function getExecutableProtocolsForChain(chain: SettlementChain) {
 
   if (enabled.has("aave_usdc") && addresses.aavePoolAddress) {
     executable.add("aave_usdc");
+  }
+
+  if (enabled.has("compound_v3_usdc") && addresses.compoundCometAddress) {
+    executable.add("compound_v3_usdc");
+  }
+
+  if (enabled.has("morpho_v1_usdc") && addresses.morphoVaultAddress) {
+    executable.add("morpho_v1_usdc");
   }
 
   if (

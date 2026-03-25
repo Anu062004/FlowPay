@@ -17,6 +17,7 @@ import { evaluateAgentPolicy } from "./agentPolicyService.js";
 import { getCompanySettlementChain } from "./companySettlementService.js";
 import { getSettlementCurrencyLabel, getSettlementNetworkLabel } from "../utils/settlement.js";
 import {
+  canonicalizeInvestmentProtocolKey,
   getEnabledInvestmentProtocols as getConfiguredInvestmentProtocols,
   getExecutableProtocolsForChain,
   getExecutionAssetForChain,
@@ -69,14 +70,15 @@ function parseLoggedAllocation(
 
   return Object.entries(allocation as Record<string, Record<string, unknown>>)
     .map(([protocolKey, item]) => {
+      const normalizedProtocolKey = canonicalizeInvestmentProtocolKey(protocolKey);
       const action: TradingAgentsAllocationAction | null =
         item.action === "deposit" || item.action === "swap_to_pt" || item.action === "supply"
           ? item.action
           : null;
 
       return {
-        protocolKey,
-        protocol: typeof item.protocol === "string" ? item.protocol : protocolKey,
+        protocolKey: normalizedProtocolKey,
+        protocol: typeof item.protocol === "string" ? item.protocol : normalizedProtocolKey,
         action,
         percent: parseFloatSafe(item.percent),
         amount_usdc: parseFloatSafe(item.amount_usdc)
@@ -246,6 +248,28 @@ function buildFallbackAllocation(
     return allocation;
   }
 
+  if (executable.has("morpho_v1_usdc")) {
+    const allocation: Record<string, TradingAgentsAllocationItem> = {};
+    allocation.morpho_v1_usdc = {
+      protocol: "morpho-v1",
+      action: "deposit",
+      percent: 1,
+      amount_usdc: round(totalAmount)
+    };
+    return allocation;
+  }
+
+  if (executable.has("compound_v3_usdc")) {
+    const allocation: Record<string, TradingAgentsAllocationItem> = {};
+    allocation.compound_v3_usdc = {
+      protocol: "compound-v3",
+      action: "deposit",
+      percent: 1,
+      amount_usdc: round(totalAmount)
+    };
+    return allocation;
+  }
+
   throw new Error(
     "No executable investment protocols are enabled. Configure INVESTMENT_ENABLED_PROTOCOLS and protocol addresses before running TradingAgents automation."
   );
@@ -259,7 +283,10 @@ function normalizeAutomatedAllocation(
     return decision;
   }
 
-  const entries = Object.entries(decision.allocation ?? {});
+  const entries = Object.entries(decision.allocation ?? {}).map(([protocolKey, item]) => [
+    canonicalizeInvestmentProtocolKey(protocolKey),
+    item
+  ] as const);
   if (entries.length === 0) {
     return decision;
   }

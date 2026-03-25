@@ -1,3 +1,4 @@
+import { env } from "../config/env.js";
 import { db } from "../db/pool.js";
 import type { AgentLogContext, AgentPolicyResult } from "./agentLogService.js";
 import { logAgentAction } from "./agentLogService.js";
@@ -92,6 +93,11 @@ function round(value: number) {
     return 0;
   }
   return parseFloat(value.toFixed(6));
+}
+
+function getMinimumInvestmentPoolAmount() {
+  const parsed = parseFloat(env.INVESTMENT_MIN_POOL_AMOUNT ?? "10");
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 10;
 }
 
 export function getEnabledInvestmentProtocols() {
@@ -434,11 +440,12 @@ export async function runInvestment(companyId: string, auditContext: AgentLogCon
   ensureStableTreasuryConfig(investmentSupport.chain);
   const tradingAgentsConfig = getTradingAgentsConfig(investmentSupport.chain);
   const treasuryTokenSymbol = getTreasuryAssetForChain(investmentSupport.chain).symbol;
+  const minimumInvestmentPoolAmount = getMinimumInvestmentPoolAmount();
 
   const { investmentPool, payrollReserve, lendingPool, mainReserve } = await getInvestmentPool(companyId);
   const currentAllocation = await getCurrentInvestmentAllocation(companyId);
 
-  if (investmentPool < 10) {
+  if (investmentPool < minimumInvestmentPoolAmount) {
     await logAgentAction(
       "TradingAgentsDecisionEngine",
       {
@@ -448,7 +455,7 @@ export async function runInvestment(companyId: string, auditContext: AgentLogCon
       },
       { action: "HOLD" },
       "Investment pool is below the minimum threshold for TradingAgents analysis.",
-      `Skipped investment analysis because the investment pool is under 10 ${treasuryTokenSymbol}.`,
+      `Skipped investment analysis because the investment pool is under ${minimumInvestmentPoolAmount} ${treasuryTokenSymbol}.`,
       companyId,
       {
         ...auditContext,

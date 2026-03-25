@@ -4,7 +4,7 @@ import WalletManagerTon from "@tetherto/wdk-wallet-ton";
 import WalletManagerTron from "@tetherto/wdk-wallet-tron";
 import WalletManagerBtc from "@tetherto/wdk-wallet-btc";
 import WalletManagerSolana from "@tetherto/wdk-wallet-solana";
-import { Contract } from "ethers";
+import { Contract, HDNodeWallet } from "ethers";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db/pool.js";
 import { env } from "../config/env.js";
@@ -22,6 +22,7 @@ import {
   normalizeSettlementChain
 } from "../utils/settlement.js";
 import {
+  getRpcProviderForChain,
   getRoundRobinRpcUrlForChain,
   withRpcFailover,
   withRpcFailoverForChain
@@ -184,6 +185,45 @@ function getWalletGasAssetLabel(chain: string) {
   return normalized === "ethereum" || normalized === "polygon"
     ? getNativeGasAssetLabel(normalized)
     : "native gas";
+}
+
+function shouldUseDirectEvmSignerFallback(error: unknown, chain: string) {
+  if (!SUPPORTED_EVM_CHAINS.has(normalizeChain(chain))) {
+    return false;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("eth_getTransactionCount") ||
+    message.includes("could not coalesce error") ||
+    message.includes("Internal error")
+  );
+}
+
+async function sendContractTransactionWithDirectSigner(params: {
+  chain: string;
+  seedPhrase: string;
+  toAddress: string;
+  data: string;
+  valueWei?: bigint;
+}) {
+  const provider = getRpcProviderForChain(params.chain);
+  const signer = HDNodeWallet.fromPhrase(params.seedPhrase).connect(provider);
+  const nonce = await provider.getTransactionCount(signer.address, "latest");
+  const tx = await signer.sendTransaction({
+    to: params.toAddress,
+    data: params.data,
+    value: params.valueWei ?? 0n,
+    nonce
+  });
+  const receipt = await tx.wait();
+  if (!receipt) {
+    throw new ApiError(500, "Contract transaction receipt is empty");
+  }
+  return {
+    txHash: tx.hash,
+    from: signer.address,
+    to: params.toAddress
+  };
 }
 
 async function resolveEmployeeWalletChain(employeeId: string, client?: Queryable) {
@@ -565,23 +605,42 @@ export async function sendContractTransaction(params: {
       );
     }
 
-    const txResult = await account.sendTransaction({
-      to: params.toAddress,
-      data: params.data,
-      value: params.valueWei ?? 0n
-    });
-    const txHash = txResult?.hash ?? null;
-    if (!txHash) {
-      throw new ApiError(500, "Contract transaction did not return a transaction hash");
-    }
+    let txHash: string | null = null;
+    let txFrom: string;
+    try {
+      const txResult = await account.sendTransaction({
+        to: params.toAddress,
+        data: params.data,
+        value: params.valueWei ?? 0n
+      });
+      txHash = txResult?.hash ?? null;
+      if (!txHash) {
+        throw new ApiError(500, "Contract transaction did not return a transaction hash");
+      }
+      const confirmedTxHash = txHash;
 
-    const receipt = await withRpcFailoverForChain(
-      chain,
-      `wallet waitForTransaction ${txHash}`,
-      (provider) => provider.waitForTransaction(txHash)
-    );
-    if (!receipt) {
-      throw new ApiError(500, "Contract transaction receipt is empty");
+      const receipt = await withRpcFailoverForChain(
+        chain,
+        `wallet waitForTransaction ${confirmedTxHash}`,
+        (provider) => provider.waitForTransaction(confirmedTxHash)
+      );
+      if (!receipt) {
+        throw new ApiError(500, "Contract transaction receipt is empty");
+      }
+      txFrom = await account.getAddress();
+    } catch (error) {
+      if (!shouldUseDirectEvmSignerFallback(error, chain)) {
+        throw error;
+      }
+      const fallback = await sendContractTransactionWithDirectSigner({
+        chain,
+        seedPhrase,
+        toAddress: params.toAddress,
+        data: params.data,
+        valueWei: params.valueWei
+      });
+      txHash = fallback.txHash;
+      txFrom = fallback.from;
     }
 
     if (params.recordTransaction !== false) {
@@ -597,7 +656,7 @@ export async function sendContractTransaction(params: {
 
     return {
       txHash,
-      from: await account.getAddress(),
+      from: txFrom,
       to: params.toAddress
     };
   } finally {

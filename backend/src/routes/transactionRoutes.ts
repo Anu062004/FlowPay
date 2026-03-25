@@ -3,9 +3,10 @@ import { z } from "zod";
 import { asyncHandler } from "../utils/errors.js";
 import { db } from "../db/pool.js";
 import { uuidQueryParam } from "../utils/validation.js";
-import { env } from "../config/env.js";
 import { getTokenTransfers } from "../services/indexerService.js";
 import { assertCompanyScope, assertEmployeeScope, requireCompanySession, requireEmployeeSession } from "../middleware/auth.js";
+import { getCompanySettlementChain } from "../services/companySettlementService.js";
+import { getSettlementTokenConfig } from "../utils/settlement.js";
 
 const router = Router();
 
@@ -43,6 +44,7 @@ router.get(
            END
          ) AS tx_hash,
          t.token_symbol,
+         t.chain,
          t.created_at,
          w.wallet_address
        FROM transactions t
@@ -79,8 +81,10 @@ router.get(
   asyncHandler(async (req, res) => {
     const companyId = uuidQueryParam.parse(req.query.companyId);
     assertCompanyScope(res, companyId);
-    const token = (req.query.token as string | undefined) ?? env.TREASURY_TOKEN_SYMBOL ?? "usdt";
-    const blockchain = (req.query.blockchain as string | undefined) ?? env.TREASURY_TOKEN_BLOCKCHAIN;
+    const companyChain = await getCompanySettlementChain(companyId);
+    const companyToken = getSettlementTokenConfig(companyChain);
+    const token = (req.query.token as string | undefined) ?? companyToken?.symbol.toLowerCase() ?? "usdt";
+    const blockchain = (req.query.blockchain as string | undefined) ?? companyToken?.blockchain ?? companyChain;
     const limit = Math.min(parseInt((req.query.limit as string) ?? "50"), 200);
 
     const walletResult = await db.query(
@@ -130,6 +134,7 @@ router.get(
            END
          ) AS tx_hash,
          t.token_symbol,
+         t.chain,
          t.created_at
        FROM transactions t
        JOIN wallets w ON t.wallet_id = w.id

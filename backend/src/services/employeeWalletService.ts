@@ -1,9 +1,9 @@
 import { ethers } from "ethers";
 import { db } from "../db/pool.js";
-import { env } from "../config/env.js";
 import { ApiError } from "../utils/errors.js";
 import { formatAmount, parseAmount } from "../utils/amounts.js";
 import { getWalletBalance, minimumGasReserveWei, nativeTransferMaxFee, sendTransaction } from "./walletService.js";
+import { getSettlementTokenSymbol, normalizeSettlementChain } from "../utils/settlement.js";
 
 async function getEmployeeWalletRow(employeeId: string) {
   const result = await db.query(
@@ -88,10 +88,10 @@ export async function withdrawEmployeeFunds(
     amount: amountEth.toString(),
     from: transfer.from,
     to: transfer.to,
-    token_symbol: balanceTokenSymbol()
+    token_symbol: balanceTokenSymbol(wallet.chain)
   };
 }
 
-function balanceTokenSymbol() {
-  return env.TREASURY_TOKEN_SYMBOL ?? "ETH";
+function balanceTokenSymbol(chain: string) {
+  return getSettlementTokenSymbol(normalizeSettlementChain(chain, "ethereum"));
 }

@@ -12,6 +12,8 @@ import {
   getEmployeeCreditScoreOnCore,
   recordPayrollOnCore
 } from "./contractService.js";
+import { getCompanySettlementChain } from "./companySettlementService.js";
+import { getSettlementTokenSymbol } from "../utils/settlement.js";
 import {
   formatPayrollMonthKey,
   formatPayrollMonthLabel,
@@ -88,8 +90,8 @@ export async function getDuePayrollEmployees(companyId: string, payrollMonthKey:
   return activeEmployees.filter((employee) => !employee.paid_at_this_period);
 }
 
-async function syncEmployeeCreditScore(employeeId: string, walletAddress: string) {
-  const score = await getEmployeeCreditScoreOnCore(walletAddress);
+async function syncEmployeeCreditScore(companyId: string, employeeId: string, walletAddress: string) {
+  const score = await getEmployeeCreditScoreOnCore(companyId, walletAddress);
   await db.query("UPDATE employees SET credit_score = $1 WHERE id = $2", [score, employeeId]);
   return score;
 }
@@ -150,6 +152,8 @@ export async function runPayroll(
     }
 
     try {
+      const settlementChain = await getCompanySettlementChain(company.id);
+      const treasuryCurrency = getSettlementTokenSymbol(settlementChain);
       const activeEmployees = await getCompanyPayrollEmployees(company.id, payrollMonthKey);
       const dueEmployees = activeEmployees.filter((employee) => !employee.paid_at_this_period);
       const alreadyPaidEmployees = activeEmployees.length - dueEmployees.length;
@@ -268,7 +272,7 @@ export async function runPayroll(
 
         try {
           await recordPayrollOnCore(company.id, employee.walletAddress);
-          await syncEmployeeCreditScore(employee.employeeId, employee.walletAddress);
+          await syncEmployeeCreditScore(company.id, employee.employeeId, employee.walletAddress);
         } catch (error) {
           console.error("[Blockchain] Failed to sync payroll to FlowPayCore", {
             companyId: company.id,
@@ -278,15 +282,14 @@ export async function runPayroll(
         }
 
         if (employee.totalEmi > 0) {
-          const tokenSymbol = env.TREASURY_TOKEN_SYMBOL ?? "ETH";
           const createdAt = new Date();
           await db.query(
-            "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, created_at) VALUES ($1, 'emi_repayment', $2, $3, $4, $5)",
-            [company.treasury_wallet_id, employee.totalEmi.toFixed(6), payrollTxHash, tokenSymbol, createdAt]
+            "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, chain, created_at) VALUES ($1, 'emi_repayment', $2, $3, $4, $5, $6)",
+            [company.treasury_wallet_id, employee.totalEmi.toFixed(6), payrollTxHash, treasuryCurrency, settlementChain, createdAt]
           );
           await db.query(
-            "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, created_at) VALUES ($1, 'emi_repayment', $2, $3, $4, $5)",
-            [employee.walletId, employee.totalEmi.toFixed(6), payrollTxHash, tokenSymbol, createdAt]
+            "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, chain, created_at) VALUES ($1, 'emi_repayment', $2, $3, $4, $5, $6)",
+            [employee.walletId, employee.totalEmi.toFixed(6), payrollTxHash, treasuryCurrency, settlementChain, createdAt]
           );
         }
 
@@ -484,7 +487,9 @@ export async function requestPayrollApproval(
       shortfall,
       payrollMonth: payrollMonthKey,
       payrollMonthLabel,
-      currency: env.TREASURY_TOKEN_SYMBOL ?? "ETH",
+      currency: treasuryBalance > 0
+        ? (await getTreasuryBalance(company.id)).token_symbol ?? "USDT"
+        : getSettlementTokenSymbol(await getCompanySettlementChain(company.id)),
       requestedAt: new Date().toISOString()
     };
 

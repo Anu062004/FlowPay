@@ -1,8 +1,14 @@
 import { ethers } from "ethers";
-import { env } from "../config/env.js";
 import { formatAmount, parseAmount } from "../utils/amounts.js";
-import { getContractRpcProvider } from "./rpcService.js";
+import { getContractRpcProviderForChain } from "./rpcService.js";
 import { getCompanyContractKey, sendCompanyManagedContractTransaction } from "./companyContractSignerService.js";
+import { getCompanySettlementChain } from "./companySettlementService.js";
+import {
+  getContractAddressesForChain,
+  getDefaultSettlementChain,
+  normalizeSettlementChain,
+  type SettlementChain
+} from "../utils/settlement.js";
 
 const CORE_ABI = [
   "function registerCompanyActor(bytes32 companyId, address actor) external",
@@ -29,14 +35,6 @@ const LOAN_ABI = [
   "function checkEligibility(address employee) external view returns (bool allowed, uint256 maxAmount, uint256 interestRatePct)"
 ];
 
-function getCoreContract() {
-  return new ethers.Contract(env.CORE_CONTRACT_ADDRESS, CORE_ABI, getContractRpcProvider());
-}
-
-function getLoanContract() {
-  return new ethers.Contract(env.LOAN_CONTRACT_ADDRESS, LOAN_ABI, getContractRpcProvider());
-}
-
 function parseMonthlySalaryEth(monthlySalaryEth: string | number) {
   const parsed = typeof monthlySalaryEth === "number"
     ? monthlySalaryEth
@@ -45,8 +43,32 @@ function parseMonthlySalaryEth(monthlySalaryEth: string | number) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export async function getCoreEmployeeState(employeeAddress: string) {
-  const contract = getCoreContract();
+function getCoreContract(chain: SettlementChain) {
+  return new ethers.Contract(
+    getContractAddressesForChain(chain).core,
+    CORE_ABI,
+    getContractRpcProviderForChain(chain)
+  );
+}
+
+function getLoanContract(chain: SettlementChain) {
+  return new ethers.Contract(
+    getContractAddressesForChain(chain).loan,
+    LOAN_ABI,
+    getContractRpcProviderForChain(chain)
+  );
+}
+
+async function resolveCompanyChain(companyId: string) {
+  return getCompanySettlementChain(companyId);
+}
+
+function resolveReadChain(chain?: string) {
+  return normalizeSettlementChain(chain, getDefaultSettlementChain());
+}
+
+export async function getCoreEmployeeState(companyId: string, employeeAddress: string) {
+  const contract = getCoreContract(await resolveCompanyChain(companyId));
   const [score, monthlySalary, lastPayrollAt, activeLoans, initialized] = await contract.getEmployee(employeeAddress) as [
     bigint,
     bigint,
@@ -65,8 +87,8 @@ export async function getCoreEmployeeState(employeeAddress: string) {
   };
 }
 
-export async function getEmployeeCompanyKeyOnCore(employeeAddress: string) {
-  const contract = getCoreContract();
+export async function getEmployeeCompanyKeyOnCore(companyId: string, employeeAddress: string) {
+  const contract = getCoreContract(await resolveCompanyChain(companyId));
   return contract.getEmployeeCompany(employeeAddress) as Promise<string>;
 }
 
@@ -81,15 +103,17 @@ export async function initializeEmployeeOnCore(
     throw new Error("Employee salary must be greater than zero before on-chain initialization");
   }
 
+  const chain = await resolveCompanyChain(companyId);
+  const addresses = getContractAddressesForChain(chain);
   await sendCompanyManagedContractTransaction({
     companyId,
-    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    contractAddress: addresses.core,
     abi: CORE_ABI,
     method: "initializeEmployee",
     args: [getCompanyContractKey(companyId), employeeAddress, monthlySalaryWei, employmentType]
   });
 
-  return getCoreEmployeeState(employeeAddress);
+  return getCoreEmployeeState(companyId, employeeAddress);
 }
 
 export async function ensureEmployeeInitializedOnCore(
@@ -98,7 +122,7 @@ export async function ensureEmployeeInitializedOnCore(
   monthlySalaryEth: string | number,
   employmentType = 1
 ) {
-  const current = await getCoreEmployeeState(employeeAddress);
+  const current = await getCoreEmployeeState(companyId, employeeAddress);
   if (current.initialized) {
     return current;
   }
@@ -106,8 +130,8 @@ export async function ensureEmployeeInitializedOnCore(
   return initializeEmployeeOnCore(companyId, employeeAddress, monthlySalaryEth, employmentType);
 }
 
-export async function getEmployeeCreditScoreOnCore(employeeAddress: string) {
-  const contract = getCoreContract();
+export async function getEmployeeCreditScoreOnCore(companyId: string | undefined, employeeAddress: string) {
+  const contract = getCoreContract(resolveReadChain(companyId ? await resolveCompanyChain(companyId) : undefined));
   const score = await contract.getScore(employeeAddress) as bigint;
   return Number(score);
 }
@@ -128,11 +152,11 @@ export async function syncEmployeeCreditScoreOnCore(
     return state.score;
   }
 
-  return getEmployeeCreditScoreOnCore(employeeAddress);
+  return getEmployeeCreditScoreOnCore(options.companyId, employeeAddress);
 }
 
-export async function checkLoanEligibilityOnCore(employeeAddress: string) {
-  const contract = getLoanContract();
+export async function checkLoanEligibilityOnCore(companyId: string, employeeAddress: string) {
+  const contract = getLoanContract(await resolveCompanyChain(companyId));
   const [allowed, maxAmount, interestRatePct] = await contract.checkEligibility(employeeAddress) as [
     boolean,
     bigint,
@@ -148,9 +172,10 @@ export async function checkLoanEligibilityOnCore(employeeAddress: string) {
 }
 
 export async function recordPayrollOnCore(companyId: string, employeeAddress: string): Promise<string> {
+  const addresses = getContractAddressesForChain(await resolveCompanyChain(companyId));
   const tx = await sendCompanyManagedContractTransaction({
     companyId,
-    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    contractAddress: addresses.core,
     abi: CORE_ABI,
     method: "executePayroll",
     args: [employeeAddress, 0n]
@@ -159,9 +184,10 @@ export async function recordPayrollOnCore(companyId: string, employeeAddress: st
 }
 
 export async function recordLoanDisbursementOnCore(companyId: string, employeeAddress: string): Promise<string> {
+  const addresses = getContractAddressesForChain(await resolveCompanyChain(companyId));
   const tx = await sendCompanyManagedContractTransaction({
     companyId,
-    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    contractAddress: addresses.core,
     abi: CORE_ABI,
     method: "disburseLoan",
     args: [employeeAddress, 0n]
@@ -170,9 +196,10 @@ export async function recordLoanDisbursementOnCore(companyId: string, employeeAd
 }
 
 export async function recordLoanClosureOnCore(companyId: string, employeeAddress: string): Promise<string> {
+  const addresses = getContractAddressesForChain(await resolveCompanyChain(companyId));
   const tx = await sendCompanyManagedContractTransaction({
     companyId,
-    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    contractAddress: addresses.core,
     abi: CORE_ABI,
     method: "recordLoanClosed",
     args: [employeeAddress]
@@ -181,9 +208,10 @@ export async function recordLoanClosureOnCore(companyId: string, employeeAddress
 }
 
 export async function recordEmiRepaidOnCore(companyId: string, employeeAddress: string): Promise<string> {
+  const addresses = getContractAddressesForChain(await resolveCompanyChain(companyId));
   const tx = await sendCompanyManagedContractTransaction({
     companyId,
-    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    contractAddress: addresses.core,
     abi: CORE_ABI,
     method: "recordEMIRepaid",
     args: [employeeAddress]
@@ -213,9 +241,10 @@ export async function allocateCore(
     else i += diff;
   }
 
+  const addresses = getContractAddressesForChain(await resolveCompanyChain(companyId));
   const tx = await sendCompanyManagedContractTransaction({
     companyId,
-    contractAddress: env.CORE_CONTRACT_ADDRESS,
+    contractAddress: addresses.core,
     abi: CORE_ABI,
     method: "allocate",
     args: [getCompanyContractKey(companyId), p, l, i]
@@ -229,10 +258,12 @@ export async function issueContractLoan(
   amountEth: string,
   duration: number
 ): Promise<{ txHash: string; contractLoanId: number; interestRatePct: number }> {
+  const chain = await resolveCompanyChain(companyId);
   const amountWei = parseAmount(amountEth);
+  const addresses = getContractAddressesForChain(chain);
   const tx = await sendCompanyManagedContractTransaction({
     companyId,
-    contractAddress: env.LOAN_CONTRACT_ADDRESS,
+    contractAddress: addresses.loan,
     abi: LOAN_ABI,
     method: "issueLoan",
     args: [employeeAddress, amountWei, duration]
@@ -242,7 +273,7 @@ export async function issueContractLoan(
     throw new Error("Loan issuance transaction hash is unavailable");
   }
 
-  const receipt = await getContractRpcProvider().getTransactionReceipt(txHash);
+  const receipt = await getContractRpcProviderForChain(chain).getTransactionReceipt(txHash);
   if (!receipt) {
     throw new Error("Loan issuance receipt is unavailable");
   }
@@ -271,10 +302,11 @@ export async function repayContractEMI(
   contractLoanId: number,
   amountEth: string
 ): Promise<string> {
+  const addresses = getContractAddressesForChain(await resolveCompanyChain(companyId));
   const amountWei = parseAmount(amountEth);
   const tx = await sendCompanyManagedContractTransaction({
     companyId,
-    contractAddress: env.LOAN_CONTRACT_ADDRESS,
+    contractAddress: addresses.loan,
     abi: LOAN_ABI,
     method: "repayEMI",
     args: [contractLoanId, amountWei]

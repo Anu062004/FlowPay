@@ -9,6 +9,11 @@ import { allocateCore } from "./contractService.js";
 import { formatAmount, formatTokenAmount, parseAmount } from "../utils/amounts.js";
 import { logAgentAction, type AgentLogContext } from "./agentLogService.js";
 import { evaluateAgentPolicy } from "./agentPolicyService.js";
+import {
+  getSettlementTokenConfig,
+  getSettlementTokenSymbol,
+  normalizeSettlementChain
+} from "../utils/settlement.js";
 
 const FIXED_TREASURY_SPLIT = {
   payroll_reserve_pct: 0.5,
@@ -96,7 +101,8 @@ export async function getTreasuryBalance(companyId: string) {
     ...balance,
     balance: balance.balanceEth,
     wallet_address: balance.walletAddress,
-    token_symbol: balance.tokenSymbol
+    token_symbol: balance.tokenSymbol,
+    chain: wallet.chain
   };
 }
 
@@ -152,7 +158,7 @@ export async function withdrawTreasuryFunds(
     amount: amountEth.toString(),
     from: transfer.from,
     to: transfer.to,
-    token_symbol: env.TREASURY_TOKEN_SYMBOL ?? "ETH"
+    token_symbol: getSettlementTokenSymbol(normalizeSettlementChain(wallet.chain, "ethereum"))
   };
 }
 
@@ -161,8 +167,11 @@ export async function allocateTreasury(
   balanceWei: bigint,
   auditContext: AgentLogContext = {}
 ) {
-  const useToken = Boolean(env.TREASURY_TOKEN_ADDRESS && env.TREASURY_TOKEN_SYMBOL);
-  const decimals = useToken ? parseInt(env.TREASURY_TOKEN_DECIMALS, 10) : 18;
+  const wallet = await getTreasuryWalletRow(companyId);
+  const chain = normalizeSettlementChain(wallet.chain, "ethereum");
+  const tokenConfig = getSettlementTokenConfig(chain);
+  const useToken = Boolean(tokenConfig);
+  const decimals = tokenConfig?.decimals ?? 18;
   const balanceEth = useToken
     ? parseFloat(formatTokenAmount(balanceWei, decimals))
     : parseFloat(formatEther(balanceWei));

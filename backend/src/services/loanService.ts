@@ -34,11 +34,13 @@ import {
 } from "./loanReviewService.js";
 import { repayLoanEmi, repayLoanInFull } from "./loanRepaymentService.js";
 import { sendLoanReviewStatusEmail } from "./emailService.js";
+import { getCompanySettlementChain } from "./companySettlementService.js";
+import { getSettlementTokenSymbol } from "../utils/settlement.js";
 
 export { expirePendingReviewLoans, listPendingReviewLoans, rejectPendingReviewLoan, repayLoanEmi, repayLoanInFull };
 
-function getTreasuryCurrency() {
-  return env.TREASURY_TOKEN_SYMBOL?.trim() || "ETH";
+async function getTreasuryCurrency(companyId: string) {
+  return getSettlementTokenSymbol(await getCompanySettlementChain(companyId));
 }
 
 export async function requestLoan(
@@ -47,14 +49,16 @@ export async function requestLoan(
   auditContext: AgentLogContext = {}
 ) {
   await expirePendingReviewLoans();
-  const treasuryCurrency = getTreasuryCurrency();
 
   const empCompanyResult = await db.query("SELECT company_id FROM employees WHERE id = $1", [employeeId]);
-  if ((empCompanyResult.rowCount ?? 0) > 0) {
-    const settings = await getCompanySettings(empCompanyResult.rows[0].company_id);
-    if (settings.agent?.lending_paused === true) {
-      throw new ApiError(403, "Lending temporarily paused due to elevated default risk");
-    }
+  if ((empCompanyResult.rowCount ?? 0) === 0 || !empCompanyResult.rows[0].company_id) {
+    throw new ApiError(404, "Employee company not found");
+  }
+  const companyId = empCompanyResult.rows[0].company_id as string;
+  const treasuryCurrency = await getTreasuryCurrency(companyId);
+  const settings = await getCompanySettings(companyId);
+  if (settings.agent?.lending_paused === true) {
+    throw new ApiError(403, "Lending temporarily paused due to elevated default risk");
   }
 
   const result = await db.query(
@@ -110,7 +114,7 @@ export async function requestLoan(
     throw new ApiError(400, "Score too low - keep receiving payroll to qualify");
   }
 
-  const eligibility = await checkLoanEligibilityOnCore(employee.wallet_address);
+  const eligibility = await checkLoanEligibilityOnCore(employee.company_id, employee.wallet_address);
   const maxEligibleAmount = parseFloat(eligibility.maxAmountEth);
   if (!eligibility.allowed || maxEligibleAmount <= 0) {
     throw new ApiError(400, "Employee is not eligible for a loan under FlowPayCore");

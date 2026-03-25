@@ -3,8 +3,14 @@ import bcrypt from "bcryptjs";
 import { createTreasuryWallet } from "./walletService.js";
 import { startDepositWatcher } from "./depositWatcher.js";
 import { sendCompanyAccessEmail } from "./emailService.js";
+import { normalizeSettlementChain } from "../utils/settlement.js";
 
-export async function registerCompany(input: { name: string; email: string; accessPin: string }) {
+export async function registerCompany(input: {
+  name: string;
+  email: string;
+  accessPin: string;
+  settlementChain?: string;
+}) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -16,7 +22,11 @@ export async function registerCompany(input: { name: string; email: string; acce
       [input.name, input.email, accessPinHash]
     );
     const company = companyResult.rows[0];
-    const wallet = await createTreasuryWallet(company.id, client);
+    const wallet = await createTreasuryWallet(
+      company.id,
+      client,
+      normalizeSettlementChain(input.settlementChain, "ethereum")
+    );
     await client.query("COMMIT");
 
     await startDepositWatcher(wallet.id, company.id, wallet.wallet_address);

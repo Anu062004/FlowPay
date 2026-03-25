@@ -74,7 +74,8 @@ function CompanyRecoveryInner() {
         id: response.company.id,
         name: response.company.name,
         email: response.company.email,
-        treasuryAddress: response.company.treasury_address ?? null
+        treasuryAddress: response.company.treasury_address ?? null,
+        treasuryChain: response.company.treasury_chain ?? null
       });
       router.push(nextPath ?? "/dashboard");
     } catch (err) {

@@ -19,6 +19,7 @@ export type CompanyProfile = {
   name: string;
   email: string;
   treasury_address: string | null;
+  treasury_chain?: string | null;
   created_at: string;
 };
 
@@ -208,7 +209,7 @@ async function findCompanyByAccess(access: string) {
 
   const result = uuidRegex.test(normalized)
     ? await db.query(
-        `SELECT c.id, c.name, c.email, c.created_at, c.access_pin_hash, w.wallet_address AS treasury_address
+        `SELECT c.id, c.name, c.email, c.created_at, c.access_pin_hash, w.wallet_address AS treasury_address, w.chain AS treasury_chain
          FROM companies c
          LEFT JOIN wallets w ON c.treasury_wallet_id = w.id
          WHERE c.id = $1`,
@@ -216,14 +217,14 @@ async function findCompanyByAccess(access: string) {
       )
     : emailRegex.test(normalized)
       ? await db.query(
-          `SELECT c.id, c.name, c.email, c.created_at, c.access_pin_hash, w.wallet_address AS treasury_address
+          `SELECT c.id, c.name, c.email, c.created_at, c.access_pin_hash, w.wallet_address AS treasury_address, w.chain AS treasury_chain
            FROM companies c
            LEFT JOIN wallets w ON c.treasury_wallet_id = w.id
            WHERE LOWER(c.email) = LOWER($1)`,
           [normalized]
         )
       : await db.query(
-          `SELECT c.id, c.name, c.email, c.created_at, c.access_pin_hash, w.wallet_address AS treasury_address
+          `SELECT c.id, c.name, c.email, c.created_at, c.access_pin_hash, w.wallet_address AS treasury_address, w.chain AS treasury_chain
            FROM companies c
            JOIN wallets w ON c.treasury_wallet_id = w.id
            WHERE LOWER(w.wallet_address) = LOWER($1)`,
@@ -484,7 +485,7 @@ export async function resetCompanyRecovery(token: string, accessPin: string) {
 
 export async function getCompanyProfile(companyId: string) {
   const result = await db.query(
-    `SELECT c.id, c.name, c.email, c.created_at, w.wallet_address AS treasury_address
+    `SELECT c.id, c.name, c.email, c.created_at, w.wallet_address AS treasury_address, w.chain AS treasury_chain
      FROM companies c
      LEFT JOIN wallets w ON c.treasury_wallet_id = w.id
      WHERE c.id = $1`,

@@ -58,6 +58,7 @@ export type Company = {
   name: string;
   email: string;
   treasury_address: string | null;
+  treasury_chain?: string | null;
   created_at: string;
 };
 
@@ -157,6 +158,7 @@ export type Transaction = {
   created_at: string;
   wallet_address?: string;
   token_symbol?: string;
+  chain?: string;
 };
 
 export type TreasuryBalance = {
@@ -256,6 +258,11 @@ export type CompanySettings = {
     companyEmail: string;
     timeZone: string;
   };
+  settlement: {
+    chain: "ethereum" | "polygon";
+    switchAllowed?: boolean;
+    switchBlockedReason?: string | null;
+  };
   payroll: {
     payrollDay: string;
     currency: string;
@@ -305,7 +312,12 @@ export const fetchCompanies = () =>
 export const fetchCurrentCompanySession = () =>
   sessionFetch<{ company: Company }>("/companies/session");
 
-export const registerCompany = (body: { name: string; email: string; accessPin: string }) =>
+export const registerCompany = (body: {
+  name: string;
+  email: string;
+  accessPin: string;
+  settlementChain?: "ethereum" | "polygon";
+}) =>
   apiFetch<{ company: Company; treasury_wallet: { wallet_address: string } }>("/companies/register", {
     method: "POST",
     body: JSON.stringify(body),

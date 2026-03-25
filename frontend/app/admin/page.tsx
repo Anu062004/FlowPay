@@ -306,7 +306,7 @@ export default function AdminControlPage() {
     },
     {
       label: "WDK Execution",
-      description: "Approved actions execute through the wallet layer and settle on Ethereum stablecoin rails.",
+      description: "Approved actions execute through the wallet layer and settle on each company's configured stablecoin network.",
       value: executionCount,
       badge: "success",
     },
@@ -804,7 +804,7 @@ export default function AdminControlPage() {
             </div>
             <div className="admin-note-card">
               <div className="fw-medium text-sm">4. On-chain settlement</div>
-              <div className="text-xs text-secondary mt-1">Primary settlement now runs on Ethereum stablecoin rails, while any legacy contract sync can remain isolated until mainnet contract addresses are supplied.</div>
+              <div className="text-xs text-secondary mt-1">Primary settlement now follows each company's configured network, while legacy contract sync remains isolated until the relevant chain addresses are supplied.</div>
             </div>
           </div>
         </div>

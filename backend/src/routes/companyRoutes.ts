@@ -19,7 +19,8 @@ const router = Router();
 const registerSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
-  accessPin: z.string().trim().min(4).max(64)
+  accessPin: z.string().trim().min(4).max(64),
+  settlementChain: z.enum(["ethereum", "polygon"]).optional()
 });
 
 const loginSchema = z.object({

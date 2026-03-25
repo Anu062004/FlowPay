@@ -1,6 +1,9 @@
 import { db } from "./pool.js";
+import { getDefaultSettlementChain } from "../utils/settlement.js";
 
 export async function ensureRuntimeSchema() {
+  const defaultSettlementChain = getDefaultSettlementChain();
+
   await db.query(`
     ALTER TYPE transaction_type
     ADD VALUE IF NOT EXISTS 'withdrawal'
@@ -39,6 +42,11 @@ export async function ensureRuntimeSchema() {
   await db.query(`
     ALTER TABLE companies
     ADD COLUMN IF NOT EXISTS contract_signer_wallet_id UUID REFERENCES wallets(id)
+  `);
+
+  await db.query(`
+    ALTER TABLE wallets
+    ALTER COLUMN chain SET DEFAULT '${defaultSettlementChain}'
   `);
 
   await db.query(`
@@ -165,6 +173,58 @@ export async function ensureRuntimeSchema() {
   await db.query(`
     ALTER TABLE treasury_allocations
     ADD COLUMN IF NOT EXISTS main_reserve NUMERIC(18,6) NOT NULL DEFAULT 0
+  `);
+
+  await db.query(`
+    ALTER TABLE transactions
+    ADD COLUMN IF NOT EXISTS chain TEXT
+  `);
+
+  await db.query(`
+    UPDATE transactions t
+    SET chain = COALESCE(t.chain, w.chain, '${defaultSettlementChain}')
+    FROM wallets w
+    WHERE w.id = t.wallet_id
+      AND (t.chain IS NULL OR LENGTH(TRIM(t.chain)) = 0)
+  `);
+
+  await db.query(`
+    UPDATE transactions
+    SET chain = '${defaultSettlementChain}'
+    WHERE chain IS NULL OR LENGTH(TRIM(chain)) = 0
+  `);
+
+  await db.query(`
+    ALTER TABLE transactions
+    ALTER COLUMN chain SET DEFAULT '${defaultSettlementChain}'
+  `);
+
+  await db.query(`
+    ALTER TABLE company_settings
+    ADD COLUMN IF NOT EXISTS settlement JSONB
+  `);
+
+  await db.query(`
+    UPDATE company_settings cs
+    SET settlement = jsonb_build_object(
+      'chain',
+      COALESCE(NULLIF(TRIM(LOWER(w.chain)), ''), '${defaultSettlementChain}')
+    )
+    FROM companies c
+    LEFT JOIN wallets w ON w.id = c.treasury_wallet_id
+    WHERE c.id = cs.company_id
+      AND cs.settlement IS NULL
+  `);
+
+  await db.query(`
+    UPDATE company_settings
+    SET settlement = jsonb_build_object('chain', '${defaultSettlementChain}')
+    WHERE settlement IS NULL
+  `);
+
+  await db.query(`
+    ALTER TABLE company_settings
+    ALTER COLUMN settlement SET DEFAULT '{"chain":"${defaultSettlementChain}"}'::jsonb
   `);
 
   await db.query(`

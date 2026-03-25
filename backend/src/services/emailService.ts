@@ -2,6 +2,8 @@ import { google } from "googleapis";
 import fs from "fs";
 import { env } from "../config/env.js";
 import { createOpsTask } from "./opsService.js";
+import { getCompanySettlementChain } from "./companySettlementService.js";
+import { getSettlementTokenSymbol } from "../utils/settlement.js";
 
 let gmailClient: ReturnType<typeof google.gmail> | null = null;
 let labelCache: Record<string, string> | null = null;
@@ -362,6 +364,9 @@ export async function sendLoanReviewStatusEmail(input: {
   reason?: string | null;
 }) {
   const statusLabel = input.status === "expired" ? "expired" : "rejected";
+  const tokenSymbol = input.companyId
+    ? getSettlementTokenSymbol(await getCompanySettlementChain(input.companyId))
+    : (env.TREASURY_TOKEN_SYMBOL ?? "ETH");
   return deliverEmail({
     companyId: input.companyId,
     type: "loan_review_status",
@@ -370,7 +375,7 @@ export async function sendLoanReviewStatusEmail(input: {
     text: [
       `Hello ${input.employeeName},`,
       "",
-      `Your FlowPay loan review for ${input.amount.toFixed(6)} ${env.TREASURY_TOKEN_SYMBOL ?? "ETH"} was ${statusLabel}.`,
+      `Your FlowPay loan review for ${input.amount.toFixed(6)} ${tokenSymbol} was ${statusLabel}.`,
       ...(input.reason ? [`Reason: ${input.reason}`] : []),
       "",
       input.status === "expired"

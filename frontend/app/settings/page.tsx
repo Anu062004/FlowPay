@@ -11,6 +11,13 @@ import {
   updateCompanySettings,
   type CompanySettings
 } from "../lib/api";
+import {
+  getSettlementCurrencyLabel,
+  getSettlementNativeGasSymbol,
+  getSettlementNetworkLabel,
+  normalizeSettlementChain,
+  type SettlementChain
+} from "../lib/settlement";
 
 type Status = { type: "success" | "error"; message: string } | null;
 
@@ -67,8 +74,17 @@ function companyTimeZoneLabel(value?: string | null) {
 }
 
 function normalizeCompanySettings(settings: CompanySettings) {
+  const settlementChain = normalizeSettlementChain(settings.settlement?.chain, "ethereum");
   return {
     ...settings,
+    settlement: {
+      ...settings.settlement,
+      chain: settlementChain
+    },
+    payroll: {
+      ...settings.payroll,
+      currency: getSettlementCurrencyLabel(settlementChain)
+    },
     profile: {
       ...settings.profile,
       timeZone: normalizeCompanyTimeZone(settings.profile.timeZone)
@@ -232,6 +248,18 @@ export default function SettingsPage() {
     setSettings((prev) => (prev ? { ...prev, payroll: { ...prev.payroll, ...patch } } : prev));
   };
 
+  const updateSettlementChain = (chain: SettlementChain) => {
+    setSettings((prev) =>
+      prev
+        ? {
+            ...prev,
+            settlement: { ...prev.settlement, chain },
+            payroll: { ...prev.payroll, currency: getSettlementCurrencyLabel(chain) }
+          }
+        : prev
+    );
+  };
+
   const applyPayrollSchedule = (preset: string, customDay?: number) => {
     const existing = settings?.payroll.payrollDay ?? "15th of each month";
     const parsed = parsePayrollSchedule(existing);
@@ -286,14 +314,15 @@ export default function SettingsPage() {
       const { settings: next } = await updateCompanySettings(context.id, settings);
       const normalizedSettings = normalizeCompanySettings(next);
       setSettings(normalizedSettings);
-      if (context.name !== next.profile.companyName || context.email !== next.profile.companyEmail) {
-        saveCompanyContext({
-          id: context.id,
-          name: normalizedSettings.profile.companyName,
-          email: normalizedSettings.profile.companyEmail || context.email,
-          treasuryAddress: context.treasuryAddress ?? null
-        });
-      }
+      const nextContext = {
+        id: context.id,
+        name: normalizedSettings.profile.companyName,
+        email: normalizedSettings.profile.companyEmail || context.email,
+        treasuryAddress: context.treasuryAddress ?? null,
+        treasuryChain: normalizedSettings.settlement.chain
+      } satisfies CompanyContext;
+      saveCompanyContext(nextContext);
+      setContext(nextContext);
 
       if (options?.triggerTodayPayroll) {
         try {
@@ -355,6 +384,10 @@ export default function SettingsPage() {
   const companyTimeZone = settings ? normalizeCompanyTimeZone(settings.profile.timeZone) : DEFAULT_COMPANY_TIME_ZONE;
   const companyTimeZoneDisplay = companyTimeZoneLabel(settings?.profile.timeZone);
   const todayPayrollLabel = settings ? getTodayPayrollLabel(companyTimeZone) : "15th of each month";
+  const settlementChain = normalizeSettlementChain(settings?.settlement?.chain, "ethereum");
+  const settlementCurrencyLabel = getSettlementCurrencyLabel(settlementChain);
+  const settlementNetworkLabel = getSettlementNetworkLabel(settlementChain);
+  const settlementGasSymbol = getSettlementNativeGasSymbol(settlementChain);
 
   const sectionBadges = settings
     ? {
@@ -367,7 +400,7 @@ export default function SettingsPage() {
         payroll: (
           <span className={`badge badge-${settings.payroll.autoProcess ? "accent" : "neutral"}`}>
             <span className="badge-dot" />
-            {settings.payroll.autoProcess ? "Automation On" : "Manual Control"}
+            {settings.payroll.autoProcess ? `${settlementNetworkLabel} Auto` : `${settlementNetworkLabel} Manual`}
           </span>
         ),
         security: (
@@ -675,15 +708,21 @@ export default function SettingsPage() {
                       </span>
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Default Currency</label>
+                      <label className="form-label">Settlement Network</label>
                       <select
                         className="form-select"
-                        value={settings.payroll.currency}
-                        onChange={(e) => updatePayroll({ currency: e.target.value })}
+                        value={settlementChain}
+                        onChange={(e) => updateSettlementChain(e.target.value as SettlementChain)}
+                        disabled={settings.settlement.switchAllowed === false}
                       >
-                        <option>USDC</option>
-                        <option>USDT on Ethereum</option>
+                        <option value="ethereum">{getSettlementNetworkLabel("ethereum")}</option>
+                        <option value="polygon">{getSettlementNetworkLabel("polygon")}</option>
                       </select>
+                      <span className="form-hint">
+                        {settings.settlement.switchAllowed === false
+                          ? settings.settlement.switchBlockedReason ?? "Network switching is locked after treasury activity begins."
+                          : `All treasury, payroll, lending, and contract writes will use ${settlementCurrencyLabel} on ${settlementNetworkLabel}.`}
+                      </span>
                     </div>
                   </div>
 
@@ -731,7 +770,7 @@ export default function SettingsPage() {
                     <div className="settings-callout-title">Quick Payroll Actions</div>
                     <div className="settings-callout-copy">
                       Current schedule: <strong>{settings.payroll.payrollDay}</strong>. Auto-process follows the
-                      configured rule, but you can still trigger a live payroll run immediately.
+                      configured rule, but you can still trigger a live payroll run immediately. Live disbursals settle in <strong>{settlementCurrencyLabel}</strong>.
                     </div>
                     <div className="settings-section-actions">
                       <button
@@ -766,9 +805,7 @@ export default function SettingsPage() {
                   <div className="settings-callout settings-callout-highlight">
                     <div className="settings-callout-title">Runtime note</div>
                     <div className="settings-callout-copy">
-                      Primary treasury settlement now runs on USDT on Ethereum. The OpenClaw orchestration path, FlowPay policy engine,
-                      and WDK execution layer are kept visible here so the settings surface mirrors the actual control
-                      plane.
+                      Primary treasury settlement now runs on <strong>{settlementCurrencyLabel}</strong>, and this company must keep native <strong>{settlementGasSymbol}</strong> in treasury for gas. The OpenClaw orchestration path, FlowPay policy engine, and WDK execution layer are kept visible here so the settings surface mirrors the actual control plane.
                     </div>
                   </div>
 

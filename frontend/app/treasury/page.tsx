@@ -8,6 +8,12 @@ import { loadCompanyContext, type CompanyContext } from "../lib/companyContext";
 import {
   getTransactionHashFallbackLabel
 } from "../lib/transactions";
+import {
+  getSettlementNativeGasLabel,
+  getSettlementNativeGasSymbol,
+  getSettlementNetworkLabel,
+  normalizeSettlementChain
+} from "../lib/settlement";
 
 const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -77,6 +83,10 @@ export default function TreasuryPage() {
     setCtx(loadCompanyContext());
   }, []);
   const walletAddress = ctx?.treasuryAddress ?? treasury.data?.wallet_address ?? null;
+  const treasuryChain = normalizeSettlementChain(treasury.data?.chain ?? ctx?.treasuryChain, "ethereum");
+  const treasuryNetworkLabel = getSettlementNetworkLabel(treasuryChain);
+  const treasuryGasLabel = getSettlementNativeGasLabel(treasuryChain);
+  const treasuryGasSymbol = getSettlementNativeGasSymbol(treasuryChain);
   const balance = parseFloat(treasury.data?.balance ?? "0");
   const balanceSymbol = treasury.data?.token_symbol ?? "ETH";
   const maxWithdrawable = parseFloat(treasury.data?.max_withdrawable ?? "0");
@@ -104,7 +114,7 @@ export default function TreasuryPage() {
 
   async function handleContinue() {
     if (!isEvmAddress(trimmedDest)) {
-      setActionError("Enter a valid Ethereum wallet address.");
+      setActionError("Enter a valid wallet address.");
       return;
     }
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
@@ -176,7 +186,7 @@ export default function TreasuryPage() {
 
       {/* Wallet card */}
       <div className="wallet-card">
-        <div className="wallet-card-label">Treasury Wallet · Ethereum</div>
+        <div className="wallet-card-label">Treasury Wallet · {treasuryNetworkLabel}</div>
         {treasury.loading ? (
           <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 32, fontWeight: 700 }}>Loading…</div>
         ) : (
@@ -221,7 +231,7 @@ export default function TreasuryPage() {
           <div className="card-header">
             <div>
               <div className="card-title">Wallet Address</div>
-              <div className="card-subtitle">Use this address to receive funds on Ethereum</div>
+              <div className="card-subtitle">Use this address to receive funds on {treasuryNetworkLabel}</div>
             </div>
             <Badge variant="success">Active</Badge>
           </div>
@@ -233,9 +243,9 @@ export default function TreasuryPage() {
             <div className="alert alert-info mt-4" style={{ marginTop: 16 }}>
               <span className="alert-icon"><Icon d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={16} /></span>
               <span>
-  {balanceSymbol === "ETH"
-    ? "Only send ETH to this address. Sending other assets may result in permanent loss of funds."
-    : `Only send ${balanceSymbol} or native ETH to this address. Sending other assets may result in permanent loss of funds.`}
+  {balanceSymbol === treasuryGasSymbol
+    ? `Only send ${treasuryGasSymbol} to this address. Sending other assets may result in permanent loss of funds.`
+    : `Only send ${balanceSymbol} or ${treasuryGasLabel} to this address. Sending other assets may result in permanent loss of funds.`}
 </span>
             </div>
             <div className="alert alert-warning mt-4" style={{ marginTop: 16 }}>
@@ -351,7 +361,7 @@ export default function TreasuryPage() {
                     value={dest}
                     onChange={e => setDest(e.target.value)}
                   />
-                  <span className="form-hint">Must be a valid Ethereum-compatible recipient address.</span>
+                  <span className="form-hint">Must be a valid EVM-compatible recipient address.</span>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Amount ({balanceSymbol})</label>
@@ -445,11 +455,11 @@ export default function TreasuryPage() {
                 </div>
                 <div className="alert alert-info">
                   <span className="alert-icon"><Icon d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={16} /></span>
-                  <span>Maintain at least 0.002 ETH in this treasury wallet for gas so employee setup, payroll, lending, and other on-chain actions can run.</span>
+                  <span>Maintain at least 0.002 {treasuryGasSymbol} in this treasury wallet for gas so employee setup, payroll, lending, and other on-chain actions can run.</span>
                 </div>
                 <div className="alert alert-warning">
                   <span className="alert-icon"><Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} /></span>
-                  <span>Transfers on Ethereum networks take 1–3 minutes to confirm.</span>
+                  <span>Transfers on {treasuryNetworkLabel} usually confirm in 1-3 minutes.</span>
                 </div>
               </div>
             </div>

@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS wallets (
   wallet_address TEXT NOT NULL,
   wallet_id TEXT NOT NULL,
   encrypted_seed TEXT NOT NULL,
-  chain TEXT NOT NULL DEFAULT 'sepolia',
+  chain TEXT NOT NULL DEFAULT 'ethereum',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   amount NUMERIC(18,6) NOT NULL,
   tx_hash TEXT,
   token_symbol TEXT NOT NULL DEFAULT 'ETH',
+  chain TEXT NOT NULL DEFAULT 'ethereum',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -113,6 +114,7 @@ CREATE TABLE IF NOT EXISTS payroll_disbursements (
 CREATE TABLE IF NOT EXISTS company_settings (
   company_id UUID PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
   profile JSONB NOT NULL,
+  settlement JSONB NOT NULL DEFAULT '{"chain":"ethereum"}'::jsonb,
   payroll JSONB NOT NULL,
   security JSONB NOT NULL,
   agent JSONB NOT NULL,

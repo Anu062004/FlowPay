@@ -4,9 +4,9 @@ import { db } from "../db/pool.js";
 import { allocateTreasury } from "./treasuryService.js";
 import { getTokenBalance, getTokenTransfers } from "./indexerService.js";
 import { formatTokenAmount } from "../utils/amounts.js";
-import { withRpcFailover } from "./rpcService.js";
+import { withRpcFailoverForChain } from "./rpcService.js";
+import { getSettlementTokenConfig, normalizeSettlementChain } from "../utils/settlement.js";
 const pollIntervalMs = 30000;
-const useTokenIndexer = Boolean(env.TREASURY_TOKEN_ADDRESS && env.TREASURY_TOKEN_SYMBOL);
 
 function depositWatchersEnabled() {
   return (env.DEPOSIT_WATCHERS_ENABLED ?? "true").toLowerCase() === "true";
@@ -15,6 +15,7 @@ function depositWatchersEnabled() {
 type Watcher = {
   address: string;
   companyId: string;
+  chain: string;
   lastBalance?: bigint;
   lastBlock?: number;
   lastSeenAt?: number;
@@ -92,13 +93,14 @@ function extractAmountRaw(transfer: any): string | null {
 async function pollWallet(walletId: string) {
   const watcher = watchers.get(walletId);
   if (!watcher) return;
+  const tokenConfig = getSettlementTokenConfig(
+    normalizeSettlementChain(watcher.chain, "ethereum")
+  );
 
-  if (useTokenIndexer) {
-    const token = env.TREASURY_TOKEN_SYMBOL!.toLowerCase();
-    const blockchain = env.TREASURY_TOKEN_BLOCKCHAIN;
+  if (tokenConfig) {
     const transfersData = await getTokenTransfers({
-      blockchain,
-      token,
+      blockchain: tokenConfig.blockchain,
+      token: tokenConfig.symbol.toLowerCase(),
       address: watcher.address,
       limit: 200
     });
@@ -106,7 +108,7 @@ async function pollWallet(walletId: string) {
     const addressLower = watcher.address.toLowerCase();
     let sawDeposit = false;
     let newestSeen = watcher.lastSeenAt ?? 0;
-    const decimals = parseInt(env.TREASURY_TOKEN_DECIMALS, 10);
+    const decimals = tokenConfig.decimals;
 
     for (const transfer of transfers) {
       const recipient = extractRecipient(transfer)?.toLowerCase();
@@ -149,8 +151,8 @@ async function pollWallet(walletId: string) {
 
       if ((updateResult.rowCount ?? 0) === 0) {
         await db.query(
-          "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol) VALUES ($1, 'deposit', $2, $3, $4)",
-          [walletId, amountFormatted, txHash, env.TREASURY_TOKEN_SYMBOL]
+          "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, chain) VALUES ($1, 'deposit', $2, $3, $4, $5)",
+          [walletId, amountFormatted, txHash, tokenConfig.symbol, tokenConfig.blockchain]
         );
       }
 
@@ -162,8 +164,8 @@ async function pollWallet(walletId: string) {
 
     if (sawDeposit) {
       const balanceData = await getTokenBalance({
-        blockchain,
-        token,
+        blockchain: tokenConfig.blockchain,
+        token: tokenConfig.symbol.toLowerCase(),
         address: watcher.address
       });
       const balanceRaw = BigInt(
@@ -177,7 +179,7 @@ async function pollWallet(walletId: string) {
     return;
   }
 
-  const currentBlock = await withRpcFailover("deposit watcher getBlockNumber", (provider) =>
+  const currentBlock = await withRpcFailoverForChain(watcher.chain, "deposit watcher getBlockNumber", (provider) =>
     provider.getBlockNumber()
   );
   if (watcher.lastBlock !== undefined && currentBlock <= watcher.lastBlock) return;
@@ -187,7 +189,7 @@ async function pollWallet(walletId: string) {
   const startBlock = watcher.lastBlock ?? Math.max(currentBlock - 120, 0);
 
   for (let blockNumber = startBlock + 1; blockNumber <= currentBlock; blockNumber += 1) {
-    const block = (await withRpcFailover(`deposit watcher getBlock ${blockNumber}`, (provider) =>
+    const block = (await withRpcFailoverForChain(watcher.chain, `deposit watcher getBlock ${blockNumber}`, (provider) =>
       provider.getBlock(blockNumber, true)
     )) as any;
     const transactions = (block?.transactions ?? []) as any[];
@@ -212,7 +214,7 @@ async function pollWallet(walletId: string) {
              AND amount = $2
            ORDER BY created_at DESC
            LIMIT 1
-         )
+        )
          UPDATE transactions SET tx_hash = $3
          WHERE id IN (SELECT id FROM target)
          RETURNING id`,
@@ -221,8 +223,8 @@ async function pollWallet(walletId: string) {
 
       if ((updateResult.rowCount ?? 0) === 0) {
         await db.query(
-          "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol) VALUES ($1, 'deposit', $2, $3, $4)",
-          [walletId, amountEth, tx.hash, "ETH"]
+          "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, chain) VALUES ($1, 'deposit', $2, $3, $4, $5)",
+          [walletId, amountEth, tx.hash, "ETH", watcher.chain]
         );
       }
       sawDeposit = true;
@@ -232,7 +234,7 @@ async function pollWallet(walletId: string) {
   watcher.lastBlock = currentBlock;
 
   if (sawDeposit) {
-    const balance = await withRpcFailover("deposit watcher getBalance", (provider) =>
+    const balance = await withRpcFailoverForChain(watcher.chain, "deposit watcher getBalance", (provider) =>
       provider.getBalance(watcher.address)
     );
     await allocateTreasury(watcher.companyId, balance);
@@ -255,15 +257,16 @@ export async function startDepositWatcher(
       console.error("Deposit watcher error", { walletId, error });
     });
   }, pollIntervalMs);
+  const walletResult = await db.query("SELECT chain FROM wallets WHERE id = $1", [walletId]);
+  const chain = String(walletResult.rows[0]?.chain ?? "ethereum").toLowerCase();
+  const tokenConfig = getSettlementTokenConfig(normalizeSettlementChain(chain, "ethereum"));
 
-  if (useTokenIndexer) {
+  if (tokenConfig) {
     let lastSeenAt = Date.now();
     try {
-      const token = env.TREASURY_TOKEN_SYMBOL!.toLowerCase();
-      const blockchain = env.TREASURY_TOKEN_BLOCKCHAIN;
       const transfersData = await getTokenTransfers({
-        blockchain,
-        token,
+        blockchain: tokenConfig.blockchain,
+        token: tokenConfig.symbol.toLowerCase(),
         address,
         limit: 1
       });
@@ -277,16 +280,17 @@ export async function startDepositWatcher(
     watchers.set(walletId, {
       address,
       companyId,
+      chain,
       lastSeenAt,
       timer
     });
     return;
   }
 
-  const balance = await withRpcFailover("deposit watcher initialize balance", (provider) =>
+  const balance = await withRpcFailoverForChain(chain, "deposit watcher initialize balance", (provider) =>
     provider.getBalance(address)
   );
-  const currentBlock = await withRpcFailover("deposit watcher initialize blockNumber", (provider) =>
+  const currentBlock = await withRpcFailoverForChain(chain, "deposit watcher initialize blockNumber", (provider) =>
     provider.getBlockNumber()
   );
   const lastBlock = Math.max(currentBlock - 120, 0);
@@ -294,6 +298,7 @@ export async function startDepositWatcher(
   watchers.set(walletId, {
     address,
     companyId,
+    chain,
     lastBalance: balance,
     lastBlock,
     timer

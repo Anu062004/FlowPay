@@ -13,11 +13,20 @@ const sepoliaRpcUrl =
   process.env.RPC_URL ||
   "";
 
+const polygonRpcUrl =
+  process.env.POLYGON_RPC_URL ||
+  process.env.RPC_URL ||
+  "";
+
 const config: HardhatUserConfig = {
   solidity: "0.8.24",
   networks: {
     mainnet: {
       url: mainnetRpcUrl,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
+    },
+    polygon: {
+      url: polygonRpcUrl,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
     },
     sepolia: {

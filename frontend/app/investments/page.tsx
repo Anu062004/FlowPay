@@ -205,15 +205,16 @@ export default function InvestmentsPage() {
     }
 
     const context = loadCompanyContext();
-    if (!context?.id || context.treasuryAddress === treasuryAddress) {
+    if (!context?.id || (context.treasuryAddress === treasuryAddress && context.treasuryChain === treasury.data?.chain)) {
       return;
     }
 
     saveCompanyContext({
       ...context,
-      treasuryAddress
+      treasuryAddress,
+      treasuryChain: treasury.data?.chain ?? context.treasuryChain ?? null
     });
-  }, [treasuryAddress]);
+  }, [treasury.data?.chain, treasuryAddress]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {

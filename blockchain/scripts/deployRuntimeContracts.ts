@@ -29,20 +29,26 @@ function updateBackendEnv(addresses: RuntimeDeployAddresses) {
     }
   };
 
-  replaceOrAppend("FLOW_PAY_CORE_ADDRESS", addresses.core);
-  replaceOrAppend("FLOW_PAY_LOAN_ADDRESS", addresses.loan);
-  replaceOrAppend("SCORE_TIER_VERIFIER_ADDRESS", addresses.scoreTierVerifier);
-  replaceOrAppend("FLOW_PAY_CORE_DEPLOY_TX_HASH", addresses.coreDeployTxHash);
-  replaceOrAppend("FLOW_PAY_LOAN_DEPLOY_TX_HASH", addresses.loanDeployTxHash);
-  replaceOrAppend("FLOW_PAY_CORE_SET_LOAN_TX_HASH", addresses.coreSetLoanTxHash);
-  replaceOrAppend("SCORE_TIER_VERIFIER_DEPLOY_TX_HASH", addresses.scoreTierVerifierDeployTxHash);
+  const isPolygon = network.name === "polygon";
+  replaceOrAppend(isPolygon ? "POLYGON_FLOW_PAY_CORE_ADDRESS" : "FLOW_PAY_CORE_ADDRESS", addresses.core);
+  replaceOrAppend(isPolygon ? "POLYGON_FLOW_PAY_LOAN_ADDRESS" : "FLOW_PAY_LOAN_ADDRESS", addresses.loan);
+  replaceOrAppend(isPolygon ? "POLYGON_SCORE_TIER_VERIFIER_ADDRESS" : "SCORE_TIER_VERIFIER_ADDRESS", addresses.scoreTierVerifier);
+  replaceOrAppend(isPolygon ? "POLYGON_FLOW_PAY_CORE_DEPLOY_TX_HASH" : "FLOW_PAY_CORE_DEPLOY_TX_HASH", addresses.coreDeployTxHash);
+  replaceOrAppend(isPolygon ? "POLYGON_FLOW_PAY_LOAN_DEPLOY_TX_HASH" : "FLOW_PAY_LOAN_DEPLOY_TX_HASH", addresses.loanDeployTxHash);
+  replaceOrAppend(isPolygon ? "POLYGON_FLOW_PAY_CORE_SET_LOAN_TX_HASH" : "FLOW_PAY_CORE_SET_LOAN_TX_HASH", addresses.coreSetLoanTxHash);
+  replaceOrAppend(
+    isPolygon ? "POLYGON_SCORE_TIER_VERIFIER_DEPLOY_TX_HASH" : "SCORE_TIER_VERIFIER_DEPLOY_TX_HASH",
+    addresses.scoreTierVerifierDeployTxHash
+  );
 
   const selectedRpcUrl =
     network.name === "mainnet"
       ? process.env.ETHEREUM_RPC_URL || process.env.MAINNET_RPC_URL || process.env.RPC_URL
-      : process.env.SEPOLIA_RPC_URL || process.env.RPC_URL;
+      : network.name === "polygon"
+        ? process.env.POLYGON_RPC_URL || process.env.RPC_URL
+        : process.env.SEPOLIA_RPC_URL || process.env.RPC_URL;
   if (selectedRpcUrl) {
-    replaceOrAppend("FLOWPAY_CONTRACT_RPC_URL", selectedRpcUrl);
+    replaceOrAppend(network.name === "polygon" ? "POLYGON_RPC_URL" : "FLOWPAY_CONTRACT_RPC_URL", selectedRpcUrl);
   }
 
   fs.writeFileSync(envPath, content);

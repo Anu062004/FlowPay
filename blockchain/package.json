@@ -9,7 +9,10 @@
     "deploy:runtime": "hardhat run scripts/deployRuntimeContracts.ts --network sepolia",
     "deploy:mainnet": "hardhat run scripts/deploy.ts --network mainnet",
     "deploy:all:mainnet": "hardhat run scripts/deployAll.ts --network mainnet",
-    "deploy:runtime:mainnet": "hardhat run scripts/deployRuntimeContracts.ts --network mainnet"
+    "deploy:runtime:mainnet": "hardhat run scripts/deployRuntimeContracts.ts --network mainnet",
+    "deploy:polygon": "hardhat run scripts/deploy.ts --network polygon",
+    "deploy:all:polygon": "hardhat run scripts/deployAll.ts --network polygon",
+    "deploy:runtime:polygon": "hardhat run scripts/deployRuntimeContracts.ts --network polygon"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

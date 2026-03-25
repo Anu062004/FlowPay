@@ -49,6 +49,14 @@ const chainRpcPools = new Map<string, RpcPool>([
     )
   ],
   [
+    "polygon",
+    buildRpcPool(
+      "polygon",
+      env.POLYGON_RPC_URL?.trim() || env.RPC_URL,
+      env.POLYGON_RPC_FALLBACK_URLS ?? env.RPC_FALLBACK_URLS
+    )
+  ],
+  [
     "sepolia",
     buildRpcPool(
       "sepolia",
@@ -145,6 +153,10 @@ export function getRpcProviderForChain(chain: string, url = getChainPrimaryRpcUr
 
 export function getContractRpcProvider(url = getContractPrimaryRpcUrl()) {
   return getRpcProvider(url);
+}
+
+export function getContractRpcProviderForChain(chain: string) {
+  return getRpcProviderForChain(chain);
 }
 
 export async function withRpcFailover<T>(

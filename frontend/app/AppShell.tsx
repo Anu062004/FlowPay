@@ -19,6 +19,7 @@ import {
   type CompanyContext,
   type EmployeeContext
 } from "./lib/companyContext";
+import { getSettlementNetworkLabel, normalizeSettlementChain } from "./lib/settlement";
 
 const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -211,7 +212,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             id: currentCompany.company.id,
             name: currentCompany.company.name,
             email: currentCompany.company.email,
-            treasuryAddress: currentCompany.company.treasury_address ?? null
+            treasuryAddress: currentCompany.company.treasury_address ?? null,
+            treasuryChain: currentCompany.company.treasury_chain ?? null
           };
           saveCompanyContext(nextCompany);
         } else {
@@ -284,7 +286,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const activeRole = employeeView ? "Employee" : "Employer";
   const activeMeta = employeeView
     ? shortAddress(employeeCtx?.walletAddress)
-    : shortAddress(companyCtx?.treasuryAddress) || companyCtx?.email || null;
+    : companyCtx?.treasuryChain
+      ? `${getSettlementNetworkLabel(normalizeSettlementChain(companyCtx.treasuryChain))} settlement`
+      : shortAddress(companyCtx?.treasuryAddress) || companyCtx?.email || null;
 
   const handleLogout = async () => {
     await Promise.allSettled([logoutCompany(), logoutEmployee()]);

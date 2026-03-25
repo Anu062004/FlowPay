@@ -7,6 +7,7 @@ export type CompanyContext = {
   name?: string;
   email?: string;
   treasuryAddress?: string | null;
+  treasuryChain?: string | null;
 };
 
 const COMPANY_KEY = "flowpay_company";

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch, type Company } from "../lib/api";
 import { CompanyContext, clearCompanyContext, loadCompanyContext, saveCompanyContext } from "../lib/companyContext";
+import { getSettlementNetworkLabel, normalizeSettlementChain } from "../lib/settlement";
 
 function ContextItem({ label, value }: { label: string; value: string }) {
   return (
@@ -29,7 +30,8 @@ export default function CompanyContextBar() {
         id: data.id,
         name: data.name,
         email: data.email,
-        treasuryAddress: data.treasury_address ?? null
+        treasuryAddress: data.treasury_address ?? null,
+        treasuryChain: data.treasury_chain ?? null
       } as CompanyContext;
       saveCompanyContext(next);
       setContext(next);
@@ -86,6 +88,12 @@ export default function CompanyContextBar() {
       <div className="company-context-grid">
         {context.email ? <ContextItem label="Company Email" value={context.email} /> : null}
         <ContextItem label="Company ID" value={context.id} />
+        {context.treasuryChain ? (
+          <ContextItem
+            label="Settlement Network"
+            value={getSettlementNetworkLabel(normalizeSettlementChain(context.treasuryChain))}
+          />
+        ) : null}
         {context.treasuryAddress ? <ContextItem label="Treasury Address" value={context.treasuryAddress} /> : null}
       </div>
 

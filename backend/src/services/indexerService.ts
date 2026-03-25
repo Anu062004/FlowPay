@@ -1,10 +1,11 @@
 import { env } from "../config/env.js";
 import { Contract, isAddress } from "ethers";
 import { withRpcFailoverForChain } from "./rpcService.js";
+import { getSettlementTokenConfig, normalizeSettlementChain } from "../utils/settlement.js";
 
 const baseUrl = env.WDK_INDEXER_BASE_URL.replace(/\/+$/, "");
 const INDEXER_MAX_ATTEMPTS = 3;
-const SUPPORTED_EVM_CHAINS = new Set(["ethereum", "sepolia"]);
+const SUPPORTED_EVM_CHAINS = new Set(["ethereum", "polygon", "sepolia"]);
 const RETRIABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 const ERC20_ABI = ["function balanceOf(address owner) view returns (uint256)"];
 
@@ -48,16 +49,12 @@ function resolveRpcTokenAddress(blockchain: string, token: string) {
     return normalizedToken;
   }
 
-  const treasurySymbol = env.TREASURY_TOKEN_SYMBOL?.toLowerCase();
-  const treasuryAddress = env.TREASURY_TOKEN_ADDRESS;
-  const treasuryBlockchain = env.TREASURY_TOKEN_BLOCKCHAIN.toLowerCase();
-  if (
-    treasuryAddress &&
-    treasurySymbol &&
-    treasuryBlockchain === normalizedBlockchain &&
-    normalizedToken === treasurySymbol
-  ) {
-    return treasuryAddress;
+  const settlementChain = normalizeSettlementChain(normalizedBlockchain, "ethereum");
+  if (settlementChain === normalizedBlockchain) {
+    const tokenConfig = getSettlementTokenConfig(settlementChain);
+    if (tokenConfig && normalizedToken === tokenConfig.symbol.toLowerCase()) {
+      return tokenConfig.address;
+    }
   }
 
   return null;

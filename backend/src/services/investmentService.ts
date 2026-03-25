@@ -15,6 +15,8 @@ import {
   getCurrentInvestmentAllocation
 } from "./investmentExecutionService.js";
 import { evaluateAgentPolicy } from "./agentPolicyService.js";
+import { getCompanySettlementChain } from "./companySettlementService.js";
+import { getSettlementCurrencyLabel, getSettlementNetworkLabel } from "../utils/settlement.js";
 
 type AggregatedPolicyResult = AgentPolicyResult & {
   itemResults: Array<{
@@ -163,13 +165,31 @@ export function getExecutableInvestmentProtocols() {
   return Array.from(getExecutableProtocols());
 }
 
+async function getInvestmentSupportState(companyId: string) {
+  const chain = await getCompanySettlementChain(companyId);
+  if (chain !== "ethereum") {
+    return {
+      chain,
+      supported: false,
+      reason: `Investment automation is not configured for ${getSettlementNetworkLabel(chain)} yet. Treasury, payroll, lending, and contract sync support ${getSettlementCurrencyLabel(chain)}, but TradingAgents execution still needs Polygon-specific protocol addresses.`
+    };
+  }
+
+  return {
+    chain,
+    supported: true,
+    reason: null
+  };
+}
+
 export async function getTradingAgentsOverview(companyId: string) {
+  const investmentSupport = await getInvestmentSupportState(companyId);
   const configured = Boolean(env.TRADING_AGENTS_URL?.trim() && env.TRADING_AGENTS_SECRET?.trim());
   let reachable = false;
   let health: Record<string, unknown> | null = null;
-  let healthError: string | null = null;
+  let healthError: string | null = investmentSupport.reason;
 
-  if (configured) {
+  if (configured && investmentSupport.supported) {
     try {
       health = await checkTradingAgentsHealth();
       reachable = true;
@@ -415,6 +435,11 @@ function summarizeDecision(decision: TradingAgentsDecision) {
 }
 
 export async function runInvestment(companyId: string, auditContext: AgentLogContext = {}) {
+  const investmentSupport = await getInvestmentSupportState(companyId);
+  if (!investmentSupport.supported) {
+    throw new Error(investmentSupport.reason ?? "Investment automation is not configured for this settlement network");
+  }
+
   ensureStableTreasuryConfig();
   const treasuryTokenSymbol = getTreasuryTokenSymbol();
 

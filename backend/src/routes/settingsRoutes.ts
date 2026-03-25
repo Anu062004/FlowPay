@@ -14,6 +14,11 @@ const settingsSchema = z.object({
     companyEmail: z.string().email().or(z.literal("")),
     timeZone: z.string().min(1)
   }),
+  settlement: z.object({
+    chain: z.enum(["ethereum", "polygon"]),
+    switchAllowed: z.boolean().optional(),
+    switchBlockedReason: z.string().nullable().optional()
+  }),
   payroll: z.object({
     payrollDay: z.string().min(1),
     currency: z.string().min(1),

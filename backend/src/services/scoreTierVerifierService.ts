@@ -1,9 +1,10 @@
 import { ethers } from "ethers";
-import { env } from "../config/env.js";
 import { computeEmployeeCommit } from "../zk/poseidon.js";
 import type { ScoreTierSolidityCalldata } from "../zk/generateTierProof.js";
 import { getCompanyContractKey, sendCompanyManagedContractTransaction } from "./companyContractSignerService.js";
-import { getContractRpcProvider } from "./rpcService.js";
+import { getContractRpcProviderForChain } from "./rpcService.js";
+import { getCompanySettlementChain } from "./companySettlementService.js";
+import { getContractAddressesForChain } from "../utils/settlement.js";
 
 const SCORE_TIER_VERIFIER_ABI = [
   "function registerCompanyActor(bytes32 companyId, address actor) external",
@@ -13,16 +14,18 @@ const SCORE_TIER_VERIFIER_ABI = [
   "function previewVerifyScoreTier(uint256[2] pA, uint256[2][2] pB, uint256[2] pC, uint256[4] pubSignals, address employeeAddr) external view returns (bool)"
 ];
 
-function getVerifierAddress() {
-  const address = env.SCORE_TIER_VERIFIER_ADDRESS?.trim();
-  if (!address) {
-    throw new Error("SCORE_TIER_VERIFIER_ADDRESS is not configured");
-  }
-  return address;
+async function getVerifierAddress(companyId: string) {
+  const chain = await getCompanySettlementChain(companyId);
+  return getContractAddressesForChain(chain).verifier;
 }
 
-function getVerifierContract() {
-  return new ethers.Contract(getVerifierAddress(), SCORE_TIER_VERIFIER_ABI, getContractRpcProvider());
+async function getVerifierContract(companyId: string) {
+  const chain = await getCompanySettlementChain(companyId);
+  return new ethers.Contract(
+    getContractAddressesForChain(chain).verifier,
+    SCORE_TIER_VERIFIER_ABI,
+    getContractRpcProviderForChain(chain)
+  );
 }
 
 export async function registerEmployeeCommitOnVerifier(
@@ -31,9 +34,10 @@ export async function registerEmployeeCommitOnVerifier(
   companySalt: string
 ) {
   const employeeCommit = await computeEmployeeCommit(employeeAddr, companySalt);
+  const verifierAddress = await getVerifierAddress(companyId);
   const tx = await sendCompanyManagedContractTransaction({
     companyId,
-    contractAddress: getVerifierAddress(),
+    contractAddress: verifierAddress,
     abi: SCORE_TIER_VERIFIER_ABI,
     method: "registerEmployeeCommit",
     args: [getCompanyContractKey(companyId), employeeAddr, employeeCommit]
@@ -50,7 +54,8 @@ export async function verifyScoreTierOnChain(input: {
   employeeAddr: string;
   solidityCalldata: ScoreTierSolidityCalldata;
 }) {
-  const contract = getVerifierContract();
+  const verifierAddress = await getVerifierAddress(input.companyId);
+  const contract = await getVerifierContract(input.companyId);
   const verified = await contract.previewVerifyScoreTier(
     input.solidityCalldata.pA,
     input.solidityCalldata.pB,
@@ -65,7 +70,7 @@ export async function verifyScoreTierOnChain(input: {
 
   const tx = await sendCompanyManagedContractTransaction({
     companyId: input.companyId,
-    contractAddress: getVerifierAddress(),
+    contractAddress: verifierAddress,
     abi: SCORE_TIER_VERIFIER_ABI,
     method: "verifyScoreTier",
     args: [

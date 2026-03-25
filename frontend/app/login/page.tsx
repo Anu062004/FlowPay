@@ -12,6 +12,7 @@ import {
   clearEmployeeContext,
   saveCompanyContext,
 } from "../lib/companyContext";
+import { getSettlementCurrencyLabel, getSettlementNetworkLabel, type SettlementChain } from "../lib/settlement";
 
 type Status = { type: "success" | "error"; message: string } | null;
 
@@ -28,6 +29,7 @@ function EmployerLoginInner() {
   const [companyName, setCompanyName] = useState("");
   const [companyEmail, setCompanyEmail] = useState("");
   const [companyAccessPin, setCompanyAccessPin] = useState("");
+  const [settlementChain, setSettlementChain] = useState<SettlementChain>("ethereum");
   const [companyAccess, setCompanyAccess] = useState("");
   const [companyLoginPin, setCompanyLoginPin] = useState("");
   const [companyLoginEmail, setCompanyLoginEmail] = useState("");
@@ -41,7 +43,8 @@ function EmployerLoginInner() {
       id: company.id,
       name: company.name,
       email: company.email,
-      treasuryAddress: company.treasury_address ?? null
+      treasuryAddress: company.treasury_address ?? null,
+      treasuryChain: company.treasury_chain ?? settlementChain
     });
     router.push(nextPath ?? "/dashboard");
   };
@@ -54,7 +57,8 @@ function EmployerLoginInner() {
       const data = await registerCompany({
         name: companyName.trim(),
         email: companyEmail.trim(),
-        accessPin: companyAccessPin.trim()
+        accessPin: companyAccessPin.trim(),
+        settlementChain
       });
       setStatus({
         type: "success",
@@ -156,6 +160,18 @@ function EmployerLoginInner() {
                       required
                     />
                     <span className="form-hint">This PIN is required every time someone opens the employer dashboard.</span>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Settlement Network</label>
+                    <select
+                      className="form-select"
+                      value={settlementChain}
+                      onChange={(e) => setSettlementChain(e.target.value as SettlementChain)}
+                    >
+                      <option value="ethereum">{getSettlementNetworkLabel("ethereum")} · {getSettlementCurrencyLabel("ethereum")}</option>
+                      <option value="polygon">{getSettlementNetworkLabel("polygon")} · {getSettlementCurrencyLabel("polygon")}</option>
+                    </select>
+                    <span className="form-hint">Treasury, payroll, lending, and contract writes stay on the selected network for this company.</span>
                   </div>
                   <button className="btn btn-primary" type="submit" disabled={busyAction !== null}>
                     {busyAction === "create-company" ? "Creating..." : "Create Company Wallet"}

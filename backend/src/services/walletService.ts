@@ -16,6 +16,12 @@ import { startDepositWatcher } from "./depositWatcher.js";
 import { generateSeedPhrase } from "../utils/seed.js";
 import { getTokenBalance as getIndexedTokenBalance } from "./indexerService.js";
 import {
+  getDefaultSettlementChain,
+  getNativeGasAssetLabel,
+  getSettlementTokenConfig,
+  normalizeSettlementChain
+} from "../utils/settlement.js";
+import {
   getRoundRobinRpcUrlForChain,
   withRpcFailover,
   withRpcFailoverForChain
@@ -23,7 +29,7 @@ import {
 
 const transferMaxFee = BigInt(env.WDK_TRANSFER_MAX_FEE);
 const minimumNativeGasReserveWei = parseAmount(env.MIN_NATIVE_GAS_RESERVE_ETH);
-const SUPPORTED_EVM_CHAINS = new Set(["ethereum", "sepolia"]);
+const SUPPORTED_EVM_CHAINS = new Set(["ethereum", "polygon", "sepolia"]);
 const EMPLOYEE_LEDGER_MIRROR_TYPES = new Set(["payroll", "loan_disbursement", "emi_repayment"]);
 export const nativeTransferMaxFee = transferMaxFee;
 export const minimumGasReserveWei = minimumNativeGasReserveWei;
@@ -75,6 +81,10 @@ function buildWdk(seedPhrase: string) {
     provider: getRoundRobinRpcUrlForChain("ethereum"),
     transferMaxFee
   });
+  wdk.registerWallet("polygon", WalletManagerEvm, {
+    provider: getRoundRobinRpcUrlForChain("polygon"),
+    transferMaxFee
+  });
   wdk.registerWallet("sepolia", WalletManagerEvm, {
     provider: getRoundRobinRpcUrlForChain("sepolia"),
     transferMaxFee
@@ -111,20 +121,21 @@ async function insertTransactionRecord(params: {
   amount: string;
   txHash: string | null;
   tokenSymbol: string;
+  chain: string;
   createdAt?: Date;
 }) {
-  const { walletId, type, amount, txHash, tokenSymbol, createdAt } = params;
+  const { walletId, type, amount, txHash, tokenSymbol, chain, createdAt } = params;
   if (createdAt) {
     await db.query(
-      "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
-      [walletId, type, amount, txHash, tokenSymbol, createdAt]
+      "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, chain, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [walletId, type, amount, txHash, tokenSymbol, chain, createdAt]
     );
     return;
   }
 
   await db.query(
-    "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol) VALUES ($1, $2, $3, $4, $5)",
-    [walletId, type, amount, txHash, tokenSymbol]
+    "INSERT INTO transactions (wallet_id, type, amount, tx_hash, token_symbol, chain) VALUES ($1, $2, $3, $4, $5, $6)",
+    [walletId, type, amount, txHash, tokenSymbol, chain]
   );
 }
 
@@ -134,9 +145,10 @@ async function mirrorEmployeeLedgerEntry(params: {
   amount: string;
   txHash: string | null;
   tokenSymbol: string;
+  chain: string;
   createdAt: Date;
 }) {
-  const { recipientWalletId, type, amount, txHash, tokenSymbol, createdAt } = params;
+  const { recipientWalletId, type, amount, txHash, tokenSymbol, chain, createdAt } = params;
   if (!recipientWalletId || !EMPLOYEE_LEDGER_MIRROR_TYPES.has(type)) {
     return;
   }
@@ -147,15 +159,56 @@ async function mirrorEmployeeLedgerEntry(params: {
     amount,
     txHash,
     tokenSymbol,
+    chain,
     createdAt
   });
 }
 
-async function createWallet(ownerType: "company" | "employee", ownerId: string, client?: Queryable) {
+function getWalletTokenConfig(chain: string) {
+  const normalized = normalizeSettlementChain(chain, getDefaultSettlementChain());
+  return normalized === "ethereum" || normalized === "polygon"
+    ? getSettlementTokenConfig(normalized)
+    : null;
+}
+
+function getWalletDefaultTokenSymbol(chain: string) {
+  const tokenSymbol = getWalletTokenConfig(chain)?.symbol;
+  if (tokenSymbol) {
+    return tokenSymbol;
+  }
+  return normalizeSettlementChain(chain, "ethereum") === "polygon" ? "POL" : "ETH";
+}
+
+function getWalletGasAssetLabel(chain: string) {
+  const normalized = normalizeSettlementChain(chain, "ethereum");
+  return normalized === "ethereum" || normalized === "polygon"
+    ? getNativeGasAssetLabel(normalized)
+    : "native gas";
+}
+
+async function resolveEmployeeWalletChain(employeeId: string, client?: Queryable) {
+  const queryable = client ?? db;
+  const result = await queryable.query(
+    `SELECT company_wallet.chain AS company_chain
+     FROM employees e
+     LEFT JOIN companies c ON c.id = e.company_id
+     LEFT JOIN wallets company_wallet ON company_wallet.id = c.treasury_wallet_id
+     WHERE e.id = $1`,
+    [employeeId]
+  );
+  return normalizeChain(result.rows[0]?.company_chain ?? getDefaultSettlementChain());
+}
+
+async function createWallet(
+  ownerType: "company" | "employee",
+  ownerId: string,
+  chain: string,
+  client?: Queryable
+) {
   let seedPhrase = generateSeedPhrase();
   const wdk = buildWdk(seedPhrase);
-  const chain = normalizeChain(env.DEFAULT_CHAIN || "ethereum");
-  const account = (await wdk.getAccount(chain, 0)) as unknown as WalletAccountEvm;
+  const normalizedChain = normalizeChain(chain);
+  const account = (await wdk.getAccount(normalizedChain, 0)) as unknown as WalletAccountEvm;
   try {
     const walletAddress = await account.getAddress();
     const encryptedSeed = await encryptSecret(seedPhrase);
@@ -164,7 +217,7 @@ async function createWallet(ownerType: "company" | "employee", ownerId: string, 
 
     const insert = await queryable.query(
       "INSERT INTO wallets (owner_type, owner_id, wallet_address, wallet_id, encrypted_seed, chain) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, wallet_id, wallet_address",
-      [ownerType, ownerId, walletAddress, walletExternalId, encryptedSeed, chain]
+      [ownerType, ownerId, walletAddress, walletExternalId, encryptedSeed, normalizedChain]
     );
 
     return insert.rows[0] as {
@@ -178,8 +231,13 @@ async function createWallet(ownerType: "company" | "employee", ownerId: string, 
   }
 }
 
-export async function createTreasuryWallet(companyId: string, client?: PoolClient) {
-  const wallet = await createWallet("company", companyId, client ?? undefined);
+export async function createTreasuryWallet(companyId: string, client?: PoolClient, chain?: string) {
+  const wallet = await createWallet(
+    "company",
+    companyId,
+    normalizeChain(chain ?? getDefaultSettlementChain()),
+    client ?? undefined
+  );
   const queryable = client ?? db;
   await queryable.query(
     `UPDATE companies
@@ -192,7 +250,12 @@ export async function createTreasuryWallet(companyId: string, client?: PoolClien
 }
 
 export async function createEmployeeWallet(employeeId: string, client?: PoolClient) {
-  const wallet = await createWallet("employee", employeeId, client ?? undefined);
+  const wallet = await createWallet(
+    "employee",
+    employeeId,
+    await resolveEmployeeWalletChain(employeeId, client ?? undefined),
+    client ?? undefined
+  );
   const queryable = client ?? db;
   await queryable.query("UPDATE employees SET wallet_id = $1 WHERE id = $2", [wallet.id, employeeId]);
   return wallet;
@@ -201,21 +264,20 @@ export async function createEmployeeWallet(employeeId: string, client?: PoolClie
 export async function getWalletBalance(walletId: string) {
   const wallet = await getWalletRecord(walletId);
   const chain = requireSupportedEvmChain(wallet.chain, "native");
+  const tokenConfig = getWalletTokenConfig(chain);
   const nativeGasBalance = await withRpcFailoverForChain(
     chain,
     "wallet native gas balance",
     async (provider) => provider.getBalance(wallet.wallet_address)
   );
 
-  if (env.TREASURY_TOKEN_ADDRESS && env.TREASURY_TOKEN_SYMBOL) {
-    const token = env.TREASURY_TOKEN_SYMBOL.toLowerCase();
-    const blockchain = env.TREASURY_TOKEN_BLOCKCHAIN;
+  if (tokenConfig) {
     const indexed = await getIndexedTokenBalance({
-      blockchain,
-      token,
+      blockchain: tokenConfig.blockchain,
+      token: tokenConfig.symbol.toLowerCase(),
       address: wallet.wallet_address
     });
-    const decimals = parseInt(env.TREASURY_TOKEN_DECIMALS, 10);
+    const decimals = tokenConfig.decimals;
     const indexedAmount = indexed?.amount ?? "0";
     let amountRaw = 0n;
     if (typeof indexedAmount === "string") {
@@ -227,7 +289,7 @@ export async function getWalletBalance(walletId: string) {
       balanceWei: amountRaw.toString(),
       balanceEth: formatTokenAmount(amountRaw, decimals),
       walletAddress: wallet.wallet_address,
-      tokenSymbol: env.TREASURY_TOKEN_SYMBOL,
+      tokenSymbol: tokenConfig.symbol,
       nativeGasBalanceWei: nativeGasBalance.toString(),
       nativeGasBalanceEth: formatAmount(nativeGasBalance),
       minimumGasReserveWei: minimumNativeGasReserveWei.toString(),
@@ -241,7 +303,7 @@ export async function getWalletBalance(walletId: string) {
     balanceWei: balanceWei.toString(),
     balanceEth: formatAmount(balanceWei),
     walletAddress: wallet.wallet_address,
-    tokenSymbol: "ETH",
+    tokenSymbol: getWalletDefaultTokenSymbol(chain),
     nativeGasBalanceWei: nativeGasBalance.toString(),
     nativeGasBalanceEth: formatAmount(nativeGasBalance),
     minimumGasReserveWei: minimumNativeGasReserveWei.toString(),
@@ -315,7 +377,7 @@ export async function sendTokenTransfer(
     if (nativeBalance < requiredNativeGas) {
       throw new ApiError(
         400,
-        `Insufficient ETH for gas. Keep at least ${formatAmount(minimumNativeGasReserveWei)} ETH reserved, plus network fee headroom.`
+        `Insufficient ${getWalletGasAssetLabel(chain)} for gas. Keep at least ${formatAmount(minimumNativeGasReserveWei)} reserved, plus network fee headroom.`
       );
     }
 
@@ -332,6 +394,7 @@ export async function sendTokenTransfer(
       amount: amount.toString(),
       txHash: txResult?.hash ?? null,
       tokenSymbol,
+      chain,
       createdAt
     });
     await mirrorEmployeeLedgerEntry({
@@ -340,6 +403,7 @@ export async function sendTokenTransfer(
       amount: amount.toString(),
       txHash: txResult?.hash ?? null,
       tokenSymbol,
+      chain,
       createdAt
     });
 
@@ -362,21 +426,21 @@ export async function sendTransaction(
   type: LedgerTransactionType,
   recipientWalletId?: string | null
 ) {
-  if (env.TREASURY_TOKEN_ADDRESS && env.TREASURY_TOKEN_SYMBOL) {
-    const decimals = parseInt(env.TREASURY_TOKEN_DECIMALS, 10);
+  const wallet = await getWalletRecord(fromWalletId);
+  const tokenConfig = getWalletTokenConfig(wallet.chain);
+  if (tokenConfig) {
     return sendTokenTransfer(
       fromWalletId,
       toAddress,
-      env.TREASURY_TOKEN_ADDRESS,
+      tokenConfig.address,
       amountEth,
-      decimals,
+      tokenConfig.decimals,
       type,
-      env.TREASURY_TOKEN_SYMBOL,
+      tokenConfig.symbol,
       recipientWalletId
     );
   }
 
-  const wallet = await getWalletRecord(fromWalletId);
   const chain = requireSupportedEvmChain(wallet.chain, "native");
   const amountWei = parseAmount(amountEth);
   const maxTx = parseFloat(env.MAX_TX_AMOUNT);
@@ -423,7 +487,8 @@ export async function sendTransaction(
       type,
       amount: amountEth.toString(),
       txHash: txResult?.hash ?? null,
-      tokenSymbol: "ETH",
+      tokenSymbol: getWalletDefaultTokenSymbol(chain),
+      chain,
       createdAt
     });
     await mirrorEmployeeLedgerEntry({
@@ -431,7 +496,8 @@ export async function sendTransaction(
       type,
       amount: amountEth.toString(),
       txHash: txResult?.hash ?? null,
-      tokenSymbol: "ETH",
+      tokenSymbol: getWalletDefaultTokenSymbol(chain),
+      chain,
       createdAt
     });
 
@@ -495,7 +561,7 @@ export async function sendContractTransaction(params: {
     if (nativeBalance < requiredNativeGas) {
       throw new ApiError(
         400,
-        `Insufficient ETH for gas. Keep at least ${formatAmount(minimumNativeGasReserveWei)} ETH reserved, plus network fee headroom.`
+        `Insufficient ${getWalletGasAssetLabel(chain)} for gas. Keep at least ${formatAmount(minimumNativeGasReserveWei)} reserved, plus network fee headroom.`
       );
     }
 
@@ -524,7 +590,8 @@ export async function sendContractTransaction(params: {
         type: params.type ?? "investment",
         amount: amount.toString(),
         txHash,
-        tokenSymbol: params.tokenSymbol ?? env.TREASURY_TOKEN_SYMBOL ?? "ETH"
+        tokenSymbol: params.tokenSymbol ?? getWalletDefaultTokenSymbol(chain),
+        chain
       });
     }
 

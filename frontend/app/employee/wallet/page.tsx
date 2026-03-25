@@ -4,6 +4,11 @@ import { useEmployeeWallet, useMyTransactions } from "../../lib/hooks";
 import { withdrawEmployeeFunds } from "../../lib/api";
 import { loadEmployeeContext, type EmployeeContext } from "../../lib/companyContext";
 import EmployeeSessionPrompt from "../../components/EmployeeSessionPrompt";
+import {
+  getSettlementNativeGasLabel,
+  getSettlementNetworkLabel,
+  normalizeSettlementChain
+} from "../../lib/settlement";
 
 const Icon = ({ d, size = 16 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -64,6 +69,9 @@ export default function EmployeeWalletPage() {
 
   const lastSalary = txList.find((t) => t.type === "payroll");
   const walletAddress = walletHook.data?.wallet_address ?? null;
+  const walletChain = normalizeSettlementChain(walletHook.data?.chain, "ethereum");
+  const walletNetworkLabel = getSettlementNetworkLabel(walletChain);
+  const walletGasLabel = getSettlementNativeGasLabel(walletChain);
   const balance = parseFloat(walletHook.data?.balance ?? "0");
   const tokenSymbol = walletHook.data?.token_symbol ?? "USDT";
   const maxWithdrawable = parseFloat(walletHook.data?.max_withdrawable ?? "0");
@@ -82,7 +90,7 @@ export default function EmployeeWalletPage() {
 
   async function handleContinue() {
     if (!isEvmAddress(trimmedDest)) {
-      setActionError("Enter a valid Ethereum wallet address.");
+      setActionError("Enter a valid wallet address.");
       return;
     }
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
@@ -137,7 +145,7 @@ export default function EmployeeWalletPage() {
     <div className="stack-xl">
       <div className="page-header">
         <h1 className="page-title">My Wallet</h1>
-        <p className="page-subtitle">Personal Ethereum wallet{ctx.fullName ? ` · ${ctx.fullName}` : ""}</p>
+        <p className="page-subtitle">Personal {walletNetworkLabel} wallet{ctx.fullName ? ` · ${ctx.fullName}` : ""}</p>
       </div>
 
       {actionMessage ? (
@@ -157,7 +165,7 @@ export default function EmployeeWalletPage() {
       ) : null}
 
       <div className="wallet-card">
-        <div className="wallet-card-label">Personal Wallet · {walletHook.data?.chain ?? "ethereum"}</div>
+        <div className="wallet-card-label">Personal Wallet · {walletNetworkLabel}</div>
         {walletHook.loading ? (
           <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 32, fontWeight: 700 }}>Loading…</div>
         ) : (
@@ -236,7 +244,7 @@ export default function EmployeeWalletPage() {
                     value={dest}
                     onChange={e => setDest(e.target.value)}
                   />
-                  <span className="form-hint">Must be a valid Ethereum address.</span>
+                  <span className="form-hint">Must be a valid EVM wallet address.</span>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Amount ({tokenSymbol})</label>
@@ -248,7 +256,7 @@ export default function EmployeeWalletPage() {
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
                   />
-                  <span className="form-hint">Available to send: {fmtAmount(maxWithdrawable, tokenSymbol)}. A small amount stays reserved for network gas.</span>
+                  <span className="form-hint">Available to send: {fmtAmount(maxWithdrawable, tokenSymbol)}. A small amount stays reserved for {walletGasLabel}.</span>
                 </div>
                 <div className="alert alert-warning">
                   <span className="alert-icon"><Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} /></span>

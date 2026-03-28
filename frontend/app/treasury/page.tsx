@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import TransactionHashCell from "../components/TransactionHashCell";
 import { formatEth } from "../lib/format";
 import { useTreasuryBalance, useTransactions } from "../lib/hooks";
-import { withdrawTreasuryFunds } from "../lib/api";
+import { withdrawTreasuryFunds, type WalletWithdrawalAsset, type WalletWithdrawalOption } from "../lib/api";
 import { loadCompanyContext, type CompanyContext } from "../lib/companyContext";
 import {
   getTransactionHashFallbackLabel
@@ -72,6 +72,7 @@ export default function TreasuryPage() {
   const [step, setStep] = useState<"idle" | "enter" | "confirm">("idle");
   const [dest, setDest] = useState("");
   const [amount, setAmount] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState<WalletWithdrawalAsset>("settlement");
   const [submitting, setSubmitting] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -89,9 +90,41 @@ export default function TreasuryPage() {
   const treasuryGasSymbol = getSettlementNativeGasSymbol(treasuryChain);
   const balance = parseFloat(treasury.data?.balance ?? "0");
   const balanceSymbol = treasury.data?.token_symbol ?? "ETH";
-  const maxWithdrawable = parseFloat(treasury.data?.max_withdrawable ?? "0");
+  const withdrawalOptions = useMemo<WalletWithdrawalOption[]>(() => {
+    if (treasury.data?.withdrawal_options?.length) {
+      return treasury.data.withdrawal_options;
+    }
+    return [
+      {
+        asset: "settlement",
+        symbol: balanceSymbol,
+        balance: treasury.data?.balance ?? "0",
+        max_withdrawable: treasury.data?.max_withdrawable ?? "0"
+      }
+    ];
+  }, [
+    balanceSymbol,
+    treasury.data?.balance,
+    treasury.data?.max_withdrawable,
+    treasury.data?.withdrawal_options
+  ]);
+  const selectedOption =
+    withdrawalOptions.find((option) => option.asset === selectedAsset) ?? withdrawalOptions[0] ?? null;
+  const selectedSymbol = selectedOption?.symbol ?? balanceSymbol;
+  const selectedBalance = parseFloat(selectedOption?.balance ?? treasury.data?.balance ?? "0");
+  const maxWithdrawable = parseFloat(selectedOption?.max_withdrawable ?? treasury.data?.max_withdrawable ?? "0");
+  const hasWithdrawableOption = withdrawalOptions.some((option) => parseFloat(option.max_withdrawable ?? "0") > 0);
+  const nativeOption = withdrawalOptions.find((option) => option.asset === "native") ?? null;
   const trimmedDest = dest.trim();
   const numericAmount = parseFloat(amount);
+  useEffect(() => {
+    if (!withdrawalOptions.length) {
+      return;
+    }
+    if (!withdrawalOptions.some((option) => option.asset === selectedAsset)) {
+      setSelectedAsset(withdrawalOptions[0].asset);
+    }
+  }, [selectedAsset, withdrawalOptions]);
   const canContinue = useMemo(() => {
     return (
       Boolean(ctx?.id) &&
@@ -122,7 +155,7 @@ export default function TreasuryPage() {
       return;
     }
     if (numericAmount > maxWithdrawable) {
-      setActionError(`Amount exceeds the max withdrawable treasury balance of ${fmt(maxWithdrawable, balanceSymbol)}.`);
+      setActionError(`Amount exceeds the max withdrawable treasury balance of ${fmt(maxWithdrawable, selectedSymbol)}.`);
       return;
     }
     setActionError(null);
@@ -141,10 +174,11 @@ export default function TreasuryPage() {
       const result = await withdrawTreasuryFunds({
         companyId: ctx.id,
         destinationAddress: trimmedDest,
-        amount: numericAmount
+        amount: numericAmount,
+        asset: selectedOption?.asset
       });
       setActionMessage(
-        `Treasury withdrawal submitted. Sent ${fmt(result.amount, result.token_symbol ?? balanceSymbol)} to ${result.to.slice(0, 10)}...${result.to.slice(-6)}${result.txHash ? ` (tx ${result.txHash.slice(0, 12)}...).` : "."}`
+        `Treasury withdrawal submitted. Sent ${fmt(result.amount, result.token_symbol ?? selectedSymbol)} to ${result.to.slice(0, 10)}...${result.to.slice(-6)}${result.txHash ? ` (tx ${result.txHash.slice(0, 12)}...).` : "."}`
       );
       setDest("");
       setAmount("");
@@ -193,6 +227,9 @@ export default function TreasuryPage() {
           <div className="wallet-card-balance">{fmt(balance, balanceSymbol)}</div>
         )}
         <div className="wallet-card-sub">Live on-chain balance</div>
+        {nativeOption && nativeOption.symbol !== balanceSymbol ? (
+          <div className="wallet-card-sub">Native available: {fmt(nativeOption.balance, nativeOption.symbol)}</div>
+        ) : null}
         <div className="wallet-card-actions">
           <button className="btn btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }}
             onClick={() => setShowDeposit(true)}>
@@ -205,7 +242,7 @@ export default function TreasuryPage() {
               setActionError(null);
               setStep("enter");
             }}
-            disabled={treasury.loading || !ctx?.id || !walletAddress || maxWithdrawable <= 0}
+            disabled={treasury.loading || !ctx?.id || !walletAddress || !hasWithdrawableOption}
           >
             Withdraw
           </button>
@@ -354,6 +391,23 @@ export default function TreasuryPage() {
             <div className="modal-body">
               <div className="stack">
                 <div className="form-group">
+                  <label className="form-label">Asset</label>
+                  <select
+                    className="form-select"
+                    value={selectedOption?.asset ?? "settlement"}
+                    onChange={e => setSelectedAsset(e.target.value as WalletWithdrawalAsset)}
+                  >
+                    {withdrawalOptions.map((option) => (
+                      <option key={option.asset} value={option.asset}>
+                        {option.symbol} · Balance {fmt(option.balance, option.symbol)}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="form-hint">
+                    Choose whether to withdraw the settlement balance or native {treasuryGasLabel}.
+                  </span>
+                </div>
+                <div className="form-group">
                   <label className="form-label">Destination Wallet Address</label>
                   <input
                     className="form-input font-mono"
@@ -364,7 +418,7 @@ export default function TreasuryPage() {
                   <span className="form-hint">Must be a valid EVM-compatible recipient address.</span>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Amount ({balanceSymbol})</label>
+                  <label className="form-label">Amount ({selectedSymbol})</label>
                   <input
                     className="form-input"
                     type="number"
@@ -374,8 +428,10 @@ export default function TreasuryPage() {
                     onChange={e => setAmount(e.target.value)}
                   />
                   <span className="form-hint">
-                    Available to send: {fmt(maxWithdrawable, balanceSymbol)}.
-                    {balanceSymbol === "ETH" ? " A small amount stays reserved for network gas." : ""}
+                    Available to send: {fmt(maxWithdrawable, selectedSymbol)}.
+                    {selectedOption?.asset === "native"
+                      ? " A small amount stays reserved for network gas."
+                      : ` Network gas will still be paid in ${treasuryGasSymbol}.`}
                   </span>
                 </div>
                 <div className="alert alert-warning">
@@ -406,13 +462,14 @@ export default function TreasuryPage() {
             <div className="modal-body">
               <div className="stack">
                 {[
-                  ["Amount", fmt(numericAmount, balanceSymbol)],
-                  ["Treasury Balance", fmt(balance, balanceSymbol)],
-                  ["Max Withdrawable", fmt(maxWithdrawable, balanceSymbol)],
+                  ["Asset", selectedSymbol],
+                  ["Amount", fmt(numericAmount, selectedSymbol)],
+                  ["Treasury Balance", fmt(selectedBalance, selectedSymbol)],
+                  ["Max Withdrawable", fmt(maxWithdrawable, selectedSymbol)],
                   ["To", `${trimmedDest.slice(0, 12)}...${trimmedDest.slice(-8)}`],
                 ].map(([k, v], i) => (
                   <div key={i} className="row-between" style={{
-                    padding: "10px 0", borderBottom: i < 3 ? "1px solid var(--border-subtle)" : "none"
+                    padding: "10px 0", borderBottom: i < 4 ? "1px solid var(--border-subtle)" : "none"
                   }}>
                     <span className="text-sm text-secondary">{k}</span>
                     <span className="fw-semi font-mono text-sm">{v}</span>

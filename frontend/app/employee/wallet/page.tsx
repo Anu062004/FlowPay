@@ -1,7 +1,7 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useEmployeeWallet, useMyTransactions } from "../../lib/hooks";
-import { withdrawEmployeeFunds } from "../../lib/api";
+import { withdrawEmployeeFunds, type WalletWithdrawalAsset, type WalletWithdrawalOption } from "../../lib/api";
 import { loadEmployeeContext, type EmployeeContext } from "../../lib/companyContext";
 import EmployeeSessionPrompt from "../../components/EmployeeSessionPrompt";
 import {
@@ -49,6 +49,7 @@ export default function EmployeeWalletPage() {
   const [step, setStep] = useState<"idle" | "enter" | "confirm">("idle");
   const [dest, setDest] = useState("");
   const [amount, setAmount] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState<WalletWithdrawalAsset>("settlement");
   const [submitting, setSubmitting] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -74,7 +75,31 @@ export default function EmployeeWalletPage() {
   const walletGasLabel = getSettlementNativeGasLabel(walletChain);
   const balance = parseFloat(walletHook.data?.balance ?? "0");
   const tokenSymbol = walletHook.data?.token_symbol ?? "USDT";
-  const maxWithdrawable = parseFloat(walletHook.data?.max_withdrawable ?? "0");
+  const withdrawalOptions = useMemo<WalletWithdrawalOption[]>(() => {
+    if (walletHook.data?.withdrawal_options?.length) {
+      return walletHook.data.withdrawal_options;
+    }
+    return [
+      {
+        asset: "settlement",
+        symbol: tokenSymbol,
+        balance: walletHook.data?.balance ?? "0",
+        max_withdrawable: walletHook.data?.max_withdrawable ?? "0"
+      }
+    ];
+  }, [
+    tokenSymbol,
+    walletHook.data?.balance,
+    walletHook.data?.max_withdrawable,
+    walletHook.data?.withdrawal_options
+  ]);
+  const selectedOption =
+    withdrawalOptions.find((option) => option.asset === selectedAsset) ?? withdrawalOptions[0] ?? null;
+  const selectedSymbol = selectedOption?.symbol ?? tokenSymbol;
+  const selectedBalance = parseFloat(selectedOption?.balance ?? walletHook.data?.balance ?? "0");
+  const maxWithdrawable = parseFloat(selectedOption?.max_withdrawable ?? walletHook.data?.max_withdrawable ?? "0");
+  const hasWithdrawableOption = withdrawalOptions.some((option) => parseFloat(option.max_withdrawable ?? "0") > 0);
+  const nativeOption = withdrawalOptions.find((option) => option.asset === "native") ?? null;
 
   const trimmedDest = dest.trim();
   const numericAmount = parseFloat(amount);
@@ -88,6 +113,15 @@ export default function EmployeeWalletPage() {
     );
   }, [maxWithdrawable, numericAmount, trimmedDest, walletAddress]);
 
+  useEffect(() => {
+    if (!withdrawalOptions.length) {
+      return;
+    }
+    if (!withdrawalOptions.some((option) => option.asset === selectedAsset)) {
+      setSelectedAsset(withdrawalOptions[0].asset);
+    }
+  }, [selectedAsset, withdrawalOptions]);
+
   async function handleContinue() {
     if (!isEvmAddress(trimmedDest)) {
       setActionError("Enter a valid wallet address.");
@@ -98,7 +132,7 @@ export default function EmployeeWalletPage() {
       return;
     }
     if (numericAmount > maxWithdrawable) {
-      setActionError(`Amount exceeds your max withdrawable balance of ${fmtAmount(maxWithdrawable, tokenSymbol)}.`);
+      setActionError(`Amount exceeds your max withdrawable balance of ${fmtAmount(maxWithdrawable, selectedSymbol)}.`);
       return;
     }
     setActionError(null);
@@ -116,10 +150,11 @@ export default function EmployeeWalletPage() {
     try {
       const result = await withdrawEmployeeFunds(ctx.id, {
         destinationAddress: trimmedDest,
-        amount: numericAmount
+        amount: numericAmount,
+        asset: selectedOption?.asset
       });
       setActionMessage(
-        `Withdrawal submitted. Sent ${fmtAmount(result.amount, result.token_symbol ?? tokenSymbol)} to ${result.to.slice(0, 10)}...${result.to.slice(-6)}${result.txHash ? ` (tx ${result.txHash.slice(0, 12)}...).` : "."}`
+        `Withdrawal submitted. Sent ${fmtAmount(result.amount, result.token_symbol ?? selectedSymbol)} to ${result.to.slice(0, 10)}...${result.to.slice(-6)}${result.txHash ? ` (tx ${result.txHash.slice(0, 12)}...).` : "."}`
       );
       setDest("");
       setAmount("");
@@ -179,6 +214,9 @@ export default function EmployeeWalletPage() {
             </span>
           ) : "Wallet address unavailable"}
         </div>
+        {nativeOption && nativeOption.symbol !== tokenSymbol ? (
+          <div className="wallet-card-sub">Native available: {fmtAmount(nativeOption.balance, nativeOption.symbol)}</div>
+        ) : null}
         <div className="wallet-card-actions">
           <button
             className="btn btn-accent"
@@ -187,7 +225,7 @@ export default function EmployeeWalletPage() {
               setActionError(null);
               setStep("enter");
             }}
-            disabled={walletHook.loading || !walletAddress || maxWithdrawable <= 0}
+            disabled={walletHook.loading || !walletAddress || !hasWithdrawableOption}
           >
             Withdraw
           </button>
@@ -237,6 +275,23 @@ export default function EmployeeWalletPage() {
             <div className="modal-body">
               <div className="stack">
                 <div className="form-group">
+                  <label className="form-label">Asset</label>
+                  <select
+                    className="form-select"
+                    value={selectedOption?.asset ?? "settlement"}
+                    onChange={e => setSelectedAsset(e.target.value as WalletWithdrawalAsset)}
+                  >
+                    {withdrawalOptions.map((option) => (
+                      <option key={option.asset} value={option.asset}>
+                        {option.symbol} · Balance {fmtAmount(option.balance, option.symbol)}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="form-hint">
+                    Choose whether to withdraw your settlement balance or native {walletGasLabel}.
+                  </span>
+                </div>
+                <div className="form-group">
                   <label className="form-label">Destination Wallet Address</label>
                   <input
                     className="form-input font-mono"
@@ -247,7 +302,7 @@ export default function EmployeeWalletPage() {
                   <span className="form-hint">Must be a valid EVM wallet address.</span>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Amount ({tokenSymbol})</label>
+                  <label className="form-label">Amount ({selectedSymbol})</label>
                   <input
                     className="form-input"
                     type="number"
@@ -256,7 +311,12 @@ export default function EmployeeWalletPage() {
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
                   />
-                  <span className="form-hint">Available to send: {fmtAmount(maxWithdrawable, tokenSymbol)}. A small amount stays reserved for {walletGasLabel}.</span>
+                  <span className="form-hint">
+                    Available to send: {fmtAmount(maxWithdrawable, selectedSymbol)}.
+                    {selectedOption?.asset === "native"
+                      ? ` A small amount stays reserved for ${walletGasLabel}.`
+                      : ` Network gas will still be paid in ${walletGasLabel}.`}
+                  </span>
                 </div>
                 <div className="alert alert-warning">
                   <span className="alert-icon"><Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} /></span>
@@ -286,13 +346,14 @@ export default function EmployeeWalletPage() {
             <div className="modal-body">
               <div className="stack">
                 {[
-                  ["Amount", fmtAmount(numericAmount, tokenSymbol)],
-                  ["Wallet Balance", fmtAmount(balance, tokenSymbol)],
-                  ["Max Withdrawable", fmtAmount(maxWithdrawable, tokenSymbol)],
+                  ["Asset", selectedSymbol],
+                  ["Amount", fmtAmount(numericAmount, selectedSymbol)],
+                  ["Wallet Balance", fmtAmount(selectedBalance, selectedSymbol)],
+                  ["Max Withdrawable", fmtAmount(maxWithdrawable, selectedSymbol)],
                   ["To", `${trimmedDest.slice(0, 12)}...${trimmedDest.slice(-8)}`],
                 ].map(([k, v], i) => (
                   <div key={i} className="row-between" style={{
-                    padding: "10px 0", borderBottom: i < 3 ? "1px solid var(--border-subtle)" : "none"
+                    padding: "10px 0", borderBottom: i < 4 ? "1px solid var(--border-subtle)" : "none"
                   }}>
                     <span className="text-sm text-secondary">{k}</span>
                     <span className="fw-semi font-mono text-sm">{v}</span>

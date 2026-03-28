@@ -122,6 +122,10 @@ export type EmployeeWallet = {
   max_withdrawable: string;
   token_symbol: string;
   chain: string;
+  native_gas_balance?: string;
+  native_gas_reserve?: string;
+  gas_reserve_satisfied?: boolean;
+  withdrawal_options?: WalletWithdrawalOption[];
 };
 
 export type EmployeeAddResult = {
@@ -141,6 +145,15 @@ export type WithdrawalResult = {
   from: string;
   to: string;
   token_symbol: string;
+};
+
+export type WalletWithdrawalAsset = "settlement" | "native";
+
+export type WalletWithdrawalOption = {
+  asset: WalletWithdrawalAsset;
+  symbol: string;
+  balance: string;
+  max_withdrawable: string;
 };
 
 export type LendingSummary = {
@@ -167,6 +180,10 @@ export type TreasuryBalance = {
   chain?: string;
   wallet_address?: string;
   token_symbol?: string;
+  native_gas_balance?: string;
+  native_gas_reserve?: string;
+  gas_reserve_satisfied?: boolean;
+  withdrawal_options?: WalletWithdrawalOption[];
 };
 
 export type TreasuryAllocationSnapshot = {
@@ -176,6 +193,16 @@ export type TreasuryAllocationSnapshot = {
   investment_pool: string;
   main_reserve: string;
   created_at: string | null;
+  total_allocated?: string;
+  live_balance?: string;
+  is_stale?: boolean;
+  projected?: {
+    payroll_reserve: string;
+    lending_pool: string;
+    investment_pool: string;
+    main_reserve: string;
+    total: string;
+  };
   allocation: {
     payroll_reserve_pct: number;
     lending_pool_pct: number;
@@ -364,6 +391,7 @@ export const withdrawTreasuryFunds = (body: {
   companyId: string;
   destinationAddress: string;
   amount: number;
+  asset?: WalletWithdrawalAsset;
 }) =>
   apiFetch<WithdrawalResult>("/treasury/withdraw", {
     method: "POST",
@@ -434,6 +462,7 @@ export const resendEmployeeInvite = (employeeId: string) =>
 export const withdrawEmployeeFunds = (employeeId: string, body: {
   destinationAddress: string;
   amount: number;
+  asset?: WalletWithdrawalAsset;
 }) =>
   apiFetch<WithdrawalResult>(`/employees/${employeeId}/withdraw`, {
     method: "POST",

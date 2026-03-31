@@ -120,11 +120,10 @@ export function HeroSection() {
               FlowPay (click to see the demo video)
             </div>
            
-            <Link href="youtu.be/8C7_VqVijEs?si=YLXNdKIV42DgtmP2">
-            <div className="word font-display text-2xl lg:text-2xl font-bold text-[#111A12] mb-12" href="youtu.be/8C7_VqVijEs?si=YLXNdKIV42DgtmP2">
-              click to see demo video 
-            </div>
-            </Link>
+            <a href="youtu.be/8C7_VqVijEs?si=YLXNdKIV42DgtmP2">
+            <button>DEMO VIDEO</button> 
+            
+            </a>
 
             {/* Eyebrow */}
             <span className="word font-mono text-xs tracking-[0.18em] text-[#476640] mb-4">

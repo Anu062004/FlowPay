@@ -5,7 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { heroConfig } from '../config';
 import { ArrowRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import React from '/react';
+import React from 'react';
 
 gsap.registerPlugin(ScrollTrigger);
 

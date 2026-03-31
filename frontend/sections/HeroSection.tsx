@@ -121,7 +121,7 @@ export function HeroSection() {
               FlowPay (click to see the demo video)
             </div>
            
-            <a href="youtu.be/8C7_VqVijEs?si=YLXNdKIV42DgtmP2" className="my-link-styles">
+            <a href="./youtu.be/8C7_VqVijEs?si=YLXNdKIV42DgtmP2" className="my-link-styles">
               <div className="my-div-content">
               <button>DEMO VIDEO</button> 
               </div>

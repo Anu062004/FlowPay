@@ -116,7 +116,11 @@ export function HeroSection() {
           >
             {/* Logo */}
             <div className="word font-display text-4xl lg:text-5xl font-bold text-[#111A12] mb-12">
-              FlowPay
+              FlowPay 
+            </div>
+
+             <div className="word font-display text-2xl lg:text-2xl font-bold text-[#111A12] mb-12" href="youtu.be/8C7_VqVijEs?si=YLXNdKIV42DgtmP2">
+              click to see demo video 
             </div>
 
             {/* Eyebrow */}

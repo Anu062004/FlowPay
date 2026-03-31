@@ -5,6 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { heroConfig } from '../config';
 import { ArrowRight, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
+import React from '/react';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -120,9 +121,10 @@ export function HeroSection() {
               FlowPay (click to see the demo video)
             </div>
            
-            <a href="youtu.be/8C7_VqVijEs?si=YLXNdKIV42DgtmP2">
-            <button>DEMO VIDEO</button> 
-            
+            <a href="youtu.be/8C7_VqVijEs?si=YLXNdKIV42DgtmP2" classname="my-link-styles">
+              <div classname="my-div-content">
+              <button>DEMO VIDEO</button> 
+              </div>
             </a>
 
             {/* Eyebrow */}

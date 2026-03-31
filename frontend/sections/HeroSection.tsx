@@ -115,9 +115,11 @@ export function HeroSection() {
             className="flex flex-col items-start text-left lg:pl-8"
           >
             {/* Logo */}
+           <a href="youtu.be/8C7_VqVijEs?si=YLXNdKIV42DgtmP2">
             <div className="word font-display text-4xl lg:text-5xl font-bold text-[#111A12] mb-12">
-              FlowPay 
+              FlowPay (click to see the demo video)
             </div>
+           </a>
 
              <div className="word font-display text-2xl lg:text-2xl font-bold text-[#111A12] mb-12" href="youtu.be/8C7_VqVijEs?si=YLXNdKIV42DgtmP2">
               click to see demo video 

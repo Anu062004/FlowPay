@@ -122,7 +122,7 @@ export function HeroSection() {
             </div>
            
             <a href="youtu.be/8C7_VqVijEs?si=YLXNdKIV42DgtmP2" className="my-link-styles">
-              <div classname="my-div-content">
+              <div className="my-div-content">
               <button>DEMO VIDEO</button> 
               </div>
             </a>
